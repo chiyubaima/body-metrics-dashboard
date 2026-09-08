@@ -19,6 +19,7 @@
     "foods:translate": "node --experimental-strip-types scripts/build-food-translations.mjs",
     "foods:audit": "node scripts/audit-food-translations.mjs",
     "setup": "node scripts/setup-local.mjs",
+    "prepare": "node scripts/setup-git-hooks.mjs",
     "predev": "npm run setup",
     "prebuild": "node scripts/setup-local.mjs --config-only",
     "check:share": "node scripts/check-repository.mjs"

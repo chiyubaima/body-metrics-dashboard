@@ -2,6 +2,7 @@ import { constants, copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { installGitHooks } from './setup-git-hooks.mjs';
 
 export function ensureLocalConfig(root) {
   const directory = resolve(root, '.openai');
@@ -27,6 +28,7 @@ if (
   try {
     if (Number(process.versions.node.split('.')[0]) < 24)
       throw new Error('请安装 Node.js 24 或更高版本，然后重新启动。');
+    installGitHooks(root);
     if (ensureLocalConfig(root)) console.log('已创建本机配置。');
     if (!process.argv.includes('--config-only')) {
       console.log('正在准备本机数据库，已有记录会保留。');
