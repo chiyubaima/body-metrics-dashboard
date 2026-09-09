@@ -26,7 +26,6 @@ import {
   today,
   trainingDraft,
   weekDates,
-  shiftDate,
 } from '@/lib/model';
 import type {
   Body,
@@ -349,13 +348,7 @@ export function BodyPanel(props: PanelProps & { height: number | null }) {
       >
         {(
           [
-            [
-              'weight',
-              '7天晨重均值',
-              avg.value,
-              'kg',
-              `${compactDate(shiftDate(date, -6))}–${compactDate(date)}`,
-            ],
+            ['weight', '7天晨重均值', avg.value, 'kg', ''],
             [
               'waist',
               '最近腰围',
@@ -375,7 +368,7 @@ export function BodyPanel(props: PanelProps & { height: number | null }) {
               'BMI',
               bodyMassIndex(avg.value, props.height),
               '',
-              props.height ? '按晨重均值' : '请在资料填身高',
+              props.height ? '' : '请在资料填身高',
             ],
           ] as const
         ).map(([key, label, value, unit, detail]) => (

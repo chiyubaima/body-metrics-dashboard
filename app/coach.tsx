@@ -1,12 +1,18 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import {
-  ArrowUpRight,
   Bell,
   BellOff,
   Check,
   ChevronLeft,
   Bookmark,
+  CalendarCheck,
+  Clock3,
+  Heart,
+  MessageCircle,
+  ShieldCheck,
+  Target,
+  Zap,
   Pencil,
   Plus,
   RotateCcw,
@@ -21,20 +27,22 @@ import {
   SheetDescription,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogContent,
   AlertDialogTitle,
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
-import { Field, Picker, Choices } from './form-controls';
+import { Field, Picker } from './form-controls';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   commitmentLabels,
   memoryLabels,
   quietNow,
   shanghaiDateTime,
   localDateTime,
+  coachOpeningKey,
+  coachOpeningHours,
 } from '@/lib/coach';
 import { today } from '@/lib/model';
 import type {
@@ -48,7 +56,11 @@ import type {
 import type { Snapshot } from '@/lib/model';
 import { CoachConversation } from './coach-conversation';
 import type { CoachScrollPosition } from './coach-conversation';
-import { captainActivity, mergeCoachTurns } from '@/lib/coach-chat';
+import {
+  captainActivity,
+  coachEntryPreview,
+  mergeCoachTurns,
+} from '@/lib/coach-chat';
 import { requestCoachStream } from '@/lib/coach-stream';
 import { CaptainAvatar } from './captain-avatar';
 import './coach.css';
@@ -109,6 +121,7 @@ export function Coach({
   blocked: boolean;
   selectDate: (date: string) => void;
 }) {
+  const toneId = useId();
   const [state, setState] = useState<CoachState | null>(null),
     [open, setOpen] = useState(false);
   const [tab, setTab] = useState('chat'),
@@ -129,6 +142,12 @@ export function Coach({
     openingAttempts = useRef(new Set<string>());
   const scrollPosition = useRef<CoachScrollPosition>({ top: 0, pinned: true });
   const entry = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const previousTab = useRef(tab);
+  useEffect(() => {
+    if (open && previousTab.current !== tab) heading.current?.focus();
+    previousTab.current = tab;
+  }, [open, tab]);
   const readPosition = useCallback(() => scrollPosition.current, []);
   const savePosition = useCallback((value: CoachScrollPosition) => {
     scrollPosition.current = value;
@@ -202,6 +221,10 @@ export function Coach({
       const optimistic: CoachTurn = {
         id: request.id,
         kind,
+        dayKey:
+          kind === 'opening'
+            ? (retry?.dayKey ?? coachOpeningKey(new Date(now)))
+            : null,
         date: selected,
         userText: message,
         reply: null,
@@ -287,9 +310,10 @@ export function Coach({
       document.visibilityState !== 'visible'
     )
       return;
-    const key = today();
+    const key = coachOpeningKey(new Date(state.now));
     if (
-      state.opening ||
+      !key ||
+      state.opening?.dayKey === key ||
       openingAttempts.current.has(key) ||
       working.current ||
       state.turns.some((t) => t.status === 'pending')
@@ -378,8 +402,9 @@ export function Coach({
         ? `还记得我们的约定吗？${due[0].title}`
         : quiet
           ? '今天安静陪着你，想聊时随时来。'
-          : (allTurns.find(
-              (turn) => turn.kind === 'opening' && turn.date === today(),
+          : (allTurns.findLast(
+              (turn) =>
+                turn.kind === 'opening' && turn.date === today() && turn.reply,
             )?.reply ??
             state?.opening?.reply ??
             (state?.active
@@ -411,9 +436,8 @@ export function Coach({
           />
           <span className="coach-strip-copy">
             <b>Captain</b>
-            <span className="coach-entry-bubble">{headline}</span>
-            <span className="coach-invitation">
-              聊两句 <ArrowUpRight size={15} />
+            <span className="coach-entry-bubble">
+              <span>{coachEntryPreview(headline)}</span>
             </span>
           </span>
         </button>
@@ -462,7 +486,7 @@ export function Coach({
               <CaptainAvatar className="captain-contact-avatar" />
             )}
             <div className="coach-contact">
-              <SheetTitle>
+              <SheetTitle ref={heading} tabIndex={-1}>
                 {tab === 'chat'
                   ? 'Captain'
                   : tab === 'memory'
@@ -500,23 +524,7 @@ export function Coach({
               <X size={21} />
             </SheetClose>
           </header>
-          <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(String(v))}
-            className="coach-tabs"
-          >
-            <TabsList
-              className="coach-tab-list"
-              hidden={tab === 'chat'}
-              aria-label="Captain 详情"
-            >
-              <TabsTrigger value="chat">聊聊</TabsTrigger>
-              <TabsTrigger value="memory">记忆与约定</TabsTrigger>
-              <TabsTrigger value="settings">
-                <Settings2 size={16} />
-                设置
-              </TabsTrigger>
-            </TabsList>
+          <div className="coach-pages">
             {error && (
               <div className="coach-error" role="alert">
                 <span>{error}</span>
@@ -538,7 +546,11 @@ export function Coach({
                 {feedback}
               </output>
             )}
-            <TabsContent value="chat" className="coach-chat-panel" keepMounted>
+            <section
+              aria-label="与 Captain 聊天"
+              hidden={tab !== 'chat'}
+              className="coach-chat-panel"
+            >
               <CoachConversation
                 avatar={
                   <CaptainAvatar
@@ -573,8 +585,13 @@ export function Coach({
                 savePosition={savePosition}
                 mutate={mutate}
               />
-            </TabsContent>
-            <TabsContent value="memory" className="coach-management">
+            </section>
+            <section
+              aria-label="记忆与约定"
+              hidden={tab !== 'memory'}
+              className="coach-management"
+              data-annotate="coach.memory.page"
+            >
               {editor ? (
                 <CoachEditor
                   key={editor.type + (editor.item?.id ?? 'new')}
@@ -595,216 +612,330 @@ export function Coach({
                 />
               ) : (
                 <>
-                  <div className="coach-section-heading">
-                    <h3>
-                      我们的约定 <span>{pending.length}</span>
-                    </h3>
-                    <button
-                      className="text-button"
-                      onClick={() => edit({ type: 'commitment' })}
-                    >
-                      <Plus size={16} />
-                      加个约定
-                    </button>
+                  <div className="coach-page-intro">
+                    <span className="coach-overline">和 Captain 一起</span>
+                    <h2>一起记住，一起做到。</h2>
+                    <p>重要的事留在这里，小小的约定慢慢完成。</p>
                   </div>
-                  <p className="coach-muted">
-                    页面打开时提醒；关闭期间的约定，下次打开继续。所有时间按北京时间。
-                  </p>
-                  {!pending.length && (
-                    <p className="coach-empty-line">
-                      暂时没有待办约定。先从一件小事开始。
-                    </p>
-                  )}
-                  {pending.map((c) => (
-                    <div className="coach-saved" key={c.id}>
-                      <div>
-                        <b>{c.title}</b>
-                        <span>
-                          {shanghaiDateTime(c.dueAt)} ·{' '}
-                          {commitmentLabels[c.kind]}
-                        </span>
-                      </div>
-                      <div className="coach-actions">
+                  <section
+                    className="coach-detail-card"
+                    aria-label="我们的约定"
+                  >
+                    <div className="coach-section-heading">
+                      <span className="coach-section-icon">
+                        <CalendarCheck size={22} />
+                      </span>
+                      <h3>
+                        我们的约定 <span>{pending.length}</span>
+                      </h3>
+                      {!!pending.length && (
                         <button
                           className="text-button"
-                          onClick={() => edit({ type: 'commitment', item: c })}
+                          onClick={() => edit({ type: 'commitment' })}
                         >
-                          <Pencil size={14} />
-                          调整
+                          <Plus size={16} />
+                          加个约定
                         </button>
-                        <button
-                          className="text-button"
-                          disabled={saving}
-                          onClick={() =>
-                            void mutate(
-                              '/api/coach/commitments',
-                              { id: c.id, status: 'completed' },
-                              'PATCH',
-                              '约定已完成',
-                            )
-                          }
-                        >
-                          完成
-                        </button>
-                        <button
-                          className="text-button"
-                          disabled={saving}
-                          onClick={() =>
-                            void mutate(
-                              '/api/coach/commitments',
-                              { id: c.id, status: 'cancelled' },
-                              'PATCH',
-                              '约定已取消',
-                            )
-                          }
-                        >
-                          取消约定
-                        </button>
-                      </div>
+                      )}
                     </div>
-                  ))}
-                  {!!ended.length && (
-                    <details className="coach-ended">
-                      <summary>已结束的约定 · {ended.length}</summary>
-                      {ended.map((c) => (
-                        <div className="coach-saved" key={c.id}>
+                    {!pending.length && (
+                      <div className="coach-empty-card">
+                        <span className="coach-empty-symbol">
+                          <CalendarCheck size={30} />
+                        </span>
+                        <b>从一件小事开始</b>
+                        <p>约好下一步，到时候 Captain 陪你接着做。</p>
+                        <button
+                          className="primary"
+                          onClick={() => edit({ type: 'commitment' })}
+                        >
+                          <Plus size={16} />
+                          加个约定
+                        </button>
+                      </div>
+                    )}
+                    {pending.map((c) => (
+                      <div className="coach-saved coach-commitment" key={c.id}>
+                        <time className="coach-date-tile" dateTime={c.dueAt}>
+                          <small>
+                            {Number(localDateTime(c.dueAt).slice(5, 7))}月
+                          </small>
+                          <strong>
+                            {Number(localDateTime(c.dueAt).slice(8, 10))}
+                          </strong>
+                        </time>
+                        <div className="coach-saved-body">
                           <div>
                             <b>{c.title}</b>
                             <span>
                               {shanghaiDateTime(c.dueAt)} ·{' '}
-                              {c.status === 'cancelled'
-                                ? '已取消'
-                                : c.completion === 'record'
-                                  ? '已由记录确认完成'
-                                  : '你已确认完成'}
+                              {commitmentLabels[c.kind]}
                             </span>
                           </div>
+                          <div className="coach-actions">
+                            <button
+                              className="text-button"
+                              onClick={() =>
+                                edit({ type: 'commitment', item: c })
+                              }
+                            >
+                              <Pencil size={14} />
+                              调整
+                            </button>
+                            <button
+                              className="coach-complete-button"
+                              disabled={saving}
+                              onClick={() =>
+                                void mutate(
+                                  '/api/coach/commitments',
+                                  { id: c.id, status: 'completed' },
+                                  'PATCH',
+                                  '约定已完成',
+                                )
+                              }
+                            >
+                              <Check size={14} />
+                              完成
+                            </button>
+                            <button
+                              className="text-button"
+                              disabled={saving}
+                              onClick={() =>
+                                void mutate(
+                                  '/api/coach/commitments',
+                                  { id: c.id, status: 'cancelled' },
+                                  'PATCH',
+                                  '约定已取消',
+                                )
+                              }
+                            >
+                              取消约定
+                            </button>
+                          </div>
                         </div>
-                      ))}
-                    </details>
-                  )}
-                  <div className="coach-section-heading memory-heading">
-                    <h3>
-                      记得你的事 <span>{state?.memories.length ?? 0}</span>
-                    </h3>
-                    <button
-                      className="text-button"
-                      onClick={() => edit({ type: 'memory' })}
-                    >
-                      <Plus size={16} />
-                      添一条
-                    </button>
-                  </div>
-                  {!state?.memories.length && (
-                    <p className="coach-empty-line">
-                      偏好、目标、日常安排。你愿意让我记住的事，会留在这里。
+                      </div>
+                    ))}
+                    {!!ended.length && (
+                      <details className="coach-ended">
+                        <summary>已结束的约定 · {ended.length}</summary>
+                        {ended.map((c) => (
+                          <div className="coach-saved" key={c.id}>
+                            <div>
+                              <b>{c.title}</b>
+                              <span>
+                                {shanghaiDateTime(c.dueAt)} ·{' '}
+                                {c.status === 'cancelled'
+                                  ? '已取消'
+                                  : c.completion === 'record'
+                                    ? '已由记录确认完成'
+                                    : '你已确认完成'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </details>
+                    )}
+                    <p className="coach-card-footnote">
+                      <Clock3 size={13} />
+                      北京时间 · 页面打开时提醒，返回后继续跟进。
                     </p>
-                  )}
-                  {state?.memories.map((m) => (
-                    <div className="coach-saved" key={m.id}>
-                      <div>
-                        <span>{memoryLabels[m.category]}</span>
-                        <p>{m.content}</p>
-                        <details>
-                          <summary>记忆来源</summary>
-                          <p>{m.source}</p>
-                        </details>
-                      </div>
-                      <div className="coach-actions">
+                  </section>
+                  <section
+                    className="coach-detail-card"
+                    aria-label="记得你的事"
+                  >
+                    <div className="coach-section-heading">
+                      <span className="coach-section-icon">
+                        <Bookmark size={22} />
+                      </span>
+                      <h3>
+                        记得你的事 <span>{state?.memories.length ?? 0}</span>
+                      </h3>
+                      {!!state?.memories.length && (
                         <button
                           className="text-button"
-                          onClick={() => edit({ type: 'memory', item: m })}
+                          onClick={() => edit({ type: 'memory' })}
                         >
-                          <Pencil size={14} />
-                          修改
+                          <Plus size={16} />
+                          添一条
                         </button>
-                        <button
-                          className="text-button"
-                          onClick={() => setRemoving(m)}
-                        >
-                          <Trash2 size={14} />
-                          忘掉
-                        </button>
-                      </div>
+                      )}
                     </div>
-                  ))}
+                    {!state?.memories.length && (
+                      <div className="coach-empty-card">
+                        <span className="coach-empty-symbol">
+                          <Bookmark size={30} />
+                        </span>
+                        <b>越了解你，越懂怎么陪你</b>
+                        <p>你的偏好、目标和日常安排，都可以告诉 Captain。</p>
+                        <div className="coach-memory-kinds">
+                          <span>偏好</span>
+                          <span>目标</span>
+                          <span>日常安排</span>
+                        </div>
+                        <button
+                          className="secondary"
+                          onClick={() => edit({ type: 'memory' })}
+                        >
+                          <Plus size={16} />
+                          记住一件事
+                        </button>
+                      </div>
+                    )}
+                    {state?.memories.map((m) => (
+                      <div className="coach-saved" key={m.id}>
+                        <div>
+                          <span className="coach-memory-tag">
+                            {m.category === 'preference' ? (
+                              <Heart size={13} />
+                            ) : m.category === 'goal' ? (
+                              <Target size={13} />
+                            ) : (
+                              <Clock3 size={13} />
+                            )}
+                            {memoryLabels[m.category]}
+                          </span>
+                          <p>{m.content}</p>
+                          <details>
+                            <summary>记忆来源</summary>
+                            <p>{m.source}</p>
+                          </details>
+                        </div>
+                        <div className="coach-actions">
+                          <button
+                            className="text-button"
+                            onClick={() => edit({ type: 'memory', item: m })}
+                          >
+                            <Pencil size={14} />
+                            修改
+                          </button>
+                          <button
+                            className="text-button"
+                            onClick={() => setRemoving(m)}
+                          >
+                            <Trash2 size={14} />
+                            忘掉
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
                 </>
               )}
-            </TabsContent>
-            <TabsContent value="settings" className="coach-management">
-              <div className="coach-connection">
-                <span className="coach-overline">模型连接</span>
-                <h3>{state?.connection.destination || '正在读取连接状态…'}</h3>
-                <p>{state?.connection.model || '尚未选择模型'}</p>
-                <span className="coach-connection-status">
-                  {state?.active
-                    ? '已启用'
-                    : state?.connection.configured
-                      ? '已发现模型连接，等待启用'
-                      : '尚未连接'}
-                </span>
-              </div>
-              <p className="coach-setting-copy">
-                启用后，Captain
-                会将你的近期身体、饮食和训练摘要、所选日明细、个人资料、近期聊天以及已保存的记忆与约定发送到上方模型服务，用于回应你。
-              </p>
-              <p className="coach-setting-copy">
-                聊天与记忆保存在本机账本。通过 Codex
-                使用模型仍需联网，并使用当前账户的 Codex 额度。
-              </p>
-              {state?.connection.configured ? (
-                <button
-                  className={state.active ? 'secondary' : 'primary'}
-                  disabled={saving}
-                  onClick={async () => {
-                    const enable = !state.active;
-                    const ok = await mutate(
-                      '/api/coach',
-                      {
-                        enabled: enable,
-                        consentConfig: state.connection.fingerprint,
-                      },
-                      'PATCH',
-                      enable
-                        ? 'Captain 已启用，可以开始聊了'
-                        : 'Captain 已停用',
-                    );
-                    if (ok && enable) setTab('chat');
-                  }}
-                >
-                  {state.active ? '停用 AI 聊天' : '启用 Captain，开始聊聊'}
-                </button>
-              ) : (
-                <div className="coach-setup">
-                  <p>
-                    本机实验：安装依赖后，在终端运行{' '}
-                    <code>npx codex login</code> 登录 ChatGPT，再重启看板。
-                  </p>
-                  <p>
-                    已有 API 服务：运行 <code>npm run coach:setup</code>{' '}
-                    配置，密钥只保存到本机服务端。
-                  </p>
-                  <button
-                    className="text-button"
-                    onClick={() =>
-                      void refresh().catch((e) => setError(e.message))
-                    }
+            </section>
+            <section
+              aria-label="Captain 设置"
+              hidden={tab !== 'settings'}
+              className="coach-management"
+              data-annotate="coach.settings.page"
+            >
+              <div className="coach-connection-hero">
+                <div>
+                  <span
+                    className={`coach-connection-status ${state?.active ? 'is-active' : ''}`}
                   >
-                    <RotateCcw size={15} />
-                    重新检查连接
-                  </button>
+                    {state?.active
+                      ? '已启用'
+                      : state?.connection.configured
+                        ? '等待启用'
+                        : '尚未连接'}
+                  </span>
+                  <h2>
+                    {state?.active ? 'Captain 在这里。' : '按你的节奏，陪你。'}
+                  </h2>
+                  <p>
+                    {state?.active
+                      ? '聊聊近况，也一起照顾好自己。'
+                      : '连上模型，就可以开始聊聊。'}
+                  </p>
                 </div>
-              )}
-              <div className="coach-setting-block">
-                <h3>怎么陪你</h3>
-                <Choices
-                  label="Captain 语气"
+                <CaptainAvatar className="captain-settings-avatar" />
+              </div>
+              <section
+                className="coach-detail-card coach-connection"
+                aria-label="模型连接与数据"
+              >
+                <div className="coach-section-heading">
+                  <span className="coach-section-icon">
+                    <ShieldCheck size={22} />
+                  </span>
+                  <h3>连接与数据</h3>
+                </div>
+                <div className="coach-model-row">
+                  <span>模型服务</span>
+                  <strong>
+                    {state?.connection.destination || '正在读取…'}
+                  </strong>
+                </div>
+                <div className="coach-model-row">
+                  <span>当前模型</span>
+                  <code>{state?.connection.model || '尚未选择'}</code>
+                </div>
+                <p className="coach-setting-copy">
+                  启用后，Captain
+                  会将你的近期身体、饮食和训练摘要、所选日明细、个人资料、近期聊天以及已保存的记忆与约定发送到上方模型服务，用于回应你。
+                </p>
+                <p className="coach-setting-copy">
+                  聊天与记忆保存在本机账本。调用模型需要联网；通过 Codex
+                  连接时会使用当前账户的 Codex 额度。
+                </p>
+                {state?.connection.configured ? (
+                  <button
+                    className={state.active ? 'secondary' : 'primary'}
+                    disabled={saving}
+                    onClick={async () => {
+                      const enable = !state.active;
+                      const ok = await mutate(
+                        '/api/coach',
+                        {
+                          enabled: enable,
+                          consentConfig: state.connection.fingerprint,
+                        },
+                        'PATCH',
+                        enable
+                          ? 'Captain 已启用，可以开始聊了'
+                          : 'Captain 已停用',
+                      );
+                      if (ok && enable) setTab('chat');
+                    }}
+                  >
+                    {state.active ? '停用 AI 聊天' : '启用 Captain，开始聊聊'}
+                  </button>
+                ) : (
+                  <div className="coach-setup">
+                    <p>
+                      本机实验：安装依赖后，在终端运行{' '}
+                      <code>npx codex login</code> 登录 ChatGPT，再重启看板。
+                    </p>
+                    <p>
+                      已有 API 服务：运行 <code>npm run coach:setup</code>{' '}
+                      配置，密钥只保存到本机服务端。
+                    </p>
+                    <button
+                      className="text-button"
+                      onClick={() =>
+                        void refresh().catch((e) => setError(e.message))
+                      }
+                    >
+                      <RotateCcw size={15} />
+                      重新检查连接
+                    </button>
+                  </div>
+                )}
+              </section>
+              <section className="coach-detail-card" aria-label="怎么陪你">
+                <div className="coach-section-heading">
+                  <span className="coach-section-icon">
+                    <MessageCircle size={22} />
+                  </span>
+                  <h3>怎么陪你</h3>
+                </div>
+                <RadioGroup
+                  aria-label="Captain 语气"
+                  className="coach-tone-options"
+                  disabled={saving}
                   value={state?.settings.tone ?? 'direct'}
-                  options={[
-                    ['direct', '直球一点，有点俏皮'],
-                    ['gentle', '温和一点，先听我说'],
-                  ]}
-                  onChange={(tone) => {
+                  onValueChange={(tone) => {
                     if (!saving)
                       void mutate(
                         '/api/coach',
@@ -813,12 +944,72 @@ export function Coach({
                         'Captain 语气已调整',
                       );
                   }}
-                />
-              </div>
-              <div className="coach-setting-block">
-                <h3>主动提醒</h3>
+                >
+                  <label
+                    htmlFor={`${toneId}-direct`}
+                    className={
+                      state?.settings.tone !== 'gentle' ? 'is-selected' : ''
+                    }
+                  >
+                    <Zap size={23} />
+                    <b>直球一点</b>
+                    <span>有点俏皮，陪你迈出下一步。</span>
+                    <RadioGroupItem id={`${toneId}-direct`} value="direct" />
+                  </label>
+                  <label
+                    htmlFor={`${toneId}-gentle`}
+                    className={
+                      state?.settings.tone === 'gentle' ? 'is-selected' : ''
+                    }
+                  >
+                    <Heart size={23} />
+                    <b>温和一点</b>
+                    <span>先听你说，慢慢找到节奏。</span>
+                    <RadioGroupItem id={`${toneId}-gentle`} value="gentle" />
+                  </label>
+                </RadioGroup>
+              </section>
+              <section
+                className="coach-detail-card"
+                aria-label="主动问候与提醒"
+              >
+                <div className="coach-section-heading">
+                  <span className="coach-section-icon">
+                    <Bell size={22} />
+                  </span>
+                  <h3>一天里的几声问候</h3>
+                </div>
                 <p className="coach-setting-copy">
-                  每日一次开场，跟进已经保存的约定。你可以随时主动聊天。
+                  每隔4小时，结合你的最新记录聊一句，也跟进已经保存的约定。
+                </p>
+                <div className="coach-schedule" aria-label="北京时间问候时段">
+                  {coachOpeningHours.map((hour) => {
+                    const current =
+                      state?.active &&
+                      !quiet &&
+                      coachOpeningKey(new Date(state.now))?.includes(
+                        `T${hour}:`,
+                      );
+                    return (
+                      <div key={hour} className={current ? 'is-current' : ''}>
+                        <i aria-hidden="true" />
+                        <b>{hour}:00</b>
+                        <span>
+                          {hour === 10
+                            ? '上午'
+                            : hour === 14
+                              ? '午后'
+                              : hour === 18
+                                ? '傍晚'
+                                : '晚间'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="coach-card-footnote">
+                  <Clock3 size={13} />
+                  北京时间 · 页面打开时更新，返回后补最近时段。
                 </p>
                 <button
                   className="secondary"
@@ -835,8 +1026,8 @@ export function Coach({
                   {quiet ? <BellOff size={16} /> : <Bell size={16} />}
                   {quiet ? '今天已安静 · 恢复提醒' : '今天安静陪着我'}
                 </button>
-              </div>
-              <details className="coach-setting-block">
+              </section>
+              <details className="coach-detail-card coach-setting-block">
                 <summary>切换模型与数据备份</summary>
                 <p className="coach-setting-copy">
                   API 接口支持 Responses 与兼容的 Chat Completions。运行{' '}
@@ -847,8 +1038,8 @@ export function Coach({
                   聊天、记忆和约定会随“个人资料与备份”中的全部记录一起导出。
                 </p>
               </details>
-            </TabsContent>
-          </Tabs>
+            </section>
+          </div>
         </SheetContent>
       </Sheet>
       <AlertDialog

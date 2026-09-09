@@ -219,20 +219,13 @@ html .dialog-close {
 }
 
 /* Calendar and segmented controls keep their existing selected/recorded states. */
-html
-  :is(
-    .segmented,
-    .mobile-tabs,
-    .developer-mode-switch,
-    .coach-tab-list[data-slot='tabs-list']
-  ) {
+html :is(.segmented, .mobile-tabs, .developer-mode-switch) {
   background: #dfe7eb80;
   border-color: transparent;
   border-radius: 13px;
   box-shadow: inset 0 1px 2px #29465508;
 }
-html :is(.segmented, .mobile-tabs, .developer-mode-switch) button.selected,
-html .coach-tab-list [data-active] {
+html :is(.segmented, .mobile-tabs, .developer-mode-switch) button.selected {
   background: #ffffffed;
   border-radius: 10px;
   box-shadow:
@@ -257,9 +250,6 @@ html .calendar-day.selected {
 }
 html .calendar-day.selected b {
   color: var(--glass-accent);
-}
-html .calendar-day.is-today b:after {
-  background: var(--glass-accent);
 }
 html .month-nav select {
   background: #e8eef080;

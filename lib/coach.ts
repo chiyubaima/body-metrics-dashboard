@@ -56,6 +56,7 @@ export type CoachProposal = {
 export type CoachTurn = {
   id: string;
   kind: 'chat' | 'opening';
+  dayKey?: string | null;
   date: string;
   userText: string;
   reply: string | null;
@@ -165,6 +166,12 @@ export function validateCoachRequest(value: unknown, now = new Date()) {
     date,
     userText: kind === 'opening' ? '' : coachText(v.message, 3000, '消息'),
   };
+}
+export const coachOpeningHours = [10, 14, 18, 22] as const;
+export function coachOpeningKey(now = new Date()) {
+  const hour = Number(localDateTime(now.toISOString()).slice(11, 13));
+  const slot = coachOpeningHours.findLast((value) => value <= hour);
+  return slot === undefined ? null : `${today(now)}T${slot}:00+08:00`;
 }
 export function quietNow(settings: CoachSettings, now = new Date()) {
   return settings.quietUntil !== null && new Date(settings.quietUntil) > now;

@@ -1,6 +1,17 @@
 import type { CoachTurn } from './coach.ts';
 import { shiftDate, today } from './model.ts';
 
+export function coachEntryPreview(text: string) {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  const characters = Array.from(
+    new Intl.Segmenter('zh-CN', { granularity: 'grapheme' }).segment(compact),
+    (part) => part.segment,
+  );
+  return characters.length <= 60
+    ? compact
+    : characters.slice(0, 59).join('').trimEnd() + '…';
+}
+
 // Server-completed replies win even when a client clock is ahead.
 export function mergeCoachTurns(history: CoachTurn[], local: CoachTurn[]) {
   const turns = new Map(history.map((turn) => [turn.id, turn]));

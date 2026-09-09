@@ -57,6 +57,7 @@ function CalendarGrid({
             disabled={d < min || d > max}
             className={`calendar-day ${d === value ? 'selected' : ''} ${d.slice(0, 7) !== view.slice(0, 7) ? 'outside' : ''} ${d === today() ? 'is-today' : ''}`}
             aria-pressed={d === value}
+            aria-current={d === today() ? 'date' : undefined}
             aria-label={`${d}${d === today() ? ' 今天' : ''}${marks.body ? ' 身体已记' : ''}${marks.diet ? (marks.diet === 'complete' ? ' 饮食已记完' : ' 饮食部分记录') : ''}${marks.training ? ' 训练' + { complete: '已完成', rest: '休息', missed: '未完成' }[marks.training] : ''}`}
             onClick={() => onChange(d)}
           >

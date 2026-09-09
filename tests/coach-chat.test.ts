@@ -12,11 +12,29 @@ import type { ComponentProps } from 'react';
 import type { CoachTurn } from '../lib/coach.ts';
 import { defaultCoachSettings } from '../lib/coach.ts';
 import {
+  coachEntryPreview,
   mergeCoachTurns,
   coachTimestamp,
   showCoachTimestamp,
   shouldSendCoachMessage,
 } from '../lib/coach-chat.ts';
+
+await test('entry previews cap at 60 visible characters without breaking emoji and compact line breaks', () => {
+  assert.equal(
+    coachEntryPreview('  合成问候\n\n  第二句。  '),
+    '合成问候 第二句。',
+  );
+  const exact = '问'.repeat(59) + '。';
+  assert.equal(coachEntryPreview(exact), exact);
+  assert.equal(coachEntryPreview(exact + '好'), '问'.repeat(59) + '…');
+  const emoji = '🏋🏽‍♀️';
+  assert.equal(coachEntryPreview(emoji.repeat(60)), emoji.repeat(60));
+  assert.equal(coachEntryPreview(emoji.repeat(61)), emoji.repeat(59) + '…');
+  assert.equal(
+    coachEntryPreview('Captain ' + 'x'.repeat(100)),
+    'Captain ' + 'x'.repeat(51) + '…',
+  );
+});
 
 function turn(id: string, value: Partial<CoachTurn> = {}): CoachTurn {
   return {

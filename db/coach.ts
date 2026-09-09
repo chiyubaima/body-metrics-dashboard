@@ -5,6 +5,7 @@ import {
   validateCommitment,
   coachObject,
   coachChoice,
+  coachOpeningKey,
 } from '../lib/coach.ts';
 import { commitmentEvidence } from '../lib/coach-context.ts';
 import type {
@@ -41,6 +42,7 @@ type TurnRow = {
   id: string;
   kind: CoachTurn['kind'];
   date: string;
+  day_key: string | null;
   user_text: string;
   reply: string | null;
   status: CoachTurn['status'];
@@ -72,6 +74,7 @@ const commitment = (r: CommitmentRow): Commitment => ({
 const turn = (r: TurnRow): CoachTurn => ({
   id: r.id,
   kind: r.kind,
+  dayKey: r.day_key,
   date: r.date,
   userText: r.user_text,
   reply: r.reply,
@@ -274,7 +277,9 @@ export async function getDailyOpening(
   day = today(),
 ) {
   const r = await db
-    .prepare('SELECT * FROM coach_turns WHERE owner=? AND day_key=?')
+    .prepare(
+      "SELECT * FROM coach_turns WHERE owner=? AND kind='opening' AND date=? ORDER BY day_key DESC,created_at DESC,id DESC LIMIT 1",
+    )
     .bind(owner, day)
     .first<TurnRow>();
   return r ? turn(r) : null;
@@ -329,10 +334,19 @@ export async function claimCoachTurn(
   now = new Date(),
 ) {
   await expireCoachTurns(db, owner, now);
+  const dayKey = request.kind === 'opening' ? coachOpeningKey(now) : null;
+  if (request.kind === 'opening' && !dayKey)
+    throw new InputError('Captain 会在上午10点后更新主动问候。');
+  const findSlot = async () => {
+    if (!dayKey) return null;
+    const row = await db
+      .prepare('SELECT * FROM coach_turns WHERE owner=? AND day_key=?')
+      .bind(owner, dayKey)
+      .first<TurnRow>();
+    return row ? turn(row) : null;
+  };
   const existing =
-    request.kind === 'opening'
-      ? await getDailyOpening(db, owner, request.date)
-      : await getCoachTurn(db, owner, request.id);
+    (await getCoachTurn(db, owner, request.id)) ?? (await findSlot());
   if (
     existing &&
     (existing.kind !== request.kind ||
@@ -361,7 +375,7 @@ export async function claimCoachTurn(
             owner,
             request.kind,
             request.date,
-            request.kind === 'opening' ? request.date : null,
+            dayKey,
             request.userText,
             stamp,
             stamp,
@@ -373,9 +387,7 @@ export async function claimCoachTurn(
   } catch (e) {
     if (String(e).includes('UNIQUE')) {
       const duplicate =
-        request.kind === 'opening'
-          ? await getDailyOpening(db, owner, request.date)
-          : await getCoachTurn(db, owner, request.id);
+        (await getCoachTurn(db, owner, request.id)) ?? (await findSlot());
       if (duplicate) return { turn: duplicate, claimed: false };
       throw new InputError('教练正在回应上一条消息，稍等一下再发。');
     }

@@ -19,6 +19,7 @@ import {
   quietNow,
   nextShanghaiDay,
   validateCoachRequest,
+  coachOpeningKey,
 } from './coach.ts';
 import { buildCoachContext } from './coach-context.ts';
 import { coachSystemPrompt, parseCoachOutput } from './coach-prompt.ts';
@@ -112,10 +113,13 @@ export async function coachChat(
     settings.consentConfig !== connection.fingerprint
   )
     throw new InputError('请先在教练设置中核对模型服务并启用。');
-  if (request.kind === 'opening' && quietNow(settings, now))
+  if (
+    request.kind === 'opening' &&
+    (quietNow(settings, now) || !coachOpeningKey(now))
+  )
     return {
       turn: await getDailyOpening(db, owner, request.date),
-      quiet: true,
+      quiet: quietNow(settings, now),
     };
   const claimed = await claimCoachTurn(db, owner, request, now);
   if (!claimed.claimed) return { turn: claimed.turn };
@@ -142,7 +146,13 @@ export async function coachChat(
           ? '\n用户选择温和陪伴，减少调侃和催促，先倾听。'
           : '\n用户选择直球陪伴，保持活泼和具体行动感。'),
       JSON.stringify({
-        task: request.kind === 'opening' ? '生成今日开场' : '回复当前用户消息',
+        task:
+          request.kind === 'opening'
+            ? '生成当前时段的主动问候，全文含标点不超过60字、不换行。基于最新记录和近期对话选一个值得聊的变化，不重复之前的问候或已经回答的问题；没有新记录也可以自然关心近况。'
+            : '回复当前用户消息',
+        ...(request.kind === 'opening'
+          ? { scheduledFor: claimed.turn.dayKey }
+          : {}),
         context,
         message: request.userText,
       }),

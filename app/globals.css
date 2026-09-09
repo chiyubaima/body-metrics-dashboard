@@ -91,6 +91,7 @@ small {
   color: var(--muted-foreground);
 }
 .dashboard {
+  --dashboard-gap: 20px;
   height: 100dvh;
   min-height: 360px;
   max-width: 1920px;
@@ -206,7 +207,7 @@ small {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  gap: var(--dashboard-gap);
   flex: 1;
 }
 .panel {
@@ -1441,10 +1442,8 @@ select.entry-input {
 }
 @media (min-width: 1600px) {
   .dashboard {
+    --dashboard-gap: 26px;
     padding: 0 44px;
-  }
-  .columns {
-    gap: 26px;
   }
   .panel-fixed {
     padding: 26px 28px 21px;
@@ -1461,10 +1460,8 @@ select.entry-input {
 }
 @media (max-width: 1190px) {
   .dashboard {
+    --dashboard-gap: 12px;
     padding: 0 18px;
-  }
-  .columns {
-    gap: 12px;
   }
   .panel-fixed {
     padding: 20px 17px 16px;
@@ -2642,6 +2639,13 @@ select.entry-input {
   font-size: 15px;
   color: #50675a;
   line-height: 22px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  border-radius: 50%;
 }
 .calendar-day:hover:not(:disabled) {
   background: #eff8e9;
@@ -2655,15 +2659,8 @@ select.entry-input {
 .calendar-day.selected b {
   color: #459511;
 }
-.calendar-day.is-today b:after {
-  content: '';
-  width: 3px;
-  height: 3px;
-  display: inline-block;
-  background: #58b518;
-  border-radius: 50%;
-  margin-left: 4px;
-  vertical-align: middle;
+.calendar-day.is-today b {
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 .calendar-day.outside:not(.selected) {
   opacity: 0.5;
@@ -5114,9 +5111,6 @@ select.entry-input {
 }
 .body-dialog .calendar-day.selected b {
   color: #1583b5;
-}
-.body-dialog .calendar-day.is-today b:after {
-  background: #22a5df;
 }
 .body-dialog :focus-visible {
   outline-color: #22a5df;

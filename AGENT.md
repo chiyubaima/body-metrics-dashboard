@@ -65,6 +65,19 @@ This is the application checkout for the body metrics dashboard. The parent proj
 - Use built-in ImageGen edits and hatch-pet's bounded asset workers in parent `work/captain/color/`; do not create new actions or a new Codex pet. Public assets and prompt provenance stay in `public/captain/`. Clearly label the unchanged optional monochrome v2 package as the prior version; the web module does not load it.
 - Check image identity/palette/alpha/frame geometry, existing avatar tests and build; local only, no personal data edits, model calls with personal records, commit, push or deployment.
 
+## Captain detail and summary annotations (2026-09-09)
+
+- Apply the seven current annotations: remove the entry's redundant invitation and detail tab bar; retain header navigation and mounted chat drafts/scroll state. Design monochrome memory/commitment cards, useful empty states, connection status, tone choices and greeting schedule with existing primitives/icons and the colored Captain assets.
+- Refresh proactive greetings at 10:00, 14:00, 18:00 and 22:00 Asia/Shanghai. Foreground checks and reopening catch up only the latest elapsed slot; no new greeting before 10:00 the next day. Derive/deduplicate slots on the server, preserve legacy openings and failed-message retry identity, fetch fresh context, and respect consent, quiet mode and in-flight chat. Reuse day_key without changing stored records or applied migrations.
+- Replace the calendar's inline today dot with a fixed-size date ring and aria-current=date, preserving selected state and footprints. Remove the weight card's date-range footer and BMI's calculated-value footer; retain missing-height guidance and all calculations.
+- Validate schedule boundaries, concurrency/retries/legacy data/fresh context and management navigation/actions using synthetic data, then test/typecheck/lint/build. Resolve only initially read unchanged annotations. No automatic commit, push, deployment or personal-record model verification.
+
+## Captain entry annotations (2026-09-09)
+
+- Limit proactive greeting instructions to 60 characters including punctuation. Bound entry previews to 60 graphemes with an ellipsis while preserving complete conversation text. Clamp the unpadded text layer to three lines at every viewport width.
+- Match the companion row to the dashboard's three equal columns and shared responsive gap: calendar spans two columns, Captain occupies the training column, with matching top/bottom edges. Preserve the stacked layout on narrow screens.
+- Verify greeting boundaries, intact emoji and existing chat behavior with synthetic data, then test/typecheck/lint/build. Resolve only the two initially read, unchanged annotations. Local only; no automatic commit, push or deployment.
+
 ## Sharing and local setup
 
 - This checkout is a standalone Git repository. A clone starts with an empty local database and no personal profile or active plans. Never commit the original author's health data, annotations, exports, machine paths, credentials or Sites project binding.

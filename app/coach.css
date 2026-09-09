@@ -1,13 +1,26 @@
 .dashboard-companion-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--dashboard-gap);
   flex-shrink: 0;
-  margin-bottom: 16px;
+  margin-bottom: var(--dashboard-gap);
 }
 .dashboard-companion-row .journal-calendar {
+  grid-column: span 2;
   margin-bottom: 0;
   min-width: 0;
+  container-type: inline-size;
+}
+.dashboard-companion-row .week .calendar-day {
+  gap: 8px;
+  padding-inline: 4px;
+}
+@container (max-width: 720px) {
+  .journal-calendar-grid.week .calendar-day {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 46px;
+  }
 }
 .dashboard-companion-row .calendar-footer {
   flex-wrap: wrap;
@@ -71,11 +84,8 @@ html :is(.coach-strip, .coach-sheet, .coach-forget) {
   padding-right: 25px;
 }
 .coach-entry-bubble {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  overflow: hidden;
+  display: block;
+  max-width: 100%;
   padding: 9px 12px;
   border: 1px solid #e6e6e6;
   border-radius: 15px 15px 15px 4px;
@@ -84,15 +94,16 @@ html :is(.coach-strip, .coach-sheet, .coach-forget) {
   font-size: 13px;
   line-height: 1.6;
 }
-.coach-invitation {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #575757;
-  font-size: 12px;
+.coach-entry-bubble > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
-.coach-strip-main:hover .coach-invitation {
-  color: #111;
+.coach-strip-main:hover .coach-entry-bubble {
+  border-color: #aaa;
 }
 .coach-quiet {
   position: absolute;
@@ -196,15 +207,6 @@ html :is(.coach-sheet, .coach-forget, .captain-picker) {
   --popover-foreground: #242424;
   --destructive: #555;
 }
-html .coach-sheet .choice-list > label {
-  color: #454545;
-  background: #f6f6f6;
-  border-color: #dedede;
-}
-html .coach-sheet .choice-list > label:has([data-checked]) {
-  background: #ececec;
-  border-color: #999;
-}
 html .coach-sheet .coach-editor .field :is(input, textarea),
 html .coach-sheet [data-slot='select-trigger'] {
   color: #333;
@@ -271,7 +273,7 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   background: #ebebeb80;
   color: var(--coach-ink);
 }
-.coach-tabs {
+.coach-pages {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -279,37 +281,13 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   gap: 0;
   position: relative;
 }
-.coach-tab-list[data-slot='tabs-list'] {
-  display: flex;
-  width: calc(100% - 40px);
-  min-height: 44px;
-  margin: 16px 20px 0;
-  padding: 4px;
-  border-radius: 13px;
-  background: #ededed;
-  flex-shrink: 0;
-}
-.coach-tab-list[hidden] {
-  display: none !important;
-}
-.coach-tab-list [data-slot='tabs-trigger'] {
-  font-size: 14px;
-  padding: 7px 10px;
-  min-height: 36px;
-  border-radius: 10px;
-}
-.coach-tab-list [data-active] {
-  color: #616161;
-  background: white;
-}
-.coach-chat-panel[data-slot='tabs-content'] {
+.coach-chat-panel {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
-.coach-chat-panel[data-hidden],
-.coach-management[data-hidden],
 .coach-chat-panel[hidden],
 .coach-management[hidden] {
   display: none !important;
@@ -894,11 +872,13 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   font-size: 14px;
   cursor: pointer;
 }
-.coach-management[data-slot='tabs-content'] {
+.coach-management {
+  flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 24px 22px 34px;
+  padding: 22px 20px 34px;
   font-size: 16px;
+  background: #f3f3f3;
 }
 .coach-section-heading {
   display: flex;
@@ -906,6 +886,10 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+.coach-section-heading h3 {
+  flex: 1;
+  min-width: 0;
 }
 .coach-section-heading h3,
 .coach-setting-block h3 {
@@ -923,15 +907,12 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   font-size: 13px;
   line-height: 1.7;
 }
-.coach-empty-line {
-  padding: 22px 0;
-  color: #8b8b8b;
-  font-size: 14px;
-  line-height: 1.8;
-}
 .coach-saved {
-  border-bottom: 1px solid #e9e9e9;
-  padding: 17px 0;
+  border: 1px solid #ebebeb;
+  border-radius: 16px;
+  background: #fafafa;
+  padding: 15px;
+  margin-top: 12px;
   overflow-wrap: anywhere;
 }
 .coach-saved b {
@@ -967,30 +948,19 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
 .coach-ended {
   margin: 18px 0;
 }
-.memory-heading {
-  margin-top: 32px;
-}
 .coach-overline {
   font-size: 13px;
   color: #7e7e7e;
 }
-.coach-connection h3 {
-  margin: 8px 0;
-  font-size: 21px;
-  font-weight: 750;
-}
-.coach-connection > p {
-  font-size: 15px;
-  color: #7a7a7a;
-}
 .coach-connection-status {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  border-radius: 7px;
-  background: #f2f2f2;
-  color: #6e6e6e;
-  padding: 5px 9px;
-  margin: 13px 0 6px;
+  border-radius: 20px;
+  background: #ffffff1a;
+  color: #eee;
+  padding: 5px 10px;
 }
 .coach-setting-copy {
   font-size: 14px;
@@ -1009,12 +979,7 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   margin-top: 12px;
 }
 .coach-setting-block {
-  margin-top: 26px;
-  padding-top: 21px;
-  border-top: 1px solid #e6e6e6;
-}
-.coach-setting-block h3 {
-  margin-bottom: 14px;
+  color: #666;
 }
 .coach-setting-block > summary {
   font-size: 14px;
@@ -1024,6 +989,10 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #e7e7e7;
+  padding: 20px;
 }
 .coach-editor textarea {
   font-size: 16px;
@@ -1041,6 +1010,333 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
 }
 .coach-forget .coach-actions {
   justify-content: flex-end;
+}
+
+.coach-page-intro {
+  padding: 4px 3px 20px;
+}
+.coach-page-intro h2 {
+  margin: 8px 0;
+  font-size: 25px;
+  font-weight: 750;
+  letter-spacing: -0.7px;
+}
+.coach-page-intro p {
+  color: #777;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.coach-detail-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 3px 12px #00000003;
+}
+.coach-detail-card + .coach-detail-card {
+  margin-top: 16px;
+}
+.coach-section-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: #f1f1f1;
+  border: 1px solid #e8e8e8;
+  border-radius: 13px;
+  color: #494949;
+}
+.coach-section-heading h3 span {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #f2f2f2;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #777;
+  vertical-align: middle;
+}
+.coach-section-heading > button {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.coach-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 16px 12px 8px;
+}
+.coach-empty-symbol {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  color: #777;
+  border: 1px solid #e5e5e5;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fafafa, #ebebeb);
+  box-shadow: inset 0 1px #fff;
+  margin-bottom: 4px;
+}
+.coach-empty-card > b {
+  font-size: 16px;
+  font-weight: 650;
+}
+.coach-empty-card p {
+  max-width: 290px;
+  color: #777;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.coach-empty-card > button {
+  min-height: 40px;
+  margin-top: 7px;
+}
+.coach-memory-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.coach-memory-kinds span {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid #e6e6e6;
+  border-radius: 7px;
+  color: #777;
+}
+.coach-card-footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #7c7c7c;
+  margin-top: 16px;
+}
+.coach-card-footnote svg {
+  flex-shrink: 0;
+}
+.coach-commitment {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.coach-date-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  flex-shrink: 0;
+  border: 1px solid #dfdfdf;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #fff;
+}
+.coach-date-tile small {
+  width: 100%;
+  text-align: center;
+  background: #ededed;
+  padding: 3px;
+  color: #666;
+  font-size: 11px;
+}
+.coach-date-tile strong {
+  font-size: 24px;
+  line-height: 1.6;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.coach-saved-body {
+  flex: 1;
+  min-width: 0;
+}
+.coach-saved-body > div > span {
+  font-size: 12px;
+}
+.coach-complete-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid #333;
+  background: #333;
+  color: #fff;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.coach-saved .coach-memory-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  font-size: 11px;
+  color: #666;
+  background: #ededed;
+  padding: 4px 7px;
+  border-radius: 7px;
+}
+.coach-connection-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 23px;
+  background: #272727;
+  color: #fff;
+  border-radius: 22px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.coach-connection-hero > div {
+  min-width: 0;
+}
+.coach-connection-hero h2 {
+  font-size: 25px;
+  letter-spacing: -0.6px;
+  font-weight: 700;
+  margin: 12px 0 8px;
+}
+.coach-connection-hero p {
+  color: #c4c4c4;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.coach-connection-status:before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+}
+.coach-connection-status.is-active:before {
+  background: #fff;
+  border-color: #fff;
+}
+.captain-settings-avatar {
+  --captain-size: 88px;
+}
+.coach-model-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 15px;
+  font-size: 13px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+.coach-model-row > span {
+  color: #888;
+  flex-shrink: 0;
+}
+.coach-model-row strong,
+.coach-model-row code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 550;
+}
+.coach-connection > button {
+  width: 100%;
+  justify-content: center;
+}
+.coach-tone-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.coach-tone-options > label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  border: 1px solid #e2e2e2;
+  background: #fafafa;
+  border-radius: 15px;
+  padding: 16px 13px;
+  cursor: pointer;
+  min-width: 0;
+}
+.coach-tone-options > label.is-selected {
+  border-color: #444;
+  background: #f0f0f0;
+  box-shadow: inset 0 0 0 0.5px #444;
+}
+.coach-tone-options label > svg {
+  color: #666;
+  margin-bottom: 13px;
+}
+.coach-tone-options b {
+  font-size: 15px;
+  font-weight: 650;
+}
+.coach-tone-options label > span {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.7;
+  margin-top: 7px;
+}
+.coach-tone-options [data-slot='radio-group-item'] {
+  position: absolute;
+  right: 12px;
+  top: 15px;
+}
+.coach-schedule {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 14px 0 6px;
+}
+.coach-schedule > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+}
+.coach-schedule > div:before {
+  content: '';
+  height: 1px;
+  background: #ddd;
+  width: 100%;
+  position: absolute;
+  top: 4px;
+}
+.coach-schedule > div:first-child:before {
+  width: 50%;
+  right: 0;
+}
+.coach-schedule > div:last-child:before {
+  width: 50%;
+  left: 0;
+}
+.coach-schedule i {
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border: 1px solid #bbb;
+  border-radius: 50%;
+  z-index: 1;
+}
+.coach-schedule .is-current i {
+  background: #333;
+  border-color: #333;
+  box-shadow: 0 0 0 4px #e7e7e7;
+}
+.coach-schedule b {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.coach-schedule span {
+  color: #888;
+  font-size: 11px;
+}
+.coach-schedule + p {
+  margin-bottom: 16px;
 }
 
 @media (max-width: 760px) {
@@ -1079,15 +1375,28 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   .coach-sheet .coach-message.assistant {
     margin-right: 18px;
   }
-  .coach-management[data-slot='tabs-content'] {
-    padding: 22px 18px 30px;
+  .coach-management {
+    padding: 18px 14px 30px;
+  }
+  .coach-detail-card {
+    padding: 16px;
+  }
+  .coach-connection-hero {
+    padding: 19px;
+  }
+  .coach-connection-hero h2 {
+    font-size: 22px;
+  }
+  .captain-settings-avatar {
+    --captain-size: 72px;
   }
 }
 @media (max-width: 960px) {
   .dashboard-companion-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    margin-bottom: 12px;
+  }
+  .dashboard-companion-row .journal-calendar {
+    grid-column: auto;
   }
   .coach-strip-main {
     padding: 10px 18px 10px 12px;
@@ -1098,10 +1407,6 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   }
   .coach-strip-copy {
     gap: 5px;
-  }
-  .coach-entry-bubble {
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
   }
 }
 @media (max-width: 420px) {

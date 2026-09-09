@@ -35,6 +35,7 @@ import {
   dueCommitments,
   coachTime,
   validateCommitment,
+  coachOpeningKey,
 } from '../lib/coach.ts';
 import { buildCoachContext, commitmentEvidence } from '../lib/coach-context.ts';
 import { parseCoachOutput } from '../lib/coach-prompt.ts';
@@ -421,33 +422,44 @@ await test('failed model responses persist a retryable turn, then the same reque
     close();
   }
 });
-await test('daily openings and concurrent claims are deduplicated; expired attempts cannot overwrite retries', async () => {
+await test('opening slots and concurrent claims are deduplicated; expired attempts cannot overwrite retries', async () => {
   const { db, close } = connect();
   try {
+    const now = new Date('2026-09-09T02:00:00Z');
     const r = {
       id: randomUUID(),
       kind: 'opening' as const,
-      date: today(),
+      date: today(now),
       userText: '',
     };
-    const first = await claimCoachTurn(db, 'a', r);
-    const second = await claimCoachTurn(db, 'a', { ...r, id: randomUUID() });
+    const first = await claimCoachTurn(db, 'a', r, now);
+    const second = await claimCoachTurn(
+      db,
+      'a',
+      { ...r, id: randomUUID() },
+      now,
+    );
     assert.equal(second.claimed, false);
     assert.equal(second.turn.id, first.turn.id);
     await assert.rejects(
-      claimCoachTurn(db, 'a', {
-        ...r,
-        id: randomUUID(),
-        kind: 'chat',
-        userText: 'hey',
-      }),
+      claimCoachTurn(
+        db,
+        'a',
+        {
+          ...r,
+          id: randomUUID(),
+          kind: 'chat',
+          userText: 'hey',
+        },
+        now,
+      ),
     );
-    await expireCoachTurns(db, 'a', new Date(Date.now() + 160_000));
+    await expireCoachTurns(db, 'a', new Date(now.getTime() + 160_000));
     const third = await claimCoachTurn(
       db,
       'a',
       r,
-      new Date(Date.now() + 161_000),
+      new Date(now.getTime() + 161_000),
     );
     assert(third.claimed);
     await assert.rejects(
@@ -462,7 +474,167 @@ await test('daily openings and concurrent claims are deduplicated; expired attem
       proposals: [],
       evidence: [],
     });
-    assert.equal((await getDailyOpening(db, 'a'))?.reply, 'current');
+    assert.equal(
+      (await getDailyOpening(db, 'a', today(now)))?.reply,
+      'current',
+    );
+  } finally {
+    close();
+  }
+});
+await test('opening slots use Beijing 10, 14, 18 and 22 boundaries and only catch up the latest slot', () => {
+  const at = (time: string) =>
+    coachOpeningKey(new Date(`2026-09-09T${time}+08:00`));
+  assert.equal(at('00:00:00'), null);
+  assert.equal(at('09:59:59'), null);
+  assert.equal(at('10:00:00'), '2026-09-09T10:00+08:00');
+  assert.equal(at('13:59:59'), '2026-09-09T10:00+08:00');
+  assert.equal(at('14:00:00'), '2026-09-09T14:00+08:00');
+  assert.equal(at('17:59:59'), '2026-09-09T14:00+08:00');
+  assert.equal(at('18:00:00'), '2026-09-09T18:00+08:00');
+  assert.equal(at('21:59:59'), '2026-09-09T18:00+08:00');
+  assert.equal(at('22:00:00'), '2026-09-09T22:00+08:00');
+  assert.equal(at('23:59:59'), '2026-09-09T22:00+08:00');
+  assert.equal(coachOpeningKey(new Date('2026-09-09T16:00:00Z')), null);
+  assert.equal(
+    coachOpeningKey(new Date('2026-09-10T02:00:00Z')),
+    '2026-09-10T10:00+08:00',
+  );
+});
+
+await test('scheduled greetings preserve legacy history, deduplicate each slot and read newly saved context', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const day = '2026-09-09';
+    const at = (hour: number) =>
+      new Date(`${day}T${hour.toString().padStart(2, '0')}:00:00+08:00`);
+    const legacy = randomUUID();
+    await db
+      .prepare(
+        "INSERT INTO coach_turns (id,owner,kind,date,day_key,user_text,reply,status,proposals,evidence,created_at,updated_at) VALUES (?,'a','opening',?,?,'','legacy opening','complete','[]','[]',?,?)",
+      )
+      .bind(legacy, day, day, at(8).toISOString(), at(8).toISOString())
+      .run();
+    assert.equal((await getDailyOpening(db, 'a', day))?.id, legacy);
+    assert.equal(await getDailyOpening(db, 'b', day), null);
+    const record = body(day, 80);
+    await saveEntry(db, 'a', record);
+    const inputs: {
+      scheduledFor: string;
+      context: {
+        facts: unknown[];
+        memories: { content: string }[];
+        conversation: { coach: string }[];
+      };
+    }[] = [];
+    const generate = async (_env: unknown, _system: string, input: string) => {
+      inputs.push(JSON.parse(input));
+      return { ...baseOutput, reply: `Synthetic greeting ${inputs.length}` };
+    };
+    const opening = () => ({ ...request(), kind: 'opening' });
+    await coachChat(db, 'a', env, opening(), generate, at(9));
+    assert.equal(inputs.length, 0);
+    const pair = await Promise.all([
+      coachChat(db, 'a', env, opening(), generate, at(10)),
+      coachChat(db, 'a', env, opening(), generate, at(10)),
+    ]);
+    assert.equal(inputs.length, 1);
+    assert.equal(pair[0].turn?.id, pair[1].turn?.id);
+    assert(
+      inputs[0].context.conversation.some((t) => t.coach === 'legacy opening'),
+    );
+    await coachChat(db, 'a', env, opening(), generate, at(13));
+    assert.equal(inputs.length, 1);
+    await saveEntry(db, 'a', {
+      ...record,
+      data: { ...record.data, weight: 81 },
+    });
+    await saveCoachMemory(db, 'a', {
+      id: randomUUID(),
+      category: 'preference',
+      content: 'Synthetic newly saved preference',
+    });
+    for (const hour of [14, 18, 22]) {
+      const result = await coachChat(
+        db,
+        'a',
+        env,
+        opening(),
+        generate,
+        at(hour),
+      );
+      assert.equal(result.turn?.dayKey, coachOpeningKey(at(hour)));
+      assert.equal((await getDailyOpening(db, 'a', day))?.id, result.turn?.id);
+    }
+    assert.equal(inputs.length, 4);
+    assert(JSON.stringify(inputs[1].context.facts).includes('81'));
+    assert(
+      inputs[1].context.memories.some(
+        (m) => m.content === 'Synthetic newly saved preference',
+      ),
+    );
+    assert(
+      inputs[1].context.conversation.some(
+        (t) => t.coach === 'Synthetic greeting 1',
+      ),
+    );
+    assert.deepEqual(
+      inputs.map((i) => i.scheduledFor),
+      [10, 14, 18, 22].map((h) => coachOpeningKey(at(h))),
+    );
+    await coachChat(db, 'a', env, opening(), generate, at(23));
+    assert.equal(inputs.length, 4);
+    assert.equal((await listCoachTurns(db, 'a')).turns.length, 5);
+    assert.equal(
+      (await getCoachTurn(db, 'a', legacy))?.reply,
+      'legacy opening',
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('failed proactive messages retry their original slot even after the next slot is due', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const at = (hour: number) => new Date(`2026-09-09T${hour}:00:00+08:00`);
+    const message = { ...request(), kind: 'opening' };
+    await assert.rejects(
+      coachChat(
+        db,
+        'a',
+        env,
+        message,
+        async () => {
+          throw new Error('Synthetic interrupted response');
+        },
+        at(14),
+      ),
+    );
+    const failed = await getCoachTurn(db, 'a', message.id);
+    assert.equal(failed?.status, 'failed');
+    const retried = await coachChat(
+      db,
+      'a',
+      env,
+      message,
+      async () => baseOutput,
+      at(18),
+    );
+    assert.equal(retried.turn?.id, message.id);
+    assert.equal(retried.turn?.dayKey, coachOpeningKey(at(14)));
+    const latest = await coachChat(
+      db,
+      'a',
+      env,
+      { ...message, id: randomUUID() },
+      async () => baseOutput,
+      at(18),
+    );
+    assert.notEqual(latest.turn?.id, message.id);
+    assert.equal(latest.turn?.dayKey, coachOpeningKey(at(18)));
   } finally {
     close();
   }
