@@ -22,6 +22,7 @@ import { JournalCalendar } from './calendar';
 import { TrashView } from './trash';
 import { DeveloperMode } from './developer-mode';
 import { Coach } from './coach';
+import { Onboarding } from './onboarding';
 import { today, activePlan } from '@/lib/model';
 import {
   workoutAchievements,
@@ -84,6 +85,8 @@ export default function Dashboard({
   localPreview: boolean;
 }) {
   const recordFormId = useId();
+  const [onboardingRequest, setOnboardingRequest] = useState(0);
+  const [coachSettingsRequest, setCoachSettingsRequest] = useState(0);
   const [celebration, setCelebration] = useState('');
   useEffect(() => {
     if (!celebration) return;
@@ -437,6 +440,7 @@ export default function Dashboard({
           snapshot={data}
           blocked={modal !== null}
           selectDate={setDate}
+          settingsRequest={coachSettingsRequest}
         />
       </div>
       <nav className="mobile-tabs" aria-label="看板模块">
@@ -498,6 +502,20 @@ export default function Dashboard({
           </button>
         </output>
       )}
+      <Onboarding
+        ready={statsReady}
+        snapshot={data}
+        blocked={modal !== null}
+        openRequest={onboardingRequest}
+        configure={(target) => {
+          if (target === 'coach') setCoachSettingsRequest((value) => value + 1);
+          else if (target === 'profile') open({ type: 'settings' });
+          else {
+            setDate(today());
+            open({ type: 'plan', kind: target });
+          }
+        }}
+      />
       <Dialog
         open={modal !== null}
         onOpenChange={(v) => {
@@ -514,12 +532,16 @@ export default function Dashboard({
           data-record-date={
             modal?.type === 'record' ? (modal.entry?.date ?? date) : date
           }
-          className={`dialog-popup ${modal?.type === 'record' ? 'record-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'body' ? 'body-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
+          className={`dialog-popup ${modal?.type === 'record' ? 'record-dialog' : ''} ${modal?.type === 'history' ? 'history-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'body' ? 'body-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
           showCloseButton={false}
         >
           <div
             className={
-              modal?.type === 'record' ? 'record-dialog-header' : undefined
+              modal?.type === 'record'
+                ? 'record-dialog-header'
+                : modal?.type === 'history'
+                  ? 'history-dialog-header'
+                  : undefined
             }
           >
             <DialogTitle>{title}</DialogTitle>
@@ -554,7 +576,7 @@ export default function Dashboard({
           {modal?.type !== 'record' && (
             <DialogDescription>
               {modal?.type === 'history'
-                ? `截至 ${date}，点击记录可以修改。`
+                ? '按日期筛选记录，支持修改和批量删除。'
                 : modal?.type === 'trash'
                   ? '删除的记录集中保管，按模块筛选后恢复。'
                   : modal?.type === 'plan'
@@ -621,12 +643,25 @@ export default function Dashboard({
               />
             )}
             {modal?.type === 'settings' && (
-              <ProfileForm
-                profile={data.profile}
-                save={save}
-                busy={busy}
-                onDirty={() => setDirty(true)}
-              />
+              <>
+                <button
+                  className="text-button onboarding-reopen"
+                  disabled={busy || dirty}
+                  title={dirty ? '保存个人资料后可以重新打开引导' : undefined}
+                  onClick={() => {
+                    setModal(null);
+                    setOnboardingRequest((value) => value + 1);
+                  }}
+                >
+                  重新查看使用引导
+                </button>
+                <ProfileForm
+                  profile={data.profile}
+                  save={save}
+                  busy={busy}
+                  onDirty={() => setDirty(true)}
+                />
+              </>
             )}
             {modal?.type === 'trash' && <TrashView restore={restore} />}
             {modal?.type === 'history' && (

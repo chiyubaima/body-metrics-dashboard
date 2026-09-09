@@ -1,7 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
-import { readFile, writeFile, chmod } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { createCoachConfiguration } from './coach-configuration.mjs';
 
 if (!process.stdin.isTTY) {
   console.error(
@@ -69,32 +68,16 @@ if (!process.stdin.isTTY) {
       if (!settings.COACH_API_KEY && !local)
         throw new Error('云端 API 需要密钥，未保存任何配置。');
     }
-    const path = fileURLToPath(new URL('../.dev.vars', import.meta.url));
-    let existing = '';
-    try {
-      existing = await readFile(path, 'utf8');
-    } catch (e) {
-      if (e.code !== 'ENOENT') throw e;
-    }
-    const rest = existing
-      .split('\n')
-      .filter(
-        (line) =>
-          !/^\s*COACH_(PROVIDER|API_BASE_URL|MODEL|API_KEY)\s*=/.test(line),
-      )
-      .join('\n')
-      .trimEnd();
-    const content =
-      (rest ? rest + '\n' : '') +
-      Object.entries(settings)
-        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-        .join('\n') +
-      '\n';
-    await writeFile(path, content, { mode: 0o600 });
-    await chmod(path, 0o600);
-    console.log('已保存本机连接配置。重启看板后，在教练设置中核对服务并启用。');
-    if (provider === '1')
-      console.log('如果尚未登录，请先运行 npx codex login。');
+    const configuration = await createCoachConfiguration();
+    await configuration.save({
+      provider: settings.COACH_PROVIDER,
+      baseUrl: settings.COACH_API_BASE_URL,
+      model: settings.COACH_MODEL,
+      apiKey: settings.COACH_API_KEY ?? '',
+    });
+    console.log(
+      '连接已保存并立即生效。打开 Captain 设置，核对服务后启用；Codex 登录也可以在设置中完成。',
+    );
   } catch (e) {
     console.error('连接配置未完成：' + e.message);
     process.exitCode = 1;

@@ -25,6 +25,7 @@ import { buildCoachContext } from './coach-context.ts';
 import { coachSystemPrompt, parseCoachOutput } from './coach-prompt.ts';
 import { coachConnection, generateCoachReply } from './coach-model.ts';
 import type { CoachEnvironment } from './coach-model.ts';
+import { resolveCoachEnvironment } from './coach-local.ts';
 
 export async function coachState(
   db: D1Database,
@@ -32,6 +33,7 @@ export async function coachState(
   env: CoachEnvironment,
   before?: { createdAt: string; id: string },
 ) {
+  env = await resolveCoachEnvironment(env);
   const [settings, memories, commitments, history, opening] = await Promise.all(
     [
       getCoachSettings(db, owner),
@@ -72,6 +74,7 @@ export async function updateCoachSettings(
   env: CoachEnvironment,
   value: unknown,
 ) {
+  env = await resolveCoachEnvironment(env);
   const v = coachObject(value),
     current = await getCoachSettings(db, owner),
     connection = coachConnection(env);
@@ -104,6 +107,7 @@ export async function coachChat(
   generate: typeof generateCoachReply = generateCoachReply,
   now = new Date(),
 ) {
+  env = await resolveCoachEnvironment(env);
   const request = validateCoachRequest(value, now),
     settings = await getCoachSettings(db, owner);
   const connection = coachConnection(env);
@@ -160,7 +164,15 @@ export async function coachChat(
     const parsed = parseCoachOutput(output, evidence, request.userText, now);
     // Re-check feature consent after a slow model call before storing a response.
     const latest = await getCoachSettings(db, owner);
-    if (!latest.enabled || latest.consentConfig !== connection.fingerprint)
+    const currentConnection = coachConnection(
+      await resolveCoachEnvironment(env),
+    );
+    if (
+      !latest.enabled ||
+      latest.consentConfig !== connection.fingerprint ||
+      currentConnection.fingerprint !== connection.fingerprint ||
+      !currentConnection.configured
+    )
       throw new InputError('教练已暂停，这次回复未保存。');
     return { turn: await finishCoachTurn(db, owner, claimed.turn, parsed) };
   } catch (error) {

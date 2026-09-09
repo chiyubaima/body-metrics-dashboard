@@ -10,6 +10,7 @@
   --glass-surface: #ffffffb8;
   --glass-floating: #ffffffe6;
   --glass-reading: #ffffffde;
+  --glass-plate: #ffffff70;
   --glass-edge: #ffffffed;
   --glass-line: #5269771c;
   --glass-shadow: 0 8px 28px #344f6310, 0 1px 3px #344f6308, inset 0 1px 0 #fff;
@@ -28,13 +29,18 @@ html body {
   background-attachment: fixed;
 }
 
-html :is(.body-panel, .body-dialog) {
+html :is(.body-panel, .body-dialog, .history-dialog[data-module='body']) {
   --glass-accent: #168fca;
   --glass-fill: #22a5df;
   --glass-ink: #073e57;
   --glass-tint: #ecf7fc;
 }
-html :is(.training-panel, .training-dialog) {
+html
+  :is(
+    .training-panel,
+    .training-dialog,
+    .history-dialog[data-module='training']
+  ) {
   --glass-accent: #b66b09;
   --glass-fill: #ffb52d;
   --glass-ink: #694509;
@@ -201,10 +207,15 @@ html
 html
   :is(
     .record-dialog-header,
+    .history-dialog-header,
     .coach-header,
     .coach-composer,
     .developer-panel > header
   ) {
+  background: #ffffff80;
+  border-color: var(--glass-line);
+}
+html .history-controls {
   background: #ffffff80;
   border-color: var(--glass-line);
 }
@@ -258,7 +269,7 @@ html .month-nav select {
 }
 
 /* Content uses calm reading surfaces; only the outer containers need blur. */
-html :is(.chart-card, .history-card, .history-table-wrap, .plate-detail) {
+html :is(.chart-card, .history-card, .history-table-wrap) {
   background: var(--glass-reading);
   border: 1px solid var(--glass-line);
   border-radius: 18px;
@@ -304,30 +315,158 @@ html .nutrition-orbit .orbit-dial strong {
 html :is(.orbit-label, .orbit-goal, .orbit-dial small, .nutrition-coverage) {
   color: #687c6b;
 }
-html .plate-tabs button {
-  background: #ffffff80;
-  border: 1px solid var(--glass-line);
-  border-radius: 15px;
-  box-shadow: inset 0 1px 0 #fff;
+/* Neutral frosted plate surfaces with black text. */
+html .diet-panel .plate-card {
+  --glass-accent: #171717;
+  --glass-ink: #171717;
+  --glass-tint: #f3f3f3;
+  color: #171717;
 }
+html .plate-card > .section-heading {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+html :is(.plate-tabs, .plate-detail) {
+  background:
+    linear-gradient(140deg, #ffffff70, #ffffff00 65%), var(--glass-plate);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow:
+    0 8px 24px #0000000d,
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 #ffffff59;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html .plate-tabs {
+  padding: 5px;
+  gap: 3px;
+  margin: 0 0 12px;
+}
+html .plate-tabs button,
 html .plate-tabs .logged {
-  background: #eaf6e0c7;
-  border-color: #a1c88766;
+  min-width: 0;
+  min-height: 88px;
+  padding: 9px 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 17px;
+  box-shadow: none;
+}
+html .plate-tabs button:hover {
+  background: #ffffff73;
 }
 html .plate-tabs .selected {
-  background: #edf8e6;
-  border-color: #68ac3580;
-  outline: 1px solid #68ac35a6;
-  outline-offset: 1px;
+  background: #ffffffd9;
+  border-color: #ffffff;
+  outline: none;
   box-shadow:
-    0 3px 9px #3d702415,
-    inset 0 1px 0 #fff;
+    0 3px 10px #00000014,
+    inset 0 0 0 1px #0000000d;
 }
 html .plate-tabs button > span {
   border-radius: 11px;
+  background: transparent;
+}
+html .plate-tabs .logged > span {
+  background: linear-gradient(145deg, #ffffffa6, #ffffff00), #eaeaea;
+  box-shadow: inset 0 1px 0 #ffffffc7;
+}
+html .plate-tabs button b {
+  font-size: 14px;
+}
+html .plate-tabs button small {
+  font-size: 12px;
 }
 html .plate-complete {
-  color: #507a31;
+  font-size: 12px;
+}
+html .plate-detail {
+  padding: 16px;
+}
+html .plate-surface > .text-button {
+  margin-bottom: 12px;
+}
+html .plate-meal-heading {
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #00000014;
+}
+html .plate-meal-heading > strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+html .plate-meal-heading .plate-energy {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+html .plate-energy b {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+}
+html .plate-energy small {
+  font-size: 12px;
+}
+html .plate-food {
+  align-items: flex-start;
+  gap: 12px;
+  padding-block: 13px;
+}
+html .plate-food-description > strong {
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+html .plate-food-description > small {
+  font-size: 12px;
+}
+html .plate-food .inline-macros {
+  font-size: 12px;
+  gap: 2px 8px;
+}
+html .plate-food .inline-macros b {
+  font-size: 12px;
+}
+html .plate-food > b {
+  flex-shrink: 0;
+  padding-top: 3px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+html .plate-food > b > small {
+  font-size: 12px;
+  font-weight: 400;
+}
+html .plate-detail .empty-inline {
+  padding-block: 16px;
+  font-size: 14px;
+}
+html .plate-card .plate-edit {
+  min-height: 44px;
+  margin-top: 14px;
+  font-size: 14px;
+  border-color: #ffffffd9;
+  background: #ffffff9c;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 5px #00000008;
+}
+html .plate-card .plate-edit:hover:not(:disabled) {
+  background: #ffffffde;
+  border-color: #c9c9c9;
+}
+html .plate-card .plate-complete {
+  background: #ffffffb3;
+  border-color: var(--glass-line);
+}
+html .diet-panel .plate-card :is(h3, button, strong, b, span, small, p) {
+  color: #171717;
 }
 html
   :is(
@@ -476,6 +615,45 @@ html
   --tw-ring-color: color-mix(in srgb, var(--glass-accent) 25%, transparent);
 }
 
+/* History retains each module's identity through every filter state. */
+html
+  .history-dialog
+  :is([data-slot='dialog-title'], .history-summary strong, .history-row-title) {
+  color: var(--glass-accent);
+}
+html .history-dialog :is(.history-dialog-header, .history-controls) {
+  background: linear-gradient(115deg, #ffffffd9, var(--glass-tint));
+}
+html .history-dialog .segmented button {
+  color: color-mix(in srgb, var(--glass-ink) 75%, #667980);
+}
+html .history-dialog .segmented button.selected {
+  background: linear-gradient(145deg, #ffffffb3, #ffffff00), var(--glass-tint);
+  color: var(--glass-ink);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--glass-accent) 32%, transparent),
+    0 2px 6px #304a5c14;
+}
+html .history-dialog .field > span {
+  color: var(--glass-ink);
+}
+html .history-dialog .history-date-range input {
+  border-color: color-mix(in srgb, var(--glass-accent) 25%, #d6e1e5);
+}
+html .history-dialog input[type='checkbox'] {
+  accent-color: var(--glass-accent);
+}
+html .history-dialog .selection-toolbar > span {
+  color: color-mix(in srgb, var(--glass-ink) 70%, #667980);
+}
+html .history-dialog .history-table th {
+  background: var(--glass-tint);
+  color: var(--glass-ink);
+}
+html .history-dialog .history-table tbody tr:hover {
+  background: var(--glass-tint);
+}
+
 /* System preferences and unsupported blur never leave text on a transparent base. */
 @supports not
 ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -483,6 +661,7 @@ html
     --glass-surface: #fafdff;
     --glass-floating: #fff;
     --glass-reading: #fff;
+    --glass-plate: #fff;
   }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
@@ -490,6 +669,7 @@ html
     --glass-surface: #fff;
     --glass-floating: #fff;
     --glass-reading: #fff;
+    --glass-plate: #fff;
     --glass-blur: none;
     --glass-edge: #abbcc3;
     --glass-line: #abbcc3;

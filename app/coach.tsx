@@ -34,6 +34,7 @@ import {
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 import { Field, Picker } from './form-controls';
+import { CoachConnection } from './coach-connection';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   commitmentLabels,
@@ -114,12 +115,14 @@ export function Coach({
   snapshot,
   blocked,
   selectDate,
+  settingsRequest = 0,
 }: {
   date: string;
   ready: boolean;
   snapshot: Snapshot;
   blocked: boolean;
   selectDate: (date: string) => void;
+  settingsRequest?: number;
 }) {
   const toneId = useId();
   const [state, setState] = useState<CoachState | null>(null),
@@ -144,6 +147,25 @@ export function Coach({
   const entry = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const previousTab = useRef(tab);
+  const handledSettingsRequest = useRef(0);
+  useEffect(() => {
+    if (
+      !ready ||
+      !settingsRequest ||
+      handledSettingsRequest.current === settingsRequest
+    )
+      return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      handledSettingsRequest.current = settingsRequest;
+      setTab('settings');
+      setOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, settingsRequest]);
   useEffect(() => {
     if (open && previousTab.current !== tab) heading.current?.focus();
     previousTab.current = tab;
@@ -859,8 +881,15 @@ export function Coach({
                   <span className="coach-section-icon">
                     <ShieldCheck size={22} />
                   </span>
-                  <h3>连接与数据</h3>
+                  <h3>模型连接</h3>
                 </div>
+                {open && (
+                  <CoachConnection
+                    visible={tab === 'settings'}
+                    disabled={saving || busy}
+                    onSaved={refresh}
+                  />
+                )}
                 <div className="coach-model-row">
                   <span>模型服务</span>
                   <strong>
@@ -903,23 +932,7 @@ export function Coach({
                   </button>
                 ) : (
                   <div className="coach-setup">
-                    <p>
-                      本机实验：安装依赖后，在终端运行{' '}
-                      <code>npx codex login</code> 登录 ChatGPT，再重启看板。
-                    </p>
-                    <p>
-                      已有 API 服务：运行 <code>npm run coach:setup</code>{' '}
-                      配置，密钥只保存到本机服务端。
-                    </p>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        void refresh().catch((e) => setError(e.message))
-                      }
-                    >
-                      <RotateCcw size={15} />
-                      重新检查连接
-                    </button>
+                    <p>在上方完成登录或保存 API 配置，就可以启用 Captain。</p>
                   </div>
                 )}
               </section>

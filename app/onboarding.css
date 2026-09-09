@@ -1,0 +1,170 @@
+html .dialog-popup.onboarding-dialog {
+  --glass-ink: #171717;
+  --glass-accent: #171717;
+  --glass-fill: #171717;
+  --glass-tint: #f4f4f4;
+  display: flex !important;
+  flex-direction: column;
+  width: min(620px, calc(100vw - 24px)) !important;
+  max-width: 620px !important;
+  padding: 24px !important;
+  overflow: hidden;
+  gap: 0;
+  color: #171717;
+}
+.onboarding-heading {
+  position: relative;
+  flex-shrink: 0;
+}
+.onboarding-eyebrow {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #626262;
+}
+html .onboarding-dialog [data-slot='dialog-title'] {
+  font-size: 25px;
+  line-height: 1.3;
+  letter-spacing: -0.6px;
+}
+.onboarding-heading > button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 36px;
+  height: 36px;
+}
+html .onboarding-dialog [data-slot='dialog-description'] {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #575757;
+  flex-shrink: 0;
+}
+.onboarding-steps {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 20px 0;
+  padding: 0 4px;
+}
+.onboarding-steps > li {
+  display: flex;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid #0000000f;
+}
+.onboarding-steps > li:first-child {
+  padding-top: 0;
+}
+.onboarding-steps > li:last-child {
+  padding-bottom: 0;
+  border: 0;
+}
+.onboarding-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: #147da9;
+  background: #eef8fd;
+  border: 1px solid #dceef6;
+}
+.onboarding-goals .onboarding-icon {
+  color: #4d7c28;
+  background: #f0f7e9;
+  border-color: #e2ecd8;
+}
+.onboarding-captain .onboarding-icon {
+  color: #292929;
+  background: #f1f1f1;
+  border-color: #e7e7e7;
+}
+.onboarding-step-content {
+  min-width: 0;
+  flex: 1;
+}
+.onboarding-step-content h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 16px;
+  font-weight: 650;
+}
+.onboarding-step-content p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #575757;
+  margin: 5px 0 12px;
+  overflow-wrap: anywhere;
+}
+.onboarding-status,
+.onboarding-optional {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #656565;
+}
+.onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.onboarding-dialog .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.onboarding-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid #00000012;
+  padding-top: 18px;
+}
+.onboarding-footer > span {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #656565;
+}
+html .onboarding-dialog .onboarding-footer .primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: white;
+  min-height: 44px;
+}
+.onboarding-reopen {
+  margin-top: 20px;
+}
+@media (max-width: 520px) {
+  html .dialog-popup.onboarding-dialog {
+    padding: 20px 16px !important;
+  }
+  html .onboarding-dialog [data-slot='dialog-title'] {
+    font-size: 22px;
+  }
+  .onboarding-steps > li {
+    gap: 10px;
+  }
+  .onboarding-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .onboarding-footer .primary {
+    justify-content: center;
+  }
+}

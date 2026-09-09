@@ -7,5 +7,6 @@ declare namespace Cloudflare {
     COACH_MODEL?: string;
     COACH_CODEX_URL?: string;
     COACH_CODEX_TOKEN?: string;
+    COACH_LOCAL_URL?: string;
   }
 }

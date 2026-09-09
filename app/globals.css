@@ -5333,3 +5333,132 @@ select.entry-input {
     padding: 0 16px 16px;
   }
 }
+
+/* Keep diary titles and filters outside the scrolling records. */
+.dialog-popup.history-dialog {
+  display: flex !important;
+  flex-direction: column;
+  height: min(820px, calc(100dvh - 48px));
+  padding: 0 !important;
+  overflow: hidden;
+  gap: 0;
+}
+.history-dialog-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 18px 24px 8px;
+}
+.history-dialog-header [data-slot='dialog-title'] {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+.history-dialog-header .dialog-close {
+  position: static;
+  flex-shrink: 0;
+}
+.history-dialog > [data-slot='dialog-description'] {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 24px 10px;
+}
+.history-dialog > .dialog-form-region {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.history-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 0;
+  gap: 0;
+}
+.history-controls {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  border-bottom: 1px solid #e7ede8;
+}
+.history-controls .selection-toolbar {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0;
+}
+.history-date-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px 12px;
+  max-width: 490px;
+}
+.history-date-range .field {
+  gap: 5px;
+}
+.history-date-range .field > span {
+  font-size: 12px;
+}
+.history-date-range input {
+  min-height: 40px;
+  font-size: 14px;
+  padding: 8px 10px;
+}
+.history-range-separator {
+  align-self: end;
+  line-height: 40px;
+  color: #8b9e9f;
+}
+.history-range-error {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #b04f43;
+}
+.history-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 18px 24px 24px;
+}
+.history-results > * {
+  flex-shrink: 0;
+}
+.history-results:focus-visible {
+  outline-offset: -3px;
+}
+@media (max-width: 520px) {
+  .history-dialog-header {
+    padding: 14px 16px 6px;
+  }
+  .history-dialog-header [data-slot='dialog-title'] {
+    font-size: 19px;
+  }
+  .history-dialog > [data-slot='dialog-description'] {
+    padding-inline: 16px;
+    font-size: 12px;
+  }
+  .history-controls {
+    padding: 8px 16px 12px;
+    gap: 10px;
+  }
+  .history-date-range {
+    gap: 6px;
+    max-width: none;
+  }
+  .history-date-range input {
+    font-size: 12px;
+    padding-inline: 6px;
+  }
+  .history-results {
+    padding: 14px 16px 18px;
+    gap: 14px;
+  }
+}

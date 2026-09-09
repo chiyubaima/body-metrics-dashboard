@@ -10,16 +10,25 @@ export type CoachEnvironment = {
   COACH_MODEL?: string;
   COACH_CODEX_URL?: string;
   COACH_CODEX_TOKEN?: string;
+  COACH_LOCAL_URL?: string;
+  COACH_CODEX_AUTHENTICATED?: string;
+  COACH_CONFIG_REVISION?: string;
 };
 export function coachConnection(env: CoachEnvironment): CoachConnection {
+  const revision = env.COACH_CONFIG_REVISION
+    ? `:${env.COACH_CONFIG_REVISION}`
+    : '';
   const provider =
     env.COACH_PROVIDER || (env.COACH_MODEL ? 'responses' : 'codex');
   if (provider === 'codex')
     return {
-      configured: !!env.COACH_CODEX_URL && !!env.COACH_CODEX_TOKEN,
+      configured:
+        !!env.COACH_CODEX_URL &&
+        !!env.COACH_CODEX_TOKEN &&
+        env.COACH_CODEX_AUTHENTICATED !== 'false',
       destination: 'OpenAI · 本机 Codex 登录',
       model: 'gpt-6-astra',
-      fingerprint: 'codex:gpt-6-astra',
+      fingerprint: 'codex:gpt-6-astra' + revision,
     };
   const raw = env.COACH_API_BASE_URL || 'https://api.openai.com/v1';
   try {
@@ -38,7 +47,7 @@ export function coachConnection(env: CoachEnvironment): CoachConnection {
       configured: !!env.COACH_MODEL && (!!env.COACH_API_KEY || local),
       destination: url.origin,
       model: env.COACH_MODEL ?? '',
-      fingerprint: `${provider}:${url.href.replace(/\/$/, '')}:${env.COACH_MODEL ?? ''}`,
+      fingerprint: `${provider}:${url.href.replace(/\/$/, '')}:${env.COACH_MODEL ?? ''}${revision}`,
     };
   } catch {
     return {

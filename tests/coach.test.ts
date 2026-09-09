@@ -371,6 +371,47 @@ await test('feature consent is enforced before generation and destination change
     close();
   }
 });
+await test('a model configuration change during generation invalidates the reply and requires renewed consent', async () => {
+  const { db, close } = connect();
+  const originalFetch = globalThis.fetch;
+  let revision = 'synthetic-first';
+  const local = { ...env, COACH_LOCAL_URL: 'http://127.0.0.1:9999' };
+  globalThis.fetch = (async (input) => {
+    assert.equal(
+      input instanceof URL
+        ? input.href
+        : typeof input === 'string'
+          ? input
+          : input.url,
+      'http://127.0.0.1:9999/environment',
+    );
+    return Response.json({
+      COACH_PROVIDER: 'codex',
+      COACH_CONFIG_REVISION: revision,
+    });
+  }) as typeof fetch;
+  try {
+    const state = await coachState(db, 'a', local);
+    await updateCoachSettings(db, 'a', local, {
+      enabled: true,
+      consentConfig: state.connection.fingerprint,
+    });
+    const message = request();
+    await assert.rejects(
+      coachChat(db, 'a', local, message, async () => {
+        revision = 'synthetic-second';
+        return baseOutput;
+      }),
+      /未保存/,
+    );
+    assert.equal((await getCoachTurn(db, 'a', message.id))?.status, 'failed');
+    assert.equal((await coachState(db, 'a', local)).active, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    close();
+  }
+});
+
 await test('chat retry is idempotent and fresh calls see persisted authoritative records', async () => {
   const { db, close } = connect();
   try {

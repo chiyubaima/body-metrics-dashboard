@@ -1244,6 +1244,119 @@ html :is(.coach-sheet, .coach-forget) .danger-button {
   width: 100%;
   justify-content: center;
 }
+.coach-provider-settings {
+  padding-bottom: 20px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+.coach-provider-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.coach-provider-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.coach-provider-options > label {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 12px;
+  border: 1px solid #dedede;
+  border-radius: 15px;
+  background: #fafafa;
+  cursor: pointer;
+}
+.coach-provider-options > label:has([data-checked]) {
+  border-color: #333;
+  background: #f1f1f1;
+}
+.coach-provider-options [role='radio'] {
+  position: absolute;
+  right: 12px;
+  top: 16px;
+}
+.coach-provider-options b {
+  font-size: 14px;
+  font-weight: 650;
+}
+.coach-provider-options span {
+  font-size: 11px;
+  color: #777;
+}
+.coach-provider-detail {
+  padding: 18px 0 15px;
+}
+.coach-provider-detail > p {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.7;
+  margin-top: 9px;
+}
+.coach-account-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.coach-account-state > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 550;
+}
+.coach-account-state code {
+  font-size: 11px;
+  color: #666;
+  background: #eee;
+  padding: 4px 7px;
+  border-radius: 6px;
+}
+.coach-provider-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.coach-provider-actions .secondary {
+  font-size: 12px;
+  text-decoration: none;
+}
+.coach-provider-save {
+  width: 100%;
+  justify-content: center;
+}
+.coach-provider-feedback {
+  display: block;
+  padding: 10px 12px;
+  border-left: 2px solid #777;
+  background: #f3f3f3;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+.coach-api-fields {
+  display: grid;
+  gap: 13px;
+  padding: 18px 0;
+}
+.coach-api-fields .field {
+  margin: 0;
+}
+.coach-api-fields input {
+  min-width: 0;
+  width: 100%;
+  color: #333;
+  background: #fff;
+  border-color: #ddd;
+}
 .coach-tone-options {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -78,6 +78,34 @@ This is the application checkout for the body metrics dashboard. The parent proj
 - Match the companion row to the dashboard's three equal columns and shared responsive gap: calendar spans two columns, Captain occupies the training column, with matching top/bottom edges. Preserve the stacked layout on narrow screens.
 - Verify greeting boundaries, intact emoji and existing chat behavior with synthetic data, then test/typecheck/lint/build. Resolve only the two initially read, unchanged annotations. Local only; no automatic commit, push or deployment.
 
+## Model connection GUI (2026-09-09)
+
+- Add a monochrome connection form in `app/coach-connection.tsx`: Codex sign-in or model API with protocol, base URL, model and write-only key. Save takes effect immediately; changing connection requires renewed enablement with the actual destination shown. Preserve conversations and records.
+- `scripts/coach-configuration.mjs` owns atomic, mode-0600 local settings in ignored `.dev.vars.coach.json`, seeded from existing `.dev.vars`. Deny `.dev.vars*` through Vite's file serving as well as Git sharing. Never reuse a saved API key for a changed base URL. Keep the terminal setup command compatible with the same settings file.
+- `scripts/coach-codex-account.mjs` uses official app-server account/read and login start/completed/cancel only, with disposable process data and no auth-file access. Keep gpt-6-astra. Login belongs to the user's explicit GUI action; automated checks never launch real login or generate with personal records.
+- `app/api/coach/connection/route.ts` requires existing application identity, same-origin writes and a local bridge. `lib/coach-local.ts` carries server-only bridge requests and current model configuration. The browser receives redacted settings and login status only. Recheck destination after in-flight generation; no credential persistence in D1, logs, exports or browser storage.
+- Test switch/restore, key redaction and destination binding, invalid writes, official login events/cancel/failure, and changed configuration during generation with synthetic fixtures. Run test/typecheck/lint/build and local read-only responses. No automatic commit, push or deployment.
+
+## Diary range filters (2026-09-09)
+
+- Add a custom inclusive start/end date range to all three diaries while preserving 30/90/all shortcuts and body-condition filtering. Presets retain the dashboard's selected-day anchor; explicit custom dates override that anchor. Use labeled native date inputs, reject empty/reversed/future ranges, and reset selection and result scroll position on filter changes.
+- Scope layout to history dialogs: title, description, all filters and bulk controls stay outside the independently scrolling result region. Wrap controls on narrow screens; preserve record editing, confirmed deletion, original seven-day averages and historical plans.
+- Keep implementation in existing history/dashboard/styles; synthetic component regressions belong in `tests/history.test.ts`. Verify date boundaries, one-day/cross-month/year ranges, all modules, combined conditions, invalid/empty results and deletion scope; run test/typecheck/lint/build. Preserve uncommitted Captain changes. No automatic commit, push or deployment.
+
+## Diary themes and meal glass surfaces (2026-09-09)
+
+- Let history dialogs inherit body blue and training orange through their existing `data-module`. Theme titles, filters, dates, checkboxes and focus without changing destructive/error colors, date filtering or independent scrolling.
+- Redesign today's plate as a floating meal selector above a translucent detail surface. Per the user's correction, remove the green gradient backdrop and use black text throughout the plate, including meal states, nutrition and actions; retain white highlights and neutral shallow shadows without a new enclosing border. Preserve food-name and meal-energy hierarchy, meal states, unknown nutrition, legacy entries, editing and completion behavior.
+- Keep styles in `app/glass.css` and necessary plate markup in `app/panels.tsx`; no dependencies or assets. Blur only the two plate surfaces, with opaque fallbacks for unsupported blur, reduced transparency and increased contrast. Preserve responsive layout and reduced motion.
+- Run existing tests, typecheck, lint, build and a local read-only response check. Preserve uncommitted work; no automatic commit, push or deployment.
+
+## Double-click startup and first-run guide (2026-09-09)
+
+- Add executable `启动身体日记.command` for macOS and UTF-8/CRLF `启动身体日记.cmd` for Windows at the checkout root; `.gitattributes` fixes their respective LF/CRLF checkout endings. Detect Node.js 24+ and direct missing-runtime users to the official installer; never silently install system software. `scripts/launch.mjs` handles dependency changes, existing setup, available loopback ports, successful-page readiness, browser opening, duplicate launches and owned-process cleanup.
+- `scripts/local-server.mjs` adds a development-only health endpoint and ignored `.wrangler/` instance metadata. Reuse a server only when its installation path and random instance match; keep locks and dependency fingerprints ignored. Never terminate unrelated servers or delete user state.
+- `app/onboarding.tsx` and `app/onboarding.css` provide a skippable first-run card after the first successful empty-account read. Reuse profile/plan forms and Captain settings; never enable AI or submit health data automatically. Remember dismissal as a browser UI preference and offer reopening from personal settings. Keep existing accounts undisturbed.
+- Synthetic tests in `tests/launcher.test.ts` and `tests/onboarding.test.ts` cover setup/reuse/conflicts/failure and guide lifecycle. Any full startup QA uses a temporary `body-journal-launcher-*` source-only copy without personal state or credentials, then cleans that exact copy and its processes. Update README; run test/typecheck/lint/build, preserve the preview and all uncommitted work, and do not commit, push or deploy automatically.
+
 ## Sharing and local setup
 
 - This checkout is a standalone Git repository. A clone starts with an empty local database and no personal profile or active plans. Never commit the original author's health data, annotations, exports, machine paths, credentials or Sites project binding.

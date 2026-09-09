@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,9 @@ import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { streamFrame } from '../lib/coach-stream.ts';
 import { coachOutputSchema } from '../lib/coach-prompt.ts';
+import { InputError } from '../lib/model.ts';
+import { createCoachConfiguration } from './coach-configuration.mjs';
+import { createCodexAccount } from './coach-codex-account.mjs';
 
 const disabledFeatures = [
   'shell_tool',
@@ -271,13 +274,12 @@ export async function runCodexCoach(instructions, input, signal, onDelta) {
   }
 }
 
-export async function startCodexBridge() {
-  const command = cliCommand(['login', 'status']);
-  const login = spawnSync(command.binary, command.args, {
-    encoding: 'utf8',
-    timeout: 8000,
-  });
-  if (login.error || login.status !== 0) return null;
+export async function startCodexBridge(options = {}) {
+  const configuration =
+    options.configuration ?? (await createCoachConfiguration());
+  const account =
+    options.account ??
+    createCodexAccount((directory) => cliCommand(codexArguments(directory)));
   const token = randomBytes(32).toString('hex');
   const controllers = new Set();
   const server = createServer(async (req, res) => {
@@ -288,14 +290,68 @@ export async function startCodexBridge() {
       timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
-    if (
-      !authenticated ||
-      req.headers.origin ||
-      req.url !== '/coach' ||
-      req.method !== 'POST'
-    ) {
+    if (!authenticated || req.headers.origin) {
       res.writeHead(403);
       res.end('{"error":"Forbidden"}');
+      return;
+    }
+    if (req.url !== '/coach') {
+      try {
+        let result;
+        if (req.method === 'GET' && req.url === '/environment') {
+          result = await configuration.environment();
+          if (result.COACH_PROVIDER === 'codex')
+            result.COACH_CODEX_AUTHENTICATED =
+              (await account.status()).status === 'logged-in'
+                ? 'true'
+                : 'false';
+        } else if (req.method === 'GET' && req.url === '/settings') {
+          result = {
+            ...configuration.publicSettings(await configuration.read()),
+            codex: await account.status(),
+          };
+        } else if (
+          (req.method === 'PUT' && req.url === '/settings') ||
+          (req.method === 'POST' && req.url === '/login')
+        ) {
+          let text = '';
+          for await (const chunk of req) {
+            text += chunk.toString();
+            if (text.length > 16_000)
+              throw new InputError('配置内容太长，请检查输入。');
+          }
+          let body;
+          try {
+            body = JSON.parse(text);
+          } catch {
+            throw new InputError('配置格式有误，请重新填写。');
+          }
+          if (req.url === '/settings') result = await configuration.save(body);
+          else if (body?.action === 'start') result = await account.start();
+          else if (body?.action === 'cancel') result = await account.cancel();
+          else throw new InputError('请选择登录或取消登录。');
+        } else {
+          res.writeHead(404);
+          res.end('{"error":"Not found"}');
+          return;
+        }
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(error instanceof InputError ? 400 : 503);
+        res.end(
+          JSON.stringify({
+            error:
+              error instanceof InputError
+                ? error.message
+                : '本机连接暂时不可用，请重试。',
+          }),
+        );
+      }
+      return;
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405);
+      res.end('{"error":"Method not allowed"}');
       return;
     }
     if (controllers.size) {
@@ -361,8 +417,10 @@ export async function startCodexBridge() {
     vars: {
       COACH_CODEX_URL: `http://127.0.0.1:${address.port}/coach`,
       COACH_CODEX_TOKEN: token,
+      COACH_LOCAL_URL: `http://127.0.0.1:${address.port}`,
     },
     close: () => {
+      account.close();
       for (const c of controllers) c.abort();
       server.close();
       server.closeAllConnections();

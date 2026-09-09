@@ -5,6 +5,8 @@ import { defineConfig } from 'vite';
 import type { ViteDevServer } from 'vite';
 import hostingConfig from './.openai/hosting.json';
 import { startCodexBridge } from './scripts/coach-codex-bridge.mjs';
+import { localServerPlugin } from './scripts/local-server.mjs';
+import { fileURLToPath } from 'node:url';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -52,11 +54,22 @@ export default defineConfig(async ({ command }) => {
     server: {
       host: '127.0.0.1',
       strictPort: true,
+      fs: {
+        deny: [
+          '.env',
+          '.env.*',
+          '*.{crt,pem}',
+          '**/.git/**',
+          '**/.dev.vars*',
+          '**/.wrangler/**',
+        ],
+      },
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
     },
     plugins: [
+      localServerPlugin(fileURLToPath(new URL('.', import.meta.url))),
       {
         name: 'local-coach-codex',
         configureServer(server: ViteDevServer) {

@@ -542,70 +542,82 @@ export function DietPanel(
         >
           今日餐盘
         </SectionTitle>
-        <div className="plate-tabs">
-          {slots.map((slot) => (
-            <button
-              key={slot}
-              data-annotate={`diet.meal.${slot}`}
-              aria-pressed={meal === slot}
-              className={`${meal === slot ? 'selected' : ''} ${loggedSlots.has(slot) ? 'logged' : ''}`}
-              onClick={() => setMeal(slot)}
-            >
-              <span>
-                <MealIcon meal={slot} />
-              </span>
-              <b>{mealLabels[slot]}</b>
-              <small>{loggedSlots.has(slot) ? '已记录' : '待记录'}</small>
-            </button>
-          ))}
-        </div>
-        {loggedSlots.has('unsorted') && (
-          <button className="text-button" onClick={() => setMeal('unsorted')}>
-            查看未分餐旧记录
-          </button>
-        )}
-        <div className="plate-detail" key={date + meal}>
-          <div className="section-heading">
-            <strong>{mealLabels[meal]}</strong>
-            <span>
-              {selectedFoods.length
-                ? `${numeric(selectedSummary.total.energy, 0)} 大卡${selectedSummary.known.energy < selectedSummary.count ? '（部分）' : ''}`
-                : '还没记'}
-            </span>
+        <div className="plate-surface">
+          <div className="plate-tabs" aria-label="选择餐次">
+            {slots.map((slot) => (
+              <button
+                key={slot}
+                data-annotate={`diet.meal.${slot}`}
+                aria-pressed={meal === slot}
+                className={`${meal === slot ? 'selected' : ''} ${loggedSlots.has(slot) ? 'logged' : ''}`}
+                onClick={() => setMeal(slot)}
+              >
+                <span>
+                  <MealIcon meal={slot} />
+                </span>
+                <b>{mealLabels[slot]}</b>
+                <small>{loggedSlots.has(slot) ? '已记录' : '待记录'}</small>
+              </button>
+            ))}
           </div>
-          {selectedFoods.map((food, i) => (
-            <div className="plate-food" key={i}>
-              <div className="plate-food-description">
-                <strong>{displayFoodName(food)}</strong>
-                <small>
-                  {food.grams}g ·{' '}
-                  {food.basis === 'raw'
-                    ? '生重'
-                    : food.basis === 'cooked'
-                      ? '熟重'
-                      : '食用份量'}
-                </small>
-                <MacroLine foods={[food]} />
-              </div>
-              <b>
-                {numeric(nutritionSummary([food]).total.energy, 0)}
-                <small>大卡</small>
-              </b>
-            </div>
-          ))}
-          {!selectedFoods.length && (
-            <p className="empty-inline">记下吃了什么，系统帮你算好营养。</p>
+          {loggedSlots.has('unsorted') && (
+            <button className="text-button" onClick={() => setMeal('unsorted')}>
+              查看未分餐旧记录
+            </button>
           )}
-          <button
-            className="secondary plate-edit"
-            disabled={!ready || date > today()}
-            onClick={() => edit('diet', row, meal)}
-          >
-            <Plus size={17} />
-            {selectedFoods.length
-              ? '补充 / 修改这一餐'
-              : `记录${mealLabels[meal]}`}
-          </button>
+          <div className="plate-detail" key={date + meal}>
+            <div className="section-heading plate-meal-heading">
+              <strong>{mealLabels[meal]}</strong>
+              <span className="plate-energy">
+                {selectedFoods.length ? (
+                  <>
+                    <b>{numeric(selectedSummary.total.energy, 0)}</b>
+                    <small>
+                      大卡
+                      {selectedSummary.known.energy < selectedSummary.count
+                        ? '（部分）'
+                        : ''}
+                    </small>
+                  </>
+                ) : (
+                  '还没记'
+                )}
+              </span>
+            </div>
+            {selectedFoods.map((food, i) => (
+              <div className="plate-food" key={i}>
+                <div className="plate-food-description">
+                  <strong>{displayFoodName(food)}</strong>
+                  <small>
+                    {food.grams}g ·{' '}
+                    {food.basis === 'raw'
+                      ? '生重'
+                      : food.basis === 'cooked'
+                        ? '熟重'
+                        : '食用份量'}
+                  </small>
+                  <MacroLine foods={[food]} />
+                </div>
+                <b>
+                  {numeric(nutritionSummary([food]).total.energy, 0)}
+                  <small>大卡</small>
+                </b>
+              </div>
+            ))}
+            {!selectedFoods.length && (
+              <p className="empty-inline">记下吃了什么，系统帮你算好营养。</p>
+            )}
+            <button
+              className="secondary plate-edit"
+              disabled={!ready || date > today()}
+              onClick={() => edit('diet', row, meal)}
+            >
+              <Plus size={17} />
+              {selectedFoods.length
+                ? '补充 / 修改这一餐'
+                : `记录${mealLabels[meal]}`}
+            </button>
+          </div>
         </div>
       </div>
       {diet?.note && <p className="daily-note">{diet.note}</p>}

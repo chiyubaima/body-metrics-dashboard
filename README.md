@@ -6,7 +6,22 @@
 
 ## 开始使用
 
-安装 **Node.js 24 LTS** 和 Git，然后运行：
+**下载并解压代码，或用 Git 克隆后，双击项目文件夹里的启动文件：**
+
+| 系统 | 双击文件 |
+| --- | --- |
+| macOS | `启动身体日记.command` |
+| Windows | `启动身体日记.cmd` |
+
+电脑需要 **Node.js 24 或更高版本**。启动文件会检查，未安装或版本太旧时打开 [Node.js 官方下载页](https://nodejs.org/en/download)。安装一次后，再次双击即可。
+
+首次启动会自动安装依赖、创建本机配置和空白数据库，然后打开浏览器；需要联网并等待几分钟。以后双击直接启动，代码更新导致依赖变化时会自动重新安装；更新依赖前请先关闭旧的启动窗口。同一份安装已经运行时，会打开已有页面；默认端口被占用时自动选择其他本机端口。启动窗口会显示进度，失败时保留提示，处理后再次双击即可。
+
+**使用期间保持启动窗口开启。** 按 Ctrl+C 停止服务，记录会保留；下次仍然双击同一文件。食品检索使用随代码提供的目录，正常记录无需模型连接。
+
+第一次进入空白账本会出现可跳过的使用引导：填写个人资料、设置自己的饮食/训练目标，或连接 Captain。各项均可稍后完成，应用不会预填健康目标或自动启用 AI。已有资料、记录或计划时不自动打扰；“个人资料与备份”中的“重新查看使用引导”可再次打开。跳过状态作为当前浏览器的界面偏好保存，换浏览器或清理网站存储后，空白账本可能再次显示引导。
+
+也可以继续使用命令行（需要 Git；直接下载代码的用户不需要安装 Git）：
 
 ```sh
 git clone https://github.com/chiyubaima/body-metrics-dashboard.git
@@ -15,7 +30,7 @@ npm ci
 npm start
 ```
 
-打开终端显示的本机地址，通常是 `http://127.0.0.1:3000`。首次启动会自动创建本机配置和数据库，以后启动会保留已有记录。端口已被占用时先关闭占用该端口的服务，或运行 `npm run dev -- --port 3001`。
+打开终端显示的本机地址，通常是 `http://127.0.0.1:3000`。命令行方式同样自动初始化并保留已有记录；如端口已占用，可运行 `npm run dev -- --port 3001`。Linux 用户可以使用这组命令。
 
 三模块记录不需要 Codex、ChatGPT、Cloudflare 账号，也不需要 USDA 或模型 API 密钥。本机入口会自动建立一个仅用于本机的会话，不会登录作者的账号。首次安装依赖需要联网；食品查询使用仓库随附的数据，不调用翻译或识别服务。可选的 AI 教练需要模型连接，见下文。
 
@@ -32,22 +47,16 @@ npm start
 
 ## 连接 Captain
 
-本机默认使用官方 Codex CLI 和 `gpt-6-astra`。项目固定安装独立 CLI 版本，不更改电脑上的全局 Codex。已有 ChatGPT 登录可由官方 CLI 复用；尚未登录时运行：
+在日历右侧打开 Captain，点击聊天顶部的“设置”，直接选择连接方式：
 
-```sh
-npx codex login
-npm start
-```
+- **Codex 登录**：使用当前 ChatGPT 账号和固定的 `gpt-6-astra`。已有登录会自动识别；未登录时点击“登录 ChatGPT”，在官方授权页完成后，设置页自动更新状态。
+- **模型 API**：选择 Responses 或 Chat Completions 协议，填写 API 根地址、模型名称和密钥。点击“保存并切换连接”后立即生效，无需重启。
 
-在日历右侧打开 Captain，点击聊天顶部的“设置”，核对模型服务和数据发送范围后点击“启用 Captain”。该方式依赖本机 Codex、联网和当前账户可用额度；不是将网页 ChatGPT 登录凭证当作 API 密钥。官方说明：[Codex App Server](https://learn.chatgpt.com/docs/app-server)。
+切换后核对当前服务、模型和数据发送范围，点击“启用 Captain”。API 配置会保留，切回时不必重填；密钥不回显，同一地址留空保留已有密钥，改用新地址必须填写对应密钥。本机免密服务可留空。本机配置只写入被 Git 忽略且禁止通过网页读取的 `.dev.vars.coach.json`，权限为仅当前用户可读写；首次兼容读取旧 `.dev.vars`。终端向导 `npm run coach:setup` 仍可使用，并写入同一份配置。
 
-也可以连接 Responses API 或支持 JSON Schema 的兼容 Chat Completions API：
+项目固定安装独立 Codex CLI，不更改全局 Codex。登录通过官方 app-server 的账号与浏览器授权接口完成，应用不读写或复制 Codex 凭据文件；登录依赖本机 Codex、联网和账号可用额度。官方说明：[Codex App Server 账号授权](https://learn.chatgpt.com/docs/app-server#authentication-modes)。
 
-```sh
-npm run coach:setup
-```
-
-配置向导会询问服务地址、模型名称和密钥；密钥输入不回显，只保存在被 Git 忽略的 `.dev.vars`，文件权限设为仅当前用户可读写。重启后在教练设置中核对服务并启用。程序读取 `COACH_PROVIDER`（`codex` / `responses` / `chat-completions`）、`COACH_API_BASE_URL`、`COACH_MODEL` 和 `COACH_API_KEY`；不支持从浏览器指定模型地址或读取密钥。本机免密模型允许回环 HTTP 地址，其他地址要求 HTTPS。API 模型需要支持 SSE 流式和严格 JSON Schema 结构化输出；Responses 请求设置 `store: false`，这不等于服务商完全不留存处理日志，数据政策以所选服务为准。[结构化输出接口说明](https://developers.openai.com/api/docs/guides/structured-outputs)。
+外部 API 地址要求 HTTPS，回环地址允许 HTTP。API 模型需要支持 SSE 流式和严格 JSON Schema 结构化输出；Responses 请求设置 `store: false`，这不等于服务商完全不留存处理日志，数据政策以所选服务为准。[结构化输出接口说明](https://developers.openai.com/api/docs/guides/structured-outputs)。
 
 教练每次读取当前账本，提供近30天摘要、所选日和部分最近记录明细、可比力量参考、个人资料、最近最多12轮且有长度上限的聊天、已保存记忆与待办约定。历史回复下方的“参考了 N 条记录”保留当时引用的快照；后续分析使用更正后的记录。记忆与约定卡片由用户点击保存后生效，可在“记忆与约定”里修改或结束。
 
@@ -64,6 +73,7 @@ Captain 使用黑白灰聊天界面，角色采用深蓝运动服、红色点缀
 | 记录、个人资料、计划、回收站、批注、教练聊天/记忆/约定 | `.wrangler/state/v3/d1/` | 否 |
 | 本机 Sites 配置 | `.openai/hosting.json` | 否 |
 | 环境变量和密钥 | `.env*`、`.dev.vars*` | 否 |
+| 启动锁、运行实例和依赖指纹 | `.wrangler/launcher*`、`.wrangler/local-server.json` | 否 |
 | 导出的账本备份 | 浏览器下载目录，或本机 `backups/` | 否 |
 | 公开食品与中文译名 | `data/` | 是 |
 | 程序、数据库结构、插图 | `app/`、`lib/`、`db/`、`drizzle/`、`public/` | 是 |

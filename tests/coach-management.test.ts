@@ -145,6 +145,7 @@ await test('Captain detail navigation preserves the composer and its actions wor
   // Mock only overlay/field primitives and the separately tested conversation;
   // keep the real Coach navigation, state, editors, cards and mutation handlers.
   const stubs: Record<string, string> = {
+    './coach-connection': 'export function CoachConnection(){return null}',
     '@/lib/coach-stream': `export async function requestCoachStream(request){const response=await fetch('/synthetic-coach-stream',{method:'POST',body:JSON.stringify(request)});return response.json()}`,
     '@/components/ui/sheet': `${react}
       const C=createContext({});
@@ -199,17 +200,20 @@ await test('Captain detail navigation preserves the composer and its actions wor
     globalThis.fetch = originalFetch;
     await win.happyDOM.close();
   });
-  await act(async () =>
-    root.render(
-      createElement(Coach, {
-        date: '2026-09-09',
-        ready: true,
-        snapshot: { records: [], plans: [], profile: null },
-        blocked: false,
-        selectDate() {},
-      }),
-    ),
-  );
+  const render = async (settingsRequest = 0) =>
+    act(async () =>
+      root.render(
+        createElement(Coach, {
+          date: '2026-09-09',
+          ready: true,
+          snapshot: { records: [], plans: [], profile: null },
+          blocked: false,
+          settingsRequest,
+          selectDate() {},
+        }),
+      ),
+    );
+  await render();
   assert.equal(
     container.querySelector('.coach-entry-bubble')!.textContent,
     longGreeting.slice(0, 59) + '…',
@@ -221,7 +225,23 @@ await test('Captain detail navigation preserves the composer and its actions wor
     assert(button, selector);
     await act(async () => (button as unknown as HTMLButtonElement).click());
   };
-  await click('[aria-label="与 Captain 聊聊"]');
+  await render(1);
+  assert(
+    !container
+      .querySelector('[data-annotate="coach.settings.page"]')!
+      .hasAttribute('hidden'),
+  );
+  assert.equal(
+    generated,
+    0,
+    'opening connection settings from onboarding never enables or generates',
+  );
+  assert(
+    !calls.some(
+      (call) => call.method === 'PATCH' && call.body.enabled === true,
+    ),
+  );
+  await click('[aria-label="返回聊天"]');
   assert.equal(container.querySelector('[role="tablist"]'), null);
   assert.equal(container.querySelector('.coach-tab-list'), null);
   assert.equal(container.querySelector('.coach-invitation'), null);

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { average, shiftDate, today } from '@/lib/model';
 import type {
@@ -48,15 +48,41 @@ export function HistoryView({
   busy: boolean;
 }) {
   const [period, setPeriod] = useState('90'),
+    [rangeStart, setRangeStart] = useState(() => shiftDate(date, -89)),
+    [rangeEnd, setRangeEnd] = useState(date),
     [condition, setCondition] = useState('all'),
     [selected, setSelected] = useState<string[]>([]),
     [pending, setPending] = useState<Entry[]>([]),
     [deleteError, setDeleteError] = useState('');
+  const rangeId = useId();
+  const results = useRef<HTMLElement>(null);
+  const rangeError =
+    period !== 'custom'
+      ? ''
+      : !rangeStart || !rangeEnd
+        ? '请选择开始日期和结束日期。'
+        : rangeStart > rangeEnd
+          ? '开始日期不能晚于结束日期。'
+          : rangeStart < '2000-01-01' || rangeEnd > today()
+            ? '请选择2000年1月1日至今天之间的日期。'
+            : '';
+  const from =
+    period === 'custom'
+      ? rangeStart
+      : period === 'all'
+        ? ''
+        : shiftDate(date, 1 - Number(period));
+  const to = period === 'custom' ? rangeEnd : date;
+  function resetResults() {
+    setSelected([]);
+    if (results.current) results.current.scrollTop = 0;
+  }
   const rows = records.filter(
     (r) =>
+      !rangeError &&
       r.kind === kind &&
-      r.date <= date &&
-      (period === 'all' || r.date >= shiftDate(date, 1 - Number(period))) &&
+      r.date <= to &&
+      r.date >= from &&
       (kind !== 'body' ||
         condition === 'all' ||
         (r.data as Body).condition === condition),
@@ -100,58 +126,116 @@ export function HistoryView({
   );
   return (
     <div className="dialog-body history-view">
-      <div className="history-filters">
-        <Segmented
-          label="历史范围"
-          value={period}
-          items={[
-            ['30', '30 天'],
-            ['90', '90 天'],
-            ['all', '全部'],
-          ]}
-          onChange={setPeriod}
-        />
-        {kind === 'body' && (
+      <div className="history-controls">
+        <div className="history-filters">
           <Segmented
-            label="测量条件筛选"
-            value={condition}
+            label="历史范围"
+            value={period}
             items={[
-              ['all', '全部条件'],
-              ['morning', '晨起'],
-              ['other', '其他时间'],
+              ['30', '30 天'],
+              ['90', '90 天'],
+              ['all', '全部'],
+              ['custom', '自选区间'],
             ]}
-            onChange={setCondition}
+            onChange={(value) => {
+              setPeriod(value);
+              resetResults();
+            }}
           />
+          {kind === 'body' && (
+            <Segmented
+              label="测量条件筛选"
+              value={condition}
+              items={[
+                ['all', '全部条件'],
+                ['morning', '晨起'],
+                ['other', '其他时间'],
+              ]}
+              onChange={(value) => {
+                setCondition(value);
+                resetResults();
+              }}
+            />
+          )}
+        </div>
+        {period === 'custom' && (
+          <div className="history-date-range" aria-label="自选日期区间">
+            <label className="field" htmlFor={`${rangeId}-start`}>
+              <span>开始日期</span>
+              <input
+                id={`${rangeId}-start`}
+                type="date"
+                value={rangeStart}
+                min="2000-01-01"
+                max={today()}
+                aria-invalid={!!rangeError}
+                aria-describedby={rangeError ? `${rangeId}-error` : undefined}
+                onChange={(e) => {
+                  setRangeStart(e.target.value);
+                  resetResults();
+                }}
+              />
+            </label>
+            <span className="history-range-separator" aria-hidden="true">
+              —
+            </span>
+            <label className="field" htmlFor={`${rangeId}-end`}>
+              <span>结束日期</span>
+              <input
+                id={`${rangeId}-end`}
+                type="date"
+                value={rangeEnd}
+                min={rangeStart || '2000-01-01'}
+                max={today()}
+                aria-invalid={!!rangeError}
+                aria-describedby={rangeError ? `${rangeId}-error` : undefined}
+                onChange={(e) => {
+                  setRangeEnd(e.target.value);
+                  resetResults();
+                }}
+              />
+            </label>
+            {rangeError && (
+              <p
+                className="history-range-error"
+                role="alert"
+                id={`${rangeId}-error`}
+              >
+                {rangeError}
+              </p>
+            )}
+          </div>
         )}
-      </div>
-      <div className="selection-toolbar">
-        <label>
-          <input
-            type="checkbox"
-            checked={
-              rows.length > 0 && selection.length === Math.min(rows.length, 100)
-            }
-            disabled={!rows.length || busy}
-            onChange={(e) =>
-              setSelected(
-                e.target.checked ? rows.map((r) => r.id).slice(0, 100) : [],
-              )
-            }
-          />
-          {rows.length > 100 ? '选择前100条' : '全选当前结果'}
-        </label>
-        <span>已选 {selection.length} 条</span>
-        <button
-          className="danger-text"
-          disabled={!selection.length || busy}
-          onClick={() => {
-            setDeleteError('');
-            setPending(selection);
-          }}
-        >
-          <Trash2 size={15} />
-          删除所选
-        </button>
+        <div className="selection-toolbar">
+          <label>
+            <input
+              type="checkbox"
+              checked={
+                rows.length > 0 &&
+                selection.length === Math.min(rows.length, 100)
+              }
+              disabled={!rows.length || busy}
+              onChange={(e) =>
+                setSelected(
+                  e.target.checked ? rows.map((r) => r.id).slice(0, 100) : [],
+                )
+              }
+            />
+            {rows.length > 100 ? '选择前100条' : '全选当前结果'}
+          </label>
+          <span>已选 {selection.length} 条</span>
+          <button
+            className="danger-text"
+            disabled={!selection.length || busy}
+            onClick={() => {
+              setDeleteError('');
+              setPending(selection);
+            }}
+          >
+            <Trash2 size={15} />
+            删除所选
+          </button>
+        </div>
       </div>
       <DeleteConfirm
         count={pending.length}
@@ -171,104 +255,112 @@ export function HistoryView({
           }
         }}
       />
-      <div className="history-summary">
-        <strong>{rows.length} 条记录</strong>
-        <span>
-          {rows.length
-            ? `${rows.at(-1)!.date} — ${rows[0].date}`
-            : '这一范围还没有记录'}
-        </span>
-      </div>
-      {kind === 'body' && rows.length > 0 ? (
-        <div className="history-table-wrap">
-          <table className="history-table">
-            <thead>
-              <tr>
-                <th aria-label="选择记录" />
-                <th>日期 / 条件</th>
-                <th>体重 kg</th>
-                <th>7天均值</th>
-                <th>腰围 cm</th>
-                <th>体脂 %</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const b = r.data as Body,
-                  a = average(records, r.date);
-                return (
-                  <tr key={r.id}>
-                    <td>{checkbox(r)}</td>
-                    <td>
-                      <b>{r.date}</b>
-                      <small>
-                        {b.condition === 'morning' ? '晨起空腹' : '其他时间'}
-                        {r.primaryMorning === 1 ? ' · 计入趋势' : ''}
-                      </small>
-                      {b.note && <p className="table-note">{b.note}</p>}
-                    </td>
-                    <td>
-                      <strong>{numeric(b.weight)}</strong>
-                    </td>
-                    <td>{numeric(a.value)}</td>
-                    <td>{numeric(b.waist)}</td>
-                    <td>{numeric(b.bodyFat)}</td>
-                    <td>{actions(r)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <section
+        className="history-results"
+        ref={results}
+        aria-label="日记记录列表"
+      >
+        <div className="history-summary">
+          <strong>{rows.length} 条记录</strong>
+          <span>
+            {rows.length
+              ? `${rows.at(-1)!.date} — ${rows[0].date}`
+              : rangeError
+                ? '等待选择有效日期区间'
+                : '这一范围还没有记录'}
+          </span>
         </div>
-      ) : (
-        rows.map((r) => (
-          <article key={r.id} className="history-card">
-            <div className="section-heading">
-              <h3 className="history-row-title">
-                {checkbox(r)}
-                {r.date}
-              </h3>
-              {actions(r)}
-            </div>
-            <EntryDetails
-              entry={r}
-              plan={plans.find((p) => p.id === r.planId)}
-            />
-          </article>
-        ))
-      )}
-      {!rows.length && (
-        <div className="empty-note">
-          换一个时间范围，或从今天的第一次记录开始。
-        </div>
-      )}
-      {kind !== 'body' && (
-        <details className="plan-details">
-          <summary>历史计划</summary>
-          <div className="plan-inner">
-            {plans
-              .filter((p) => p.kind === kind)
-              .map((p) => (
-                <div className="history-plan" key={p.id}>
-                  <strong>
-                    {p.date}
-                    {p.kind === 'diet' && (p.data as DietPlan).scope === 'day'
-                      ? ' · 仅当天'
-                      : ' 起生效'}
-                    {p.date > today() ? ' · 尚未生效' : ''}
-                  </strong>
-                  <p>
-                    {kind === 'diet'
-                      ? dietPlanText(p.data as DietPlan)
-                      : `每周抗阻 ${(p.data as TrainingPlan).resistance} 次 · 有氧 ${(p.data as TrainingPlan).cardio} 次`}
-                  </p>
-                </div>
-              ))}
-            {!plans.some((p) => p.kind === kind) && <p>还没有启用计划。</p>}
+        {kind === 'body' && rows.length > 0 ? (
+          <div className="history-table-wrap">
+            <table className="history-table">
+              <thead>
+                <tr>
+                  <th aria-label="选择记录" />
+                  <th>日期 / 条件</th>
+                  <th>体重 kg</th>
+                  <th>7天均值</th>
+                  <th>腰围 cm</th>
+                  <th>体脂 %</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const b = r.data as Body,
+                    a = average(records, r.date);
+                  return (
+                    <tr key={r.id}>
+                      <td>{checkbox(r)}</td>
+                      <td>
+                        <b>{r.date}</b>
+                        <small>
+                          {b.condition === 'morning' ? '晨起空腹' : '其他时间'}
+                          {r.primaryMorning === 1 ? ' · 计入趋势' : ''}
+                        </small>
+                        {b.note && <p className="table-note">{b.note}</p>}
+                      </td>
+                      <td>
+                        <strong>{numeric(b.weight)}</strong>
+                      </td>
+                      <td>{numeric(a.value)}</td>
+                      <td>{numeric(b.waist)}</td>
+                      <td>{numeric(b.bodyFat)}</td>
+                      <td>{actions(r)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </details>
-      )}
+        ) : (
+          rows.map((r) => (
+            <article key={r.id} className="history-card">
+              <div className="section-heading">
+                <h3 className="history-row-title">
+                  {checkbox(r)}
+                  {r.date}
+                </h3>
+                {actions(r)}
+              </div>
+              <EntryDetails
+                entry={r}
+                plan={plans.find((p) => p.id === r.planId)}
+              />
+            </article>
+          ))
+        )}
+        {!rows.length && !rangeError && (
+          <div className="empty-note">
+            换一个时间范围，或从今天的第一次记录开始。
+          </div>
+        )}
+        {kind !== 'body' && (
+          <details className="plan-details">
+            <summary>历史计划</summary>
+            <div className="plan-inner">
+              {plans
+                .filter((p) => p.kind === kind)
+                .map((p) => (
+                  <div className="history-plan" key={p.id}>
+                    <strong>
+                      {p.date}
+                      {p.kind === 'diet' && (p.data as DietPlan).scope === 'day'
+                        ? ' · 仅当天'
+                        : ' 起生效'}
+                      {p.date > today() ? ' · 尚未生效' : ''}
+                    </strong>
+                    <p>
+                      {kind === 'diet'
+                        ? dietPlanText(p.data as DietPlan)
+                        : `每周抗阻 ${(p.data as TrainingPlan).resistance} 次 · 有氧 ${(p.data as TrainingPlan).cardio} 次`}
+                    </p>
+                  </div>
+                ))}
+              {!plans.some((p) => p.kind === kind) && <p>还没有启用计划。</p>}
+            </div>
+          </details>
+        )}
+      </section>
     </div>
   );
 }
