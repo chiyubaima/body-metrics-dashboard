@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import {
   Activity,
   Trash2,
@@ -21,6 +21,7 @@ import { HistoryView } from './history';
 import { JournalCalendar } from './calendar';
 import { TrashView } from './trash';
 import { DeveloperMode } from './developer-mode';
+import { Coach } from './coach';
 import { today, activePlan } from '@/lib/model';
 import {
   workoutAchievements,
@@ -82,6 +83,7 @@ export default function Dashboard({
   signInPath: string;
   localPreview: boolean;
 }) {
+  const recordFormId = useId();
   const [celebration, setCelebration] = useState('');
   useEffect(() => {
     if (!celebration) return;
@@ -361,7 +363,9 @@ export default function Dashboard({
   };
   const title =
     modal?.type === 'record'
-      ? `${modal.entry ? '编辑' : '记录'}${labels[modal.kind]}${modal.kind === 'body' ? '数据' : ''}`
+      ? modal.kind === 'body' && modal.entry
+        ? '编辑身体数据'
+        : `记录${labels[modal.kind]}数据`
       : modal?.type === 'history'
         ? `${labels[modal.kind]}日记`
         : modal?.type === 'plan'
@@ -419,13 +423,22 @@ export default function Dashboard({
           </button>
         </div>
       </header>
-      <JournalCalendar
-        name={data.profile?.name}
-        date={date}
-        onChange={setDate}
-        records={data.records}
-        plans={data.plans}
-      />
+      <div className="dashboard-companion-row">
+        <JournalCalendar
+          name={data.profile?.name}
+          date={date}
+          onChange={setDate}
+          records={data.records}
+          plans={data.plans}
+        />
+        <Coach
+          date={date}
+          ready={statsReady}
+          snapshot={data}
+          blocked={modal !== null}
+          selectDate={setDate}
+        />
+      </div>
       <nav className="mobile-tabs" aria-label="看板模块">
         {Object.entries(labels).map(([key, label]) => (
           <button
@@ -501,18 +514,43 @@ export default function Dashboard({
           data-record-date={
             modal?.type === 'record' ? (modal.entry?.date ?? date) : date
           }
-          className={`dialog-popup ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
+          className={`dialog-popup ${modal?.type === 'record' ? 'record-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'body' ? 'body-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
           showCloseButton={false}
         >
-          <button
-            className="icon-button dialog-close"
-            aria-label="关闭"
-            onClick={close}
-            disabled={busy}
+          <div
+            className={
+              modal?.type === 'record' ? 'record-dialog-header' : undefined
+            }
           >
-            <X size={20} />
-          </button>
-          <DialogTitle>{title}</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
+            {modal?.type === 'record' && (
+              <button
+                type="submit"
+                form={recordFormId}
+                className="primary record-save"
+                disabled={busy || confirmClose}
+                aria-busy={busy}
+              >
+                <Check size={17} />
+                {busy
+                  ? '正在保存…'
+                  : modal.kind === 'diet'
+                    ? '保存这一餐'
+                    : modal.kind === 'training'
+                      ? '保存这次记录'
+                      : '保存记录'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="icon-button dialog-close"
+              aria-label="关闭"
+              onClick={close}
+              disabled={busy}
+            >
+              <X size={20} />
+            </button>
+          </div>
           {modal?.type !== 'record' && (
             <DialogDescription>
               {modal?.type === 'history'
@@ -556,6 +594,7 @@ export default function Dashboard({
             {modal?.type === 'record' && (
               <RecordForm
                 key={(modal.entry?.id ?? 'new') + modal.kind}
+                formId={recordFormId}
                 kind={modal.kind}
                 existing={modal.entry}
                 date={date}

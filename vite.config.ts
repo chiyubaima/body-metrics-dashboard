@@ -2,7 +2,9 @@ import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
+import type { ViteDevServer } from 'vite';
 import hostingConfig from './.openai/hosting.json';
+import { startCodexBridge } from './scripts/coach-codex-bridge.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -34,7 +36,7 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= 'false';
@@ -43,6 +45,7 @@ export default defineConfig(async () => {
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import('@cloudflare/vite-plugin');
+  const coachBridge = command === 'serve' ? await startCodexBridge() : null;
 
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
@@ -54,11 +57,20 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      {
+        name: 'local-coach-codex',
+        configureServer(server: ViteDevServer) {
+          server.httpServer?.once('close', () => coachBridge?.close());
+        },
+        closeBundle() {
+          coachBridge?.close();
+        },
+      },
       vinext(),
       sites(),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: localBindingConfig,
+        config: { ...localBindingConfig, vars: coachBridge?.vars ?? {} },
       }),
     ],
   };

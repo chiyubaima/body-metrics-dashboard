@@ -42,6 +42,7 @@ function repeatedValue(sets: WorkoutSet[], key: 'weight' | 'reps') {
   return sets.every((s) => s[key] === sets[0][key]) ? (sets[0][key] ?? '') : '';
 }
 export function TrainingForm({
+  formId,
   existing,
   date,
   records,
@@ -49,6 +50,7 @@ export function TrainingForm({
   busy,
   onDirty,
 }: {
+  formId: string;
   existing?: Entry;
   date: string;
   records: Entry[];
@@ -282,11 +284,17 @@ export function TrainingForm({
   }
   return (
     <form
+      id={formId}
       className="dialog-body compact-workout"
       data-record-date={recordDate}
       onSubmit={submit}
       onChange={onDirty}
     >
+      {error && (
+        <p className="form-error record-form-error" role="alert">
+          {error}
+        </p>
+      )}
       <div className="workout-top">
         <div className="field">
           <span>
@@ -878,16 +886,6 @@ export function TrainingForm({
           保留原来的“未完成”状态；本次编辑不自动将旧记录变成已完成。
         </p>
       )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="form-actions workout-save">
-        <button className="primary" disabled={busy}>
-          {busy ? '正在保存…' : '保存这次记录'}
-        </button>
-      </div>
     </form>
   );
 }

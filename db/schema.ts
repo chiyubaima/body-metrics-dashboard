@@ -61,3 +61,63 @@ export const annotations = sqliteTable(
   },
   (t) => [index('idx_annotations_owner_created').on(t.owner, t.createdAt)],
 );
+
+export const coachSettings = sqliteTable('coach_settings', {
+  owner: text('owner').primaryKey(),
+  payload: text('payload').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+export const coachMemories = sqliteTable(
+  'coach_memories',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    content: text('content').notNull(),
+    category: text('category').notNull(),
+    source: text('source').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [index('idx_coach_memories_owner').on(t.owner)],
+);
+export const coachCommitments = sqliteTable(
+  'coach_commitments',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    title: text('title').notNull(),
+    kind: text('kind').notNull(),
+    dueAt: text('due_at').notNull(),
+    status: text('status').notNull().default('pending'),
+    completion: text('completion'),
+    evidenceId: text('evidence_id'),
+    notifiedAt: text('notified_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [index('idx_coach_commitments_owner_due').on(t.owner, t.dueAt)],
+);
+export const coachTurns = sqliteTable(
+  'coach_turns',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    kind: text('kind').notNull(),
+    date: text('date').notNull(),
+    dayKey: text('day_key'),
+    userText: text('user_text').notNull(),
+    reply: text('reply'),
+    status: text('status').notNull().default('pending'),
+    proposals: text('proposals').notNull().default('[]'),
+    evidence: text('evidence').notNull().default('[]'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [
+    index('idx_coach_turns_owner_created').on(t.owner, t.createdAt, t.id),
+    uniqueIndex('idx_coach_daily_opening').on(t.owner, t.dayKey),
+    uniqueIndex('idx_coach_one_pending')
+      .on(t.owner)
+      .where(sql`status='pending'`),
+  ],
+);

@@ -48,6 +48,7 @@ function Submit({
 }
 
 type RecordProps = {
+  formId: string;
   kind: Kind;
   date: string;
   existing?: Entry;
@@ -62,7 +63,7 @@ export function RecordForm(props: RecordProps) {
   if (props.kind === 'training') return <TrainingForm {...props} />;
   return <BodyForm {...props} />;
 }
-function BodyForm({ existing, date, save, busy, onDirty }: RecordProps) {
+function BodyForm({ formId, existing, date, save, onDirty }: RecordProps) {
   const body = existing?.data as Body | undefined,
     [id] = useState(() => existing?.id ?? crypto.randomUUID());
   const [condition, setCondition] = useState<Body['condition']>(
@@ -100,11 +101,17 @@ function BodyForm({ existing, date, save, busy, onDirty }: RecordProps) {
   }
   return (
     <form
+      id={formId}
       className="dialog-body"
       data-record-date={recordDate}
       onSubmit={submit}
       onChange={onDirty}
     >
+      {error && (
+        <p className="form-error record-form-error" role="alert">
+          {error}
+        </p>
+      )}
       <div className="field">
         <span>
           记录日期 <em>*</em>
@@ -212,13 +219,6 @@ function BodyForm({ existing, date, save, busy, onDirty }: RecordProps) {
       <p className="detail-text">
         晨重趋势每天只使用一次测量，其他时间的体重仍会保存。
       </p>
-
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <Submit busy={busy} />
     </form>
   );
 }

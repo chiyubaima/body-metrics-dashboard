@@ -23,7 +23,9 @@ export async function api(
       return Response.json({ error: '请使用记录表单提交。' }, { status: 415 });
   }
   try {
-    return Response.json(await action(database(), user.userId), {
+    const result = await action(database(), user.userId);
+    if (result instanceof Response) return result;
+    return Response.json(result, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {

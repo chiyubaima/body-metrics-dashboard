@@ -1,0 +1,534 @@
+/* Visual materials only. Existing layout, scrolling and interaction rules remain authoritative. */
+:root {
+  --background: #eef3f5;
+  --foreground: #293b43;
+  --border: #d8e2e5;
+  --glass-accent: #559c17;
+  --glass-fill: #66bf22;
+  --glass-ink: #315d1b;
+  --glass-tint: #f0f8e9;
+  --glass-surface: #ffffffb8;
+  --glass-floating: #ffffffe6;
+  --glass-reading: #ffffffde;
+  --glass-edge: #ffffffed;
+  --glass-line: #5269771c;
+  --glass-shadow: 0 8px 28px #344f6310, 0 1px 3px #344f6308, inset 0 1px 0 #fff;
+  --glass-floating-shadow:
+    0 24px 80px #243e542b, 0 4px 16px #243e5412, inset 0 1px 0 #fff;
+  --glass-blur: blur(22px) saturate(135%);
+  --glass-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+html body {
+  background:
+    radial-gradient(ellipse at 4% 8%, #b5dff159, transparent 49%),
+    radial-gradient(ellipse at 52% 0%, #c9eab84d, transparent 45%),
+    radial-gradient(ellipse at 100% 28%, #ffe0ae47, transparent 48%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+html :is(.body-panel, .body-dialog) {
+  --glass-accent: #168fca;
+  --glass-fill: #22a5df;
+  --glass-ink: #073e57;
+  --glass-tint: #ecf7fc;
+}
+html :is(.training-panel, .training-dialog) {
+  --glass-accent: #b66b09;
+  --glass-fill: #ffb52d;
+  --glass-ink: #694509;
+  --glass-tint: #fff7e8;
+}
+
+/* Three quiet surfaces, with color carried by the controls and actual data. */
+html :is(.journal-calendar, .panel, .coach-strip) {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html .panel {
+  border-radius: 26px;
+}
+html .journal-calendar {
+  border-radius: 22px;
+}
+html .coach-strip {
+  border-radius: 18px;
+}
+html .panel-fixed {
+  background: linear-gradient(135deg, #ffffffb8, #ffffff4d);
+  border-bottom-color: var(--glass-line);
+}
+html .panel-scroll {
+  scrollbar-color: #9dafb65c transparent;
+}
+html :is(.summary-block, .training-today, .form-actions) {
+  border-color: var(--glass-line);
+}
+html .panel-heading h2 {
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+html .module-number {
+  color: color-mix(in srgb, var(--glass-accent) 25%, #dce5e8);
+  font-weight: 600;
+}
+html :is(.module-icon, .coach-mark) {
+  border: 1px solid #ffffffd9;
+  background: linear-gradient(145deg, #ffffffd9, var(--glass-tint));
+  box-shadow:
+    0 3px 9px #3659690a,
+    inset 0 1px 0 #fff;
+  border-radius: 15px;
+  transform: none;
+}
+
+/* Smooth, shallow controls replace the thick extruded button edges. */
+html :is(.primary, .panel .panel-action, .dialog-popup .primary) {
+  background: linear-gradient(180deg, #ffffff24, #ffffff00), var(--glass-fill);
+  border: 1px solid color-mix(in srgb, var(--glass-accent) 20%, transparent);
+  color: var(--glass-ink);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 #ffffff5c,
+    0 3px 8px color-mix(in srgb, var(--glass-accent) 13%, transparent);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+html
+  :is(.primary, .panel .panel-action, .dialog-popup .primary):hover:not(
+    :disabled
+  ) {
+  background: linear-gradient(180deg, #ffffff3b, #ffffff0a), var(--glass-fill);
+  filter: none;
+  box-shadow:
+    inset 0 1px 0 #ffffff70,
+    0 4px 12px color-mix(in srgb, var(--glass-accent) 18%, transparent);
+}
+html
+  :is(.primary, .panel .panel-action, .dialog-popup .primary):active:not(
+    :disabled
+  ) {
+  border-bottom-width: 1px;
+  box-shadow: inset 0 1px 3px #2942521a;
+  transform: scale(0.985);
+}
+html
+  :is(
+    .secondary,
+    .icon-button,
+    .date-picker-trigger,
+    .plate-complete,
+    .danger-button
+  ) {
+  border-width: 1px;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 3px #344f6308,
+    inset 0 1px 0 #ffffffc7;
+  font-weight: 600;
+}
+html :is(.secondary, .icon-button, .date-picker-trigger) {
+  background: var(--glass-reading);
+  border-color: var(--glass-line);
+}
+html :is(.panel, .dialog-popup) .secondary,
+html .date-picker-trigger {
+  color: var(--glass-ink);
+}
+html :is(.secondary, .icon-button, .date-picker-trigger):hover:not(:disabled) {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 28%, transparent);
+}
+html .panel-history {
+  background: color-mix(in srgb, var(--glass-tint) 70%, #ffffff80);
+  color: var(--glass-accent);
+}
+html button {
+  transition:
+    background 180ms var(--glass-ease),
+    border-color 180ms var(--glass-ease),
+    box-shadow 180ms var(--glass-ease),
+    transform 160ms var(--glass-ease);
+}
+html button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Floating material stays dense enough for forms and long diary entries. */
+html :is(.dialog-popup, .coach-forget) {
+  background: var(--glass-floating) !important;
+  border: 1px solid var(--glass-edge) !important;
+  border-radius: 26px !important;
+  box-shadow: var(--glass-floating-shadow) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html
+  :is(
+    .calendar-month-sheet,
+    .date-picker-popover,
+    .developer-toolbar,
+    .developer-panel
+  ) {
+  background: var(--glass-floating);
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  box-shadow: var(--glass-floating-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html .coach-sheet[data-slot='sheet-content'] {
+  background: var(--glass-floating);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-floating-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html
+  :is(
+    [data-slot='dialog-overlay'],
+    [data-slot='sheet-overlay'],
+    [data-slot='alert-dialog-overlay']
+  ) {
+  background: #253c5029;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+html
+  :is(
+    .record-dialog-header,
+    .coach-header,
+    .coach-composer,
+    .developer-panel > header
+  ) {
+  background: #ffffff80;
+  border-color: var(--glass-line);
+}
+html .dialog-popup [data-slot='dialog-title'] {
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+html .dialog-close {
+  background: #e8eef1b3;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 #ffffffb3;
+}
+
+/* Calendar and segmented controls keep their existing selected/recorded states. */
+html
+  :is(
+    .segmented,
+    .mobile-tabs,
+    .developer-mode-switch,
+    .coach-tab-list[data-slot='tabs-list']
+  ) {
+  background: #dfe7eb80;
+  border-color: transparent;
+  border-radius: 13px;
+  box-shadow: inset 0 1px 2px #29465508;
+}
+html :is(.segmented, .mobile-tabs, .developer-mode-switch) button.selected,
+html .coach-tab-list [data-active] {
+  background: #ffffffed;
+  border-radius: 10px;
+  box-shadow:
+    0 2px 6px #304a5c14,
+    inset 0 1px 0 #fff;
+  font-weight: 650;
+}
+html .calendar-day {
+  background: #ffffff59;
+  border-radius: 12px;
+}
+html .calendar-day:hover:not(:disabled) {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 20%, transparent);
+}
+html .calendar-day.selected {
+  background: linear-gradient(160deg, #ffffffb3, #ffffff26), var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 35%, transparent);
+  box-shadow:
+    0 2px 7px #304a5c0d,
+    inset 0 1px 0 #ffffffed;
+}
+html .calendar-day.selected b {
+  color: var(--glass-accent);
+}
+html .calendar-day.is-today b:after {
+  background: var(--glass-accent);
+}
+html .month-nav select {
+  background: #e8eef080;
+  color: var(--glass-ink);
+  border-radius: 9px;
+}
+
+/* Content uses calm reading surfaces; only the outer containers need blur. */
+html :is(.chart-card, .history-card, .history-table-wrap, .plate-detail) {
+  background: var(--glass-reading);
+  border: 1px solid var(--glass-line);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 #fff;
+}
+html :is(.body-metric-strip, .strength-body-grid) > button {
+  background: #ffffff80;
+  border: 1px solid #ffffffd9;
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 6px #344f6305;
+}
+html :is(.body-metric-strip, .strength-body-grid) > button.selected {
+  background: linear-gradient(145deg, #ffffff99, #ffffff00), var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 32%, transparent);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px #344f630a;
+}
+html .body-panel .body-metric-strip > button strong,
+html .strength-body-grid > button > strong,
+html .strength-growth-copy > strong {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.7px;
+}
+html .section-heading h3 {
+  font-weight: 650;
+}
+html .nutrition-orbit .orbit-track {
+  stroke: #d9e3df80;
+}
+html .nutrition-orbit .orbit-fill {
+  filter: drop-shadow(
+    0 2px 3px color-mix(in srgb, var(--orbit) 18%, transparent)
+  );
+}
+html .nutrition-orbit .orbit-dial strong {
+  font-weight: 650;
+  color: #334e3c;
+}
+html :is(.orbit-label, .orbit-goal, .orbit-dial small, .nutrition-coverage) {
+  color: #687c6b;
+}
+html .plate-tabs button {
+  background: #ffffff80;
+  border: 1px solid var(--glass-line);
+  border-radius: 15px;
+  box-shadow: inset 0 1px 0 #fff;
+}
+html .plate-tabs .logged {
+  background: #eaf6e0c7;
+  border-color: #a1c88766;
+}
+html .plate-tabs .selected {
+  background: #edf8e6;
+  border-color: #68ac3580;
+  outline: 1px solid #68ac35a6;
+  outline-offset: 1px;
+  box-shadow:
+    0 3px 9px #3d702415,
+    inset 0 1px 0 #fff;
+}
+html .plate-tabs button > span {
+  border-radius: 11px;
+}
+html .plate-complete {
+  color: #507a31;
+}
+html
+  :is(
+    .food-equivalents,
+    .history-summary,
+    .selection-toolbar,
+    .plan-energy-preview,
+    .plan-scope-note,
+    .strength-reference
+  ) {
+  background: color-mix(in srgb, var(--glass-tint) 75%, #ffffffb3);
+  border-color: var(--glass-line);
+  border-radius: 14px;
+}
+html
+  :is(
+    .history-table th,
+    .history-table td,
+    .trash-row,
+    .plate-food,
+    .matrix-exercise
+  ) {
+  border-color: var(--glass-line);
+}
+html .history-table th {
+  background: #f0f4f6;
+  color: #607680;
+}
+html .history-table tbody tr:hover {
+  background: #f2f7fa;
+}
+
+/* Existing forms retain their dimensions, validation and semantic error colors. */
+html
+  :is(.dialog-popup, .coach-sheet)
+  :is(
+    .field input,
+    .field textarea,
+    .matrix-input input,
+    .individual-set input,
+    .entry-input
+  ),
+html
+  :is(
+    .food-search,
+    .exercise-search-line input,
+    .exercise-search-line select,
+    .coach-composer textarea,
+    .developer-editor > textarea
+  ) {
+  background: var(--glass-reading);
+  border-width: 1px;
+  border-color: #cfdce180;
+  box-shadow:
+    inset 0 1px 2px #29465505,
+    0 1px 0 #fff;
+}
+html
+  :is(.dialog-popup, .coach-sheet)
+  :is(
+    .field input,
+    .field textarea,
+    .matrix-input input,
+    .individual-set input,
+    .entry-input
+  ):hover {
+  border-color: color-mix(in srgb, var(--glass-accent) 35%, #d6e1e5);
+}
+html .dialog-popup .choice-list > label,
+html .meal-tabs button {
+  background: #ffffffb3;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 #fff;
+}
+html .dialog-popup .choice-list > label:has([data-checked]),
+html .dialog-popup .choice-list > label:has([aria-checked='true']),
+html .meal-tabs button.selected {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 38%, transparent);
+  color: var(--glass-ink);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 5px #344f6308;
+}
+html .meal-dialog .meal-live-summary {
+  background: linear-gradient(135deg, #ffffffb3, #ffffff33), #eef7e7;
+  border: 1px solid #cbdcbe80;
+  box-shadow: inset 0 1px 0 #fff;
+}
+html .food-library {
+  background: #f3f7f1;
+  border-color: var(--glass-line);
+  border-radius: 18px;
+}
+html .food-library .food-search {
+  background: #fff;
+  box-shadow: 0 -12px 0 12px #f3f7f1;
+}
+html .food-search:focus-within {
+  outline: 2px solid var(--glass-accent);
+  outline-offset: 2px;
+}
+html .meal-editing > .section-heading {
+  background: #f9fbf8;
+  border-color: var(--glass-line);
+}
+html :is(.exercise-picker, .individual-sets) {
+  background: #fcf8ef;
+  border-color: var(--glass-line);
+}
+html .exercise-picker-list button {
+  border-color: #b8a58a33;
+  box-shadow: 0 1px 2px #344f6305;
+}
+
+html .coach-message.assistant {
+  background: var(--glass-reading);
+  border: 1px solid var(--glass-line);
+  box-shadow: 0 3px 10px #344f6306;
+}
+html .coach-message.user {
+  background: #e6f4d5;
+  border-color: #c9dfa780;
+  box-shadow: inset 0 1px 0 #ffffff80;
+}
+html .coach-send {
+  border-bottom-width: 1px;
+  box-shadow: inset 0 1px 0 #ffffff40;
+}
+html .celebration {
+  background: #f5fcefed;
+  border: 1px solid #c0dca1;
+  box-shadow: var(--glass-floating-shadow);
+}
+html
+  :is(.dashboard, .dialog-popup, .coach-sheet, .developer-tools)
+  :is(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--glass-accent);
+  outline-offset: 3px;
+}
+html
+  .dialog-popup
+  :is([data-slot='checkbox'], [data-slot='radio-group-item']):focus-visible {
+  border-color: var(--glass-accent);
+  --tw-ring-color: color-mix(in srgb, var(--glass-accent) 25%, transparent);
+}
+
+/* System preferences and unsupported blur never leave text on a transparent base. */
+@supports not
+((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-surface: #fafdff;
+    --glass-floating: #fff;
+    --glass-reading: #fff;
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --glass-surface: #fff;
+    --glass-floating: #fff;
+    --glass-reading: #fff;
+    --glass-blur: none;
+    --glass-edge: #abbcc3;
+    --glass-line: #abbcc3;
+  }
+  html body {
+    background: #eef3f5;
+  }
+  html
+    :is(
+      [data-slot='dialog-overlay'],
+      [data-slot='sheet-overlay'],
+      [data-slot='alert-dialog-overlay']
+    ) {
+    background: #253c5059;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html button,
+  html .orbit-fill {
+    transition: none;
+  }
+  html button:active:not(:disabled),
+  html
+    :is(.primary, .panel .panel-action, .dialog-popup .primary):active:not(
+      :disabled
+    ),
+  html .strength-body-grid > button:hover {
+    transform: none;
+  }
+}

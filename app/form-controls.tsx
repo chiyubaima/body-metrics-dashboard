@@ -56,11 +56,13 @@ export function Picker({
   value,
   options,
   onChange,
+  popupClassName,
 }: {
   label: string;
   value: string;
   options: [string, string][];
   onChange: (v: string) => void;
+  popupClassName?: string;
 }) {
   return (
     <Select
@@ -72,7 +74,7 @@ export function Picker({
       <SelectTrigger aria-label={label} className="w-full min-h-11">
         <SelectValue>{options.find((o) => o[0] === value)?.[1]}</SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className={popupClassName}>
         {options.map(([v, label]) => (
           <SelectItem key={v} value={v}>
             {label}

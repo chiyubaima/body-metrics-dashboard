@@ -3818,10 +3818,6 @@ select.entry-input {
     max-width: 110px;
     font-size: 10px;
   }
-  .workout-save > span {
-    font-size: 10px;
-    max-width: 130px;
-  }
   .trash-row {
     gap: 7px;
   }
@@ -4189,10 +4185,6 @@ select.entry-input {
   overflow: hidden;
   padding-bottom: 16px !important;
 }
-.meal-dialog > [data-slot='dialog-title'],
-.meal-dialog > [data-slot='dialog-description'] {
-  flex-shrink: 0;
-}
 .meal-dialog .dialog-form-region {
   display: flex;
   flex: 1;
@@ -4413,12 +4405,6 @@ select.entry-input {
   font-size: 9px;
   margin: 5px 0 0;
 }
-.meal-dialog .form-actions {
-  flex-shrink: 0;
-  padding-top: 10px;
-  margin: 0;
-  border-top: 1px solid #e7edde;
-}
 .meal-dialog .form-error {
   flex-shrink: 0;
   margin: 0;
@@ -4496,13 +4482,6 @@ select.entry-input {
   }
   .meal-form .food-empty p {
     margin: 5px 0 0;
-  }
-  .meal-dialog .form-actions > .helper {
-    display: none;
-  }
-  .meal-dialog .form-actions .primary {
-    width: 100%;
-    justify-content: center;
   }
 }
 
@@ -5072,6 +5051,81 @@ select.entry-input {
   color: #8a734e;
   padding: 6px 0;
 }
+.body-dialog {
+  --primary: #1583b5;
+  --border: #cce5f0;
+  border-color: #cce5f0 !important;
+}
+.body-dialog [data-slot='dialog-title'],
+.body-dialog .text-button {
+  color: #1583b5;
+}
+.body-dialog .record-dialog-header {
+  border-bottom-color: #e1eef5;
+}
+.body-dialog .primary {
+  background: #22a5df;
+  border-bottom-color: #1583b5;
+  color: #073e57;
+}
+.body-dialog .primary:hover:not(:disabled) {
+  background: #29aee7;
+}
+.body-dialog .secondary,
+.body-dialog .choice-list > label,
+.body-dialog .date-picker-trigger,
+.body-dialog .month-nav select {
+  background: #f2faff;
+  border-color: #cce5f0;
+  color: #286784;
+}
+.body-dialog .secondary:hover:not(:disabled),
+.body-dialog .icon-button:hover:not(:disabled),
+.body-dialog .choice-list > label:has([data-checked]),
+.body-dialog .choice-list > label:has([aria-checked='true']),
+.body-dialog .calendar-day:hover:not(:disabled),
+.body-dialog .calendar-day.selected {
+  background: #e7f5fc;
+  border-color: #8fcce7;
+}
+.body-dialog .field > span,
+.body-dialog .measurement-heading {
+  color: #527687;
+}
+.body-dialog .field input,
+.body-dialog .field textarea {
+  border-color: #cce5f0;
+  background: #fcfeff;
+}
+.body-dialog .field input:hover,
+.body-dialog .field textarea:hover {
+  border-color: #8fcce7;
+}
+.body-dialog .date-picker-popover {
+  border-color: #cce5f0;
+  border-bottom-color: #8fcce7;
+  box-shadow: 0 15px 40px #164e6824;
+}
+.body-dialog .calendar-day b {
+  color: #527687;
+}
+.body-dialog .calendar-day.selected {
+  box-shadow: 0 2px 0 #8fcce7;
+}
+.body-dialog .calendar-day.selected b {
+  color: #1583b5;
+}
+.body-dialog .calendar-day.is-today b:after {
+  background: #22a5df;
+}
+.body-dialog :focus-visible {
+  outline-color: #22a5df;
+}
+.body-dialog [data-slot='checkbox']:focus-visible,
+.body-dialog [data-slot='radio-group-item']:focus-visible {
+  border-color: #22a5df;
+  --tw-ring-color: #22a5df80;
+}
 .training-dialog {
   --primary: #b66b09;
   --ring: #ff9600;
@@ -5201,5 +5255,87 @@ select.entry-input {
 @media (prefers-reduced-motion: reduce) {
   .cardio-matrix-row {
     animation: none;
+  }
+}
+
+/* Record actions stay visible while the form's contents scroll. */
+.dialog-popup.record-dialog {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0 !important;
+}
+.record-dialog-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e7ede8;
+  background: #fff;
+}
+.record-dialog-header [data-slot='dialog-title'] {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  line-height: 1.35;
+}
+.record-dialog-header .record-save {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 9px 14px;
+  white-space: nowrap;
+}
+.record-dialog-header .dialog-close {
+  position: static;
+  flex-shrink: 0;
+}
+.record-dialog > .dialog-form-region {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 24px 20px;
+}
+.record-dialog .dialog-form-region > form {
+  padding-top: 18px;
+}
+.record-dialog.meal-dialog > .dialog-form-region {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.record-dialog .record-form-error {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex-shrink: 0;
+  margin: 0;
+}
+.record-dialog > .dialog-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+@media (max-width: 520px) {
+  .record-dialog-header {
+    gap: 8px;
+    padding: 14px 16px;
+  }
+  .record-dialog-header [data-slot='dialog-title'] {
+    font-size: 18px;
+  }
+  .record-dialog-header .record-save {
+    padding: 9px 10px;
+  }
+  .record-dialog-header .record-save > svg {
+    display: none;
+  }
+  .record-dialog-header .dialog-close {
+    width: 32px;
+    height: 36px;
+  }
+  .record-dialog > .dialog-form-region {
+    padding: 0 16px 16px;
   }
 }

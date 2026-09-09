@@ -13,6 +13,7 @@ import { compactDate, numeric } from './panels';
 import { MealIcon, MacroLine } from './nutrition';
 import { displayFoodName } from '@/lib/food-labels';
 export function MealForm({
+  formId,
   existing,
   date,
   records,
@@ -21,6 +22,7 @@ export function MealForm({
   busy,
   onDirty,
 }: {
+  formId: string;
   existing?: Entry;
   date: string;
   records: Entry[];
@@ -193,11 +195,17 @@ export function MealForm({
   }
   return (
     <form
+      id={formId}
       className="dialog-body meal-form"
       data-record-date={recordDate}
       onSubmit={submit}
       onChange={onDirty}
     >
+      {error && (
+        <p className="form-error record-form-error" role="alert">
+          {error}
+        </p>
+      )}
       <DeleteConfirm
         count={confirmDelete ? 1 : 0}
         label="当天饮食"
@@ -673,17 +681,6 @@ export function MealForm({
             />
           </Field>
         </details>
-      </div>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="form-actions">
-        <button className="primary" disabled={busy}>
-          {busy ? '正在保存…' : '保存这一餐'}
-          <Check size={17} />
-        </button>
       </div>
     </form>
   );

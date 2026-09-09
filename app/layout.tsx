@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './glass.css';
 
 export const metadata: Metadata = {
   title: '身体日记 · 看见每一份积累',

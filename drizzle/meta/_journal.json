@@ -15,6 +15,13 @@
       "when": 1788853535068,
       "tag": "0001_rich_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788923341967,
+      "tag": "0002_spicy_rattler",
+      "breakpoints": true
     }
   ]
 }

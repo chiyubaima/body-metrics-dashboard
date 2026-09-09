@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "Captain",
+  "frameWidth": 192,
+  "frameHeight": 208,
+  "avatar": "/captain/avatar.png",
+  "animations": {
+    "idle": { "src": "/captain/idle.webp", "frames": 6, "durations": [900, 140, 140, 220, 220, 1000] },
+    "greeting": { "src": "/captain/greeting.webp", "frames": 4, "durations": [220, 240, 240, 800] },
+    "thinking": { "src": "/captain/thinking.webp", "frames": 6, "durations": [360, 260, 260, 340, 360, 500] },
+    "fitness": { "src": "/captain/fitness.webp", "frames": 6, "durations": [320, 160, 240, 320, 180, 280] },
+    "eating": { "src": "/captain/eating.webp", "frames": 6, "durations": [480, 180, 280, 240, 240, 400] },
+    "rest": { "src": "/captain/rest.webp", "frames": 6, "durations": [600, 400, 400, 500, 600, 600] }
+  }
+}
