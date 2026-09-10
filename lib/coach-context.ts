@@ -6,7 +6,12 @@ import {
   loadLabels,
 } from './progress.ts';
 import { strengthOverview } from './strength.ts';
-import { commitmentLabels } from './coach.ts';
+import {
+  commitmentLabels,
+  memoryActive,
+  commitmentPending,
+  commitmentExpiry,
+} from './coach.ts';
 import type { Body, Diet, Entry, Snapshot, Training } from './model.ts';
 import type { CoachMemory, Commitment, Evidence, CoachTurn } from './coach.ts';
 
@@ -202,14 +207,45 @@ export function buildCoachContext(
   });
   let remaining = 9000;
   const conversation = turns
-    .filter((t) => t.status === 'complete')
+    .filter(
+      (t) =>
+        t.status === 'complete' &&
+        !(t.toolRuns ?? []).some((run) =>
+          (run.references ?? []).some((ref) =>
+            ref.type === 'memory'
+              ? !memories.some((m) => m.id === ref.id && memoryActive(m, now))
+              : !commitments.some(
+                  (c) => c.id === ref.id && commitmentPending(c, now),
+                ),
+          ),
+        ) &&
+        !t.proposals.some(
+          (p) =>
+            p.status === 'deleted' ||
+            p.status === 'dismissed' ||
+            (!!p.expiresAt && p.expiresAt <= now.toISOString()) ||
+            (p.type === 'memory'
+              ? memories.some((m) => m.id === p.id && !memoryActive(m, now))
+              : commitments.some(
+                  (c) => c.id === p.id && !commitmentPending(c, now),
+                )),
+        ),
+    )
     .slice(-12)
     .reverse()
     .flatMap((t) => {
       const text = t.userText.length + (t.reply?.length ?? 0);
       if (text > remaining) return [];
       remaining -= text;
-      return [{ date: t.date, user: t.userText, coach: t.reply }];
+      return [
+        {
+          id: t.id,
+          createdAt: t.createdAt,
+          date: t.date,
+          user: t.userText,
+          coach: t.reply,
+        },
+      ];
     })
     .reverse();
   const context = {
@@ -228,14 +264,17 @@ export function buildCoachContext(
         }
       : null,
     facts: evidence,
-    memories: memories.map((m) => ({
-      id: m.id,
-      category: m.category,
-      content: m.content,
-      updatedAt: m.updatedAt,
-    })),
+    memories: memories
+      .filter((m) => memoryActive(m, now))
+      .map((m) => ({
+        id: m.id,
+        category: m.category,
+        content: m.content,
+        updatedAt: m.updatedAt,
+        expiresAt: m.expiresAt ?? null,
+      })),
     commitments: commitments
-      .filter((c) => c.status === 'pending')
+      .filter((c) => commitmentPending(c, now))
       .slice(0, 30)
       .map((c) => ({
         id: c.id,
@@ -243,6 +282,7 @@ export function buildCoachContext(
         type: commitmentLabels[c.kind],
         dueAt: c.dueAt,
         status: c.status,
+        expiresAt: commitmentExpiry(c),
       })),
     conversation,
   };

@@ -35,6 +35,7 @@ export function HistoryView({
   records,
   plans,
   date,
+  initialDate,
   edit,
   remove,
   busy,
@@ -43,13 +44,16 @@ export function HistoryView({
   records: Entry[];
   plans: Plan[];
   date: string;
+  initialDate?: string;
   edit: (r: Entry) => void;
   remove: (rows: Entry[]) => Promise<void>;
   busy: boolean;
 }) {
-  const [period, setPeriod] = useState('90'),
-    [rangeStart, setRangeStart] = useState(() => shiftDate(date, -89)),
-    [rangeEnd, setRangeEnd] = useState(date),
+  const [period, setPeriod] = useState(initialDate ? 'custom' : '90'),
+    [rangeStart, setRangeStart] = useState(
+      () => initialDate ?? shiftDate(date, -89),
+    ),
+    [rangeEnd, setRangeEnd] = useState(initialDate ?? date),
     [condition, setCondition] = useState('all'),
     [selected, setSelected] = useState<string[]>([]),
     [pending, setPending] = useState<Entry[]>([]),

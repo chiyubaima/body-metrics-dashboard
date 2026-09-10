@@ -44,6 +44,7 @@ function repeatedValue(sets: WorkoutSet[], key: 'weight' | 'reps') {
 export function TrainingForm({
   formId,
   existing,
+  draft,
   date,
   records,
   save,
@@ -52,15 +53,18 @@ export function TrainingForm({
 }: {
   formId: string;
   existing?: Entry;
+  draft?: Entry;
   date: string;
   records: Entry[];
   save: Save;
   busy: boolean;
   onDirty: () => void;
 }) {
-  const original = existing?.data as Training | undefined;
-  const [id] = useState(() => existing?.id ?? crypto.randomUUID()),
-    [recordDate, setRecordDate] = useState(existing?.date ?? date),
+  const original = (draft ?? existing)?.data as Training | undefined;
+  const [id] = useState(() => draft?.id ?? existing?.id ?? crypto.randomUUID()),
+    [recordDate, setRecordDate] = useState(
+      draft?.date ?? existing?.date ?? date,
+    ),
     [type, setType] = useState<Training['type']>(
       original?.type ?? 'resistance',
     );

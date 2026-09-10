@@ -1,0 +1,1 @@
+ALTER TABLE `coach_turns` ADD `tool_runs` text DEFAULT '[]' NOT NULL;

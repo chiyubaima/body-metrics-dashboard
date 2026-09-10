@@ -1,4 +1,6 @@
 'use client';
+import { resolveRecordAction } from '@/lib/coach-tool-types';
+import type { CoachToolAction } from '@/lib/coach-tool-types';
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import {
   Activity,
@@ -38,8 +40,14 @@ import type {
   MealSlot,
 } from '@/lib/model';
 type Modal =
-  | { type: 'record'; kind: Kind; entry?: Entry; meal?: MealSlot }
-  | { type: 'history'; kind: Kind }
+  | {
+      type: 'record';
+      kind: Kind;
+      entry?: Entry;
+      draft?: Entry;
+      meal?: MealSlot;
+    }
+  | { type: 'history'; kind: Kind; initialDate?: string }
   | { type: 'plan'; kind: 'diet' | 'training' }
   | { type: 'settings' }
   | { type: 'trash' };
@@ -103,6 +111,7 @@ export default function Dashboard({
     [dirty, setDirty] = useState(false),
     [confirmClose, setConfirmClose] = useState(false),
     [notice, setNotice] = useState('');
+  const modalGeneration = useRef(0);
   const requestSequence = useRef(0),
     working = useRef(false);
   const refresh = useCallback(async () => {
@@ -114,6 +123,7 @@ export default function Dashboard({
         setLoaded(true);
         setLoadError('');
       }
+      return next;
     } catch (e) {
       if (sequence === requestSequence.current)
         setLoadError(e instanceof Error ? e.message : '读取失败');
@@ -131,6 +141,7 @@ export default function Dashboard({
     return () => window.removeEventListener('focus', focused);
   }, [refresh]);
   const open = useCallback((next: Modal) => {
+    modalGeneration.current++;
     setDirty(false);
     setConfirmClose(false);
     setModal(next);
@@ -157,12 +168,42 @@ export default function Dashboard({
       } catch {}
     });
   }, []);
+  async function openCoachAction(action: CoachToolAction) {
+    if (modal || busy) throw new Error('请先保存或关闭当前表单。');
+    if (action.type === 'record') {
+      const generation = modalGeneration.current;
+      const fresh = await refresh();
+      if (modalGeneration.current !== generation || working.current)
+        throw new Error('当前页面已开始其他编辑，请完成后重新打开草稿。');
+      const resolved = resolveRecordAction(action, fresh.records);
+      setDate((resolved.draft ?? resolved.existing ?? action.entry).date);
+      changeModule(action.entry.kind);
+      open({
+        type: 'record',
+        kind: action.entry.kind,
+        entry: resolved.existing,
+        draft: resolved.draft,
+      });
+      if (resolved.draft) setDirty(true);
+    } else if (action.type === 'page') {
+      setDate(action.date);
+      changeModule(action.kind);
+      open({ type: 'history', kind: action.kind, initialDate: action.date });
+    }
+  }
   async function save(path: string, payload: unknown, method = 'POST') {
     if (working.current) return;
     working.current = true;
     setBusy(true);
     try {
-      await request(path, payload, method);
+      const guardedPayload =
+        path === '/api/records' && modal?.type === 'record' && modal.draft
+          ? {
+              ...(payload as Record<string, unknown>),
+              expectedUpdatedAt: modal.entry?.updatedAt ?? null,
+            }
+          : payload;
+      await request(path, guardedPayload, method);
       const saved = payload as {
         id?: string;
         kind?: Kind;
@@ -440,6 +481,8 @@ export default function Dashboard({
           snapshot={data}
           blocked={modal !== null}
           selectDate={setDate}
+          onToolAction={openCoachAction}
+          onRecordsChanged={refresh}
           settingsRequest={coachSettingsRequest}
         />
       </div>
@@ -615,10 +658,11 @@ export default function Dashboard({
           >
             {modal?.type === 'record' && (
               <RecordForm
-                key={(modal.entry?.id ?? 'new') + modal.kind}
+                key={(modal.draft?.id ?? modal.entry?.id ?? 'new') + modal.kind}
                 formId={recordFormId}
                 kind={modal.kind}
                 existing={modal.entry}
+                draft={modal.draft}
                 date={date}
                 save={save}
                 busy={busy}
@@ -672,6 +716,7 @@ export default function Dashboard({
                   records={data.records}
                   plans={data.plans}
                   date={date}
+                  initialDate={modal.initialDate}
                   edit={(r) => open({ type: 'record', kind: r.kind, entry: r })}
                   remove={remove}
                   busy={busy}

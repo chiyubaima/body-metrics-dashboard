@@ -1,5 +1,9 @@
 import { api, readBody } from '@/lib/api';
-import { saveCommitment, changeCommitment } from '@/db/coach';
+import {
+  saveCommitment,
+  changeCommitment,
+  permanentlyForgetCoachItem,
+} from '@/db/coach';
 export async function POST(r: Request) {
   return api(
     r,
@@ -11,6 +15,19 @@ export async function PATCH(r: Request) {
   return api(
     r,
     async (db, owner) => changeCommitment(db, owner, await readBody(r)),
+    true,
+  );
+}
+export async function DELETE(r: Request) {
+  return api(
+    r,
+    async (db, owner) =>
+      permanentlyForgetCoachItem(
+        db,
+        owner,
+        'commitment',
+        (await readBody(r)).id,
+      ),
     true,
   );
 }

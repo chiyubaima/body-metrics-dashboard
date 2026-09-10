@@ -52,6 +52,7 @@ type RecordProps = {
   kind: Kind;
   date: string;
   existing?: Entry;
+  draft?: Entry;
   save: Save;
   busy: boolean;
   onDirty: () => void;
@@ -63,18 +64,31 @@ export function RecordForm(props: RecordProps) {
   if (props.kind === 'training') return <TrainingForm {...props} />;
   return <BodyForm {...props} />;
 }
-function BodyForm({ formId, existing, date, save, onDirty }: RecordProps) {
-  const body = existing?.data as Body | undefined,
-    [id] = useState(() => existing?.id ?? crypto.randomUUID());
+function BodyForm({
+  formId,
+  existing,
+  draft,
+  date,
+  save,
+  onDirty,
+}: RecordProps) {
+  const body = (draft ?? existing)?.data as Body | undefined,
+    [id] = useState(() => draft?.id ?? existing?.id ?? crypto.randomUUID());
   const [condition, setCondition] = useState<Body['condition']>(
       body?.condition ?? 'morning',
     ),
     [estimated, setEstimated] = useState(body?.estimated ?? true),
     [primary, setPrimary] = useState(
-      existing ? existing.primaryMorning === 1 : true,
+      draft
+        ? draft.primaryMorning === 1
+        : existing
+          ? existing.primaryMorning === 1
+          : true,
     ),
     [error, setError] = useState(''),
-    [recordDate, setRecordDate] = useState(existing?.date ?? date);
+    [recordDate, setRecordDate] = useState(
+      draft?.date ?? existing?.date ?? date,
+    );
   async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');

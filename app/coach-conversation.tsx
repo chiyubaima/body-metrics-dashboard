@@ -1,4 +1,9 @@
 'use client';
+import { CoachToolCards } from './coach-tool-cards';
+import type {
+  CoachToolAction,
+  CoachToolProgress,
+} from '@/lib/coach-tool-types';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -16,8 +21,15 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { CoachState, CoachTurn, Commitment } from '@/lib/coach';
-import { quietNow, shanghaiDateTime } from '@/lib/coach';
+import {
+  quietNow,
+  shanghaiDateTime,
+  memoryActive,
+  commitmentPending,
+  commitmentExpiry,
+} from '@/lib/coach';
 import { today } from '@/lib/model';
+import type { Entry } from '@/lib/model';
 import {
   coachTimestamp,
   shouldSendCoachMessage,
@@ -32,6 +44,14 @@ export type CoachScrollPosition = {
 };
 type Props = {
   avatar?: ReactNode;
+  records?: Entry[];
+  onToolAction?: (action: CoachToolAction) => Promise<void>;
+  onConfirmRecord?: (
+    turnId: string,
+    runId: string,
+    actionIndex: number,
+  ) => Promise<void>;
+  toolProgress?: CoachToolProgress | null;
   state: CoachState | null;
   turns: CoachTurn[];
   errors: Record<string, string>;
@@ -60,6 +80,10 @@ type Props = {
 
 export function CoachConversation({
   avatar,
+  onToolAction,
+  records,
+  onConfirmRecord,
+  toolProgress,
   state,
   turns,
   errors,
@@ -100,8 +124,7 @@ export function CoachConversation({
   const due =
     state && !quietNow(state.settings)
       ? state.commitments.filter(
-          (c) =>
-            c.status === 'pending' && c.dueAt <= state.now && !c.notifiedAt,
+          (c) => commitmentPending(c) && c.dueAt <= state.now && !c.notifiedAt,
         )
       : [];
   const lastReply = turns
@@ -386,7 +409,7 @@ export function CoachConversation({
                             onToggle={keepReading}
                           >
                             <summary>
-                              参考了 {turn.evidence.length} 条记录
+                              参考了 {turn.evidence.length} 条依据
                             </summary>
                             <div className="coach-evidence-content">
                               <span className="coach-muted">
@@ -395,15 +418,27 @@ export function CoachConversation({
                               {turn.evidence.map((evidence) => (
                                 <div key={evidence.id}>
                                   <b>
-                                    {evidence.label} · {evidence.date}
+                                    {evidence.label}
+                                    {evidence.date ? ` · ${evidence.date}` : ''}
                                   </b>
                                   <p>{evidence.detail}</p>
-                                  <button
-                                    className="text-button"
-                                    onClick={() => onDate(evidence.date)}
-                                  >
-                                    查看这一天 <ArrowUpRight size={14} />
-                                  </button>
+                                  {evidence.url ? (
+                                    <a
+                                      className="text-button"
+                                      href={evidence.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      查看来源 <ArrowUpRight size={14} />
+                                    </a>
+                                  ) : (
+                                    <button
+                                      className="text-button"
+                                      onClick={() => onDate(evidence.date)}
+                                    >
+                                      查看这一天 <ArrowUpRight size={14} />
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -434,6 +469,25 @@ export function CoachConversation({
                     )}
                   </div>
                 )}
+                {turn.status === 'complete' && !!turn.toolRuns?.length && (
+                  <CoachToolCards
+                    runs={turn.toolRuns}
+                    records={records}
+                    onAction={onToolAction}
+                    onConfirmRecord={
+                      onConfirmRecord
+                        ? (runId, index) =>
+                            onConfirmRecord(turn.id, runId, index)
+                        : undefined
+                    }
+                    disabled={saving}
+                    onRetry={
+                      !awaiting && state?.active
+                        ? () => onSend(turn.userText)
+                        : undefined
+                    }
+                  />
+                )}
                 {turn.status === 'pending' && !turn.reply && (
                   <output className="coach-typing">
                     <span className="coach-typing-dots" aria-hidden="true">
@@ -441,7 +495,11 @@ export function CoachConversation({
                       <i />
                       <i />
                     </span>
-                    <span>Captain 正在想…</span>
+                    <span>
+                      {toolProgress
+                        ? `${toolProgress.title}${toolProgress.status === 'running' ? '…' : toolProgress.status === 'error' ? '遇到问题，正在整理回复…' : '完成，正在整理回复…'}`
+                        : 'Captain 正在想…'}
+                    </span>
                   </output>
                 )}
                 {turn.status === 'failed' && (
@@ -456,86 +514,166 @@ export function CoachConversation({
                     </button>
                   </output>
                 )}
-                {turn.proposals.map((proposal) => {
-                  const saved =
-                    proposal.type === 'memory'
-                      ? state?.memories.find((item) => item.id === proposal.id)
-                      : state?.commitments.find(
-                          (item) => item.id === proposal.id,
-                        );
-                  return (
-                    <div
-                      className={`coach-proposal${saved ? ' is-saved' : ''}`}
-                      key={proposal.id}
-                    >
-                      <span className="coach-attachment-icon">
-                        {proposal.type === 'memory' ? (
-                          <Bookmark size={18} />
-                        ) : (
-                          <CalendarClock size={18} />
-                        )}
-                      </span>
-                      <div className="coach-attachment-body">
-                        <span className="coach-attachment-label">
-                          {proposal.type === 'memory'
-                            ? '一条值得记住的事'
-                            : '下次的约定'}
+                {turn.status === 'complete' &&
+                  turn.proposals.map((proposal) => {
+                    const saved =
+                      proposal.type === 'memory'
+                        ? state?.memories.find(
+                            (item) => item.id === proposal.id,
+                          )
+                        : state?.commitments.find(
+                            (item) => item.id === proposal.id,
+                          );
+                    const expiresAt = saved
+                      ? 'dueAt' in saved
+                        ? commitmentExpiry(saved)
+                        : saved.expiresAt
+                      : (proposal.expiresAt ??
+                        (proposal.dueAt
+                          ? commitmentExpiry({ dueAt: proposal.dueAt })
+                          : null));
+                    const expired =
+                      !!expiresAt && expiresAt <= new Date().toISOString();
+                    const staleReminder =
+                      !saved &&
+                      !!proposal.dueAt &&
+                      proposal.dueAt < new Date().toISOString();
+                    const handled =
+                      !!saved ||
+                      proposal.status === 'accepted' ||
+                      proposal.status === 'dismissed' ||
+                      proposal.status === 'deleted';
+                    const archived =
+                      saved &&
+                      ('dueAt' in saved
+                        ? saved.status !== 'completed' &&
+                          !commitmentPending(saved)
+                        : !memoryActive(saved));
+                    return (
+                      <div
+                        className={`coach-proposal${handled ? ' is-saved' : ''}`}
+                        key={proposal.id}
+                      >
+                        <span className="coach-attachment-icon">
+                          {proposal.type === 'memory' ? (
+                            <Bookmark size={18} />
+                          ) : (
+                            <CalendarClock size={18} />
+                          )}
                         </span>
-                        <p>
-                          {saved
-                            ? 'content' in saved
-                              ? saved.content
-                              : saved.title
-                            : proposal.text}
-                        </p>
-                        {proposal.dueAt && (
-                          <time>
-                            {shanghaiDateTime(
-                              saved && 'dueAt' in saved
-                                ? saved.dueAt
-                                : proposal.dueAt,
-                            )}
-                          </time>
-                        )}
-                        {!saved && (
-                          <details onToggle={keepReading}>
-                            <summary>你说过</summary>
-                            <q>{proposal.quote}</q>
-                          </details>
-                        )}
-                        {saved ? (
-                          <button
-                            className="coach-saved-link"
-                            onClick={onManage}
-                          >
-                            <Check size={14} /> 已保存 · 查看{' '}
-                            <ChevronRight size={13} />
-                          </button>
-                        ) : (
-                          <button
-                            className="coach-attachment-save"
-                            disabled={saving}
-                            onClick={() =>
-                              void mutate(
-                                '/api/coach/proposals',
-                                { turnId: turn.id, proposalId: proposal.id },
-                                'POST',
-                                proposal.type === 'memory'
-                                  ? '已记住，可以随时修改'
-                                  : '约定已保存',
-                              )
-                            }
-                          >
-                            {proposal.type === 'memory'
-                              ? '记住这件事'
-                              : '保存约定'}
-                            <Plus size={14} />
-                          </button>
-                        )}
+                        <div className="coach-attachment-body">
+                          <span className="coach-attachment-label">
+                            {proposal.status === 'deleted'
+                              ? '已永久忘掉'
+                              : proposal.status === 'dismissed'
+                                ? '这条暂不记录'
+                                : saved || proposal.status === 'accepted'
+                                  ? proposal.type === 'memory'
+                                    ? '记忆'
+                                    : '约定'
+                                  : proposal.type === 'memory'
+                                    ? '要记住这件事吗？'
+                                    : '把它记为约定吗？'}
+                          </span>
+                          {proposal.status !== 'deleted' && (
+                            <>
+                              <p>
+                                {saved
+                                  ? 'content' in saved
+                                    ? saved.content
+                                    : saved.title
+                                  : proposal.text}
+                              </p>
+                              {proposal.dueAt && (
+                                <time>
+                                  提醒{' '}
+                                  {shanghaiDateTime(
+                                    saved && 'dueAt' in saved
+                                      ? saved.dueAt
+                                      : proposal.dueAt,
+                                  )}
+                                </time>
+                              )}
+                              <span className="coach-validity">
+                                {expiresAt
+                                  ? `有效至 ${shanghaiDateTime(expiresAt)}`
+                                  : '长期记忆 · 可随时忘掉'}
+                              </span>
+                              {!saved && (
+                                <details onToggle={keepReading}>
+                                  <summary>你说过</summary>
+                                  <q>{proposal.quote}</q>
+                                </details>
+                              )}
+                            </>
+                          )}
+                          {saved || proposal.status === 'accepted' ? (
+                            <button
+                              className="coach-saved-link"
+                              onClick={onManage}
+                            >
+                              <Check size={14} />{' '}
+                              {archived
+                                ? saved?.status === 'expired' || expired
+                                  ? '已过期'
+                                  : '已忘掉'
+                                : '已保存'}{' '}
+                              · 查看 <ChevronRight size={13} />
+                            </button>
+                          ) : !handled && (expired || staleReminder) ? (
+                            <p className="coach-muted">
+                              {expired ? '有效期已过' : '提醒时间已过'}
+                              ，重新聊聊现在的安排吧。
+                            </p>
+                          ) : (
+                            !handled && (
+                              <div className="coach-proposal-actions">
+                                <button
+                                  className="coach-attachment-save"
+                                  disabled={saving}
+                                  onClick={() =>
+                                    void mutate(
+                                      '/api/coach/proposals',
+                                      {
+                                        turnId: turn.id,
+                                        proposalId: proposal.id,
+                                      },
+                                      'POST',
+                                      proposal.type === 'memory'
+                                        ? '已记住，可以随时修改'
+                                        : '约定已保存',
+                                    )
+                                  }
+                                >
+                                  {proposal.type === 'memory'
+                                    ? '确认记住'
+                                    : '确认约定'}{' '}
+                                  <Plus size={14} />
+                                </button>
+                                <button
+                                  className="text-button coach-proposal-dismiss"
+                                  disabled={saving}
+                                  onClick={() =>
+                                    void mutate(
+                                      '/api/coach/proposals',
+                                      {
+                                        turnId: turn.id,
+                                        proposalId: proposal.id,
+                                      },
+                                      'PATCH',
+                                      '这条暂不记录',
+                                    )
+                                  }
+                                >
+                                  暂不记录
+                                </button>
+                              </div>
+                            )
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </article>
             ))}
             {due.map((commitment) => (

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Window } from 'happy-dom';
+import { Window, type HTMLInputElement as TestInput } from 'happy-dom';
 import { act, createElement } from 'react';
 import ts from 'typescript';
 import { average } from '../lib/model.ts';
@@ -115,7 +115,7 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
   let key = 0;
   let deleted: Entry[] = [];
   let rejectDelete = false;
-  async function render(kind: Kind) {
+  async function render(kind: Kind, initialDate?: string) {
     deleted = [];
     await act(async () =>
       root.render(
@@ -125,6 +125,7 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
           records,
           plans: [],
           date: '2025-01-31',
+          initialDate,
           edit: () => {},
           busy: false,
           remove: async (rows: Entry[]) => {
@@ -174,6 +175,19 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
         .click(),
     );
 
+  await t.test(
+    'Captain navigation opens the exact requested day in every diary',
+    async () => {
+      for (const kind of kinds) {
+        await render(kind, '2024-12-31');
+        assert.deepEqual([...new Set(visible())], ['2024-12-31']);
+        assert.equal(
+          container.querySelector<TestInput>('input[type="date"]')?.value,
+          '2024-12-31',
+        );
+      }
+    },
+  );
   for (const kind of kinds)
     await t.test(
       `${kind}: inclusive, single-day, cross-year and leap-day ranges`,

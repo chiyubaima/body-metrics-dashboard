@@ -1,3 +1,4 @@
+import type { CoachToolRun } from './coach-tool-types.ts';
 import { InputError, validDate, validId, today } from './model.ts';
 
 export type MemoryCategory = 'preference' | 'goal' | 'constraint';
@@ -24,6 +25,8 @@ export type CoachMemory = {
   content: string;
   category: MemoryCategory;
   source: string;
+  status?: 'active' | 'expired' | 'forgotten';
+  expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -32,7 +35,8 @@ export type Commitment = {
   title: string;
   kind: CommitmentKind;
   dueAt: string;
-  status: 'pending' | 'completed' | 'cancelled';
+  status: 'pending' | 'completed' | 'cancelled' | 'expired';
+  expiresAt?: string | null;
   completion: 'manual' | 'record' | null;
   evidenceId: string | null;
   notifiedAt: string | null;
@@ -44,6 +48,7 @@ export type Evidence = {
   date: string;
   label: string;
   detail: string;
+  url?: string;
 };
 export type CoachProposal = {
   id: string;
@@ -52,6 +57,8 @@ export type CoachProposal = {
   category: MemoryCategory | CommitmentKind;
   dueAt: string | null;
   quote: string;
+  expiresAt?: string | null;
+  status?: 'pending' | 'accepted' | 'dismissed' | 'deleted';
 };
 export type CoachTurn = {
   id: string;
@@ -63,6 +70,7 @@ export type CoachTurn = {
   status: 'pending' | 'complete' | 'failed';
   proposals: CoachProposal[];
   evidence: Evidence[];
+  toolRuns?: CoachToolRun[];
   createdAt: string;
   updatedAt: string;
 };
@@ -127,12 +135,36 @@ export function coachTime(value: unknown) {
     throw new InputError('提醒时间不存在。');
   return time.toISOString();
 }
-export function validateMemory(value: unknown) {
+export function coachExpiry(value: unknown, now = new Date()) {
+  if (value === undefined || value === null || value === '') return null;
+  const expiresAt = coachTime(value);
+  if (expiresAt <= now.toISOString())
+    throw new InputError('有效期已过，请选择未来的失效时间。');
+  return expiresAt;
+}
+export function memoryActive(item: CoachMemory, now = new Date()) {
+  return (
+    (!item.status || item.status === 'active') &&
+    (!item.expiresAt || item.expiresAt > now.toISOString())
+  );
+}
+export function commitmentExpiry(
+  item: Pick<Commitment, 'dueAt' | 'expiresAt'>,
+) {
+  return item.expiresAt ?? nextShanghaiDay(new Date(item.dueAt));
+}
+export function commitmentPending(item: Commitment, now = new Date()) {
+  return (
+    item.status === 'pending' && commitmentExpiry(item) > now.toISOString()
+  );
+}
+export function validateMemory(value: unknown, now = new Date()) {
   const v = coachObject(value);
   return {
     id: validId(v.id),
     content: coachText(v.content, 300, '记忆'),
     category: coachChoice(v.category, ['preference', 'goal', 'constraint']),
+    expiresAt: coachExpiry(v.expiresAt, now),
   };
 }
 export function validateCommitment(value: unknown, now = new Date()) {
@@ -142,10 +174,14 @@ export function validateCommitment(value: unknown, now = new Date()) {
     throw new InputError('这个时间已过，请重新选择提醒时间。');
   if (new Date(dueAt).getTime() > now.getTime() + 366 * 86_400_000)
     throw new InputError('请选择一年内的提醒时间。');
+  const expiresAt =
+    coachExpiry(v.expiresAt, now) ?? nextShanghaiDay(new Date(dueAt));
+  if (expiresAt <= dueAt) throw new InputError('失效时间必须晚于提醒时间。');
   return {
     id: validId(v.id),
     title: coachText(v.title, 160, '约定'),
     dueAt,
+    expiresAt,
     kind: coachChoice(v.kind, [
       'checkin',
       'body',
@@ -189,7 +225,9 @@ export function dueCommitments(
   if (quietNow(settings, now)) return [];
   return items.filter(
     (c) =>
-      c.status === 'pending' && c.dueAt <= now.toISOString() && !c.notifiedAt,
+      commitmentPending(c, now) &&
+      c.dueAt <= now.toISOString() &&
+      !c.notifiedAt,
   );
 }
 export function shanghaiDateTime(value: string) {

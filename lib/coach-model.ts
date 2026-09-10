@@ -63,7 +63,7 @@ export async function generateCoachReply(
   instructions: string,
   input: string,
   fetcher: typeof fetch = fetch,
-  stream?: { onDelta: (delta: string) => void; signal?: AbortSignal },
+  stream?: { onDelta?: (delta: string) => void; signal?: AbortSignal },
 ) {
   if (!coachConnection(env).configured)
     throw new InputError('教练还没连接模型，请打开设置完成连接。');
@@ -114,7 +114,10 @@ export async function generateCoachReply(
         'Content-Type': 'application/json',
         ...(key ? { Authorization: `Bearer ${key}` } : {}),
       },
-      body: JSON.stringify({ ...body, ...(stream ? { stream: true } : {}) }),
+      body: JSON.stringify({
+        ...body,
+        ...(stream?.onDelta ? { stream: true } : {}),
+      }),
       signal: AbortSignal.any([
         AbortSignal.timeout(120_000),
         ...(stream?.signal ? [stream.signal] : []),
@@ -134,7 +137,7 @@ export async function generateCoachReply(
           : '模型服务暂时不可用，请检查连接设置后重试。',
       );
     }
-    if (stream) {
+    if (stream?.onDelta) {
       if (
         !response.body ||
         !response.headers.get('content-type')?.includes('text/event-stream')
@@ -167,7 +170,10 @@ export async function generateCoachReply(
         if (typeof delta === 'string' && delta) {
           json += delta;
           if (json.length > 200_000) throw new Error('Response too large');
-          const next = partialCoachReply(json);
+          const decisionReady =
+            !instructions.includes('应用工具：') ||
+            /^\s*\{\s*"toolCalls"\s*:\s*\[\s*\]/.test(json);
+          const next = decisionReady ? partialCoachReply(json) : '';
           if (next.startsWith(visible) && next.length > visible.length) {
             stream.onDelta(next.slice(visible.length));
             visible = next;

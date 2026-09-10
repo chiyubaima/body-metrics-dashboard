@@ -27,11 +27,19 @@ export async function POST(r: Request) {
                 owner,
                 env,
                 body,
-                (environment, instructions, input) =>
+                (environment, instructions, input, _fetcher, options) =>
                   generateCoachReply(environment, instructions, input, fetch, {
-                    signal,
+                    signal: AbortSignal.any([
+                      signal,
+                      ...(options?.signal ? [options.signal] : []),
+                    ]),
                     onDelta: (delta) => send({ type: 'delta', delta }),
                   }),
+                new Date(),
+                {
+                  signal,
+                  onProgress: (progress) => send({ type: 'tool', progress }),
+                },
               );
               send({ type: 'done', turn: result.turn });
             } catch (error) {

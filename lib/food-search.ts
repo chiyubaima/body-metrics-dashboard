@@ -207,6 +207,10 @@ function match(row: Row, approximate: boolean): FoodMatch {
     approximate: approximate && !known,
   };
 }
+export function foodById(id: unknown): FoodMatch | undefined {
+  const row = rows.find((row) => row[0] === id);
+  return row ? match(row, false) : undefined;
+}
 export function searchFoods(query: string, offset = 0, basis = 'all') {
   const raw = query.trim().toLowerCase().slice(0, 100),
     chinese = /[\u3400-\u9fff]/.test(raw);

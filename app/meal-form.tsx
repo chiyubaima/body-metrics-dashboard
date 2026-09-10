@@ -15,6 +15,7 @@ import { displayFoodName } from '@/lib/food-labels';
 export function MealForm({
   formId,
   existing,
+  draft,
   date,
   records,
   meal,
@@ -24,6 +25,7 @@ export function MealForm({
 }: {
   formId: string;
   existing?: Entry;
+  draft?: Entry;
   date: string;
   records: Entry[];
   meal?: MealSlot;
@@ -31,9 +33,11 @@ export function MealForm({
   busy: boolean;
   onDirty: () => void;
 }) {
-  const original = existing?.data as Diet | undefined,
-    [id] = useState(() => existing?.id ?? crypto.randomUUID());
-  const [recordDate, setRecordDate] = useState(existing?.date ?? date),
+  const original = (draft ?? existing)?.data as Diet | undefined,
+    [id] = useState(() => draft?.id ?? existing?.id ?? crypto.randomUUID());
+  const [recordDate, setRecordDate] = useState(
+      draft?.date ?? existing?.date ?? date,
+    ),
     [slot, setSlot] = useState<MealSlot>(
       meal ??
         (original?.foods.length

@@ -53,6 +53,7 @@ await test('Captain detail navigation preserves the composer and its actions wor
         title: 'Synthetic commitment',
         kind: 'checkin',
         dueAt: now,
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
         status: 'pending',
         completion: null,
         evidenceId: null,
@@ -128,9 +129,46 @@ await test('Captain detail navigation preserves the composer and its actions wor
     );
     const method = options?.method ?? 'GET';
     calls.push({ path, method, body });
+    if (path === '/api/coach/records') {
+      assert.deepEqual(Object.keys(body).sort(), [
+        'actionIndex',
+        'runId',
+        'turnId',
+      ]);
+      const recordTurn = state.turns.find((t) => t.id === body.turnId)!;
+      const record = recordTurn.toolRuns![0].actions![0];
+      assert.equal(record.type, 'record');
+      if (record.type === 'record') record.savedAt = new Date().toISOString();
+      recordTurn.updatedAt = new Date().toISOString();
+      return Response.json({
+        turn: recordTurn,
+        id: record.type === 'record' ? record.entry.id : '',
+      });
+    }
     if (path.endsWith('/commitments') && method === 'PATCH')
       state.commitments[0].status = body.status;
-    if (path.endsWith('/memories') && method === 'DELETE') state.memories = [];
+    if (path.endsWith('/memories') && method === 'DELETE') {
+      if (body.permanent)
+        state.memories = state.memories.filter((m) => m.id !== body.id);
+      else state.memories.find((m) => m.id === body.id)!.status = 'forgotten';
+    }
+    if (path.endsWith('/memories') && method === 'POST') {
+      const memory = state.memories.find((m) => m.id === body.id)!;
+      Object.assign(memory, {
+        content: body.content,
+        expiresAt: body.expiresAt,
+        status: 'active',
+      });
+    }
+    if (path.endsWith('/commitments') && method === 'POST') {
+      const item = state.commitments.find((c) => c.id === body.id)!;
+      Object.assign(item, {
+        title: body.title,
+        dueAt: body.dueAt,
+        expiresAt: body.expiresAt,
+        status: 'pending',
+      });
+    }
     if (path === '/api/coach' && body.tone) state.settings.tone = body.tone;
     if (path === '/api/coach' && typeof body.enabled === 'boolean') {
       state.active = body.enabled;
@@ -167,7 +205,7 @@ await test('Captain detail navigation preserves the composer and its actions wor
       export function Field({label,children}){return h('label',null,label,children)}
       export function Picker(){return null}`,
     './coach-conversation': `${react}
-      export function CoachConversation({draft,onDraft}){return h('textarea',{'aria-label':'Synthetic composer',value:draft,onChange:()=>{},onInput:e=>onDraft(e.target.value)})}`,
+      export function CoachConversation({draft,onDraft,onConfirmRecord,turns}){const turn=turns.find(t=>t.toolRuns?.length);return h('div',null,h('textarea',{'aria-label':'Synthetic composer',value:draft,onChange:()=>{},onInput:e=>onDraft(e.target.value)}),turn&&h('button',{'aria-label':'Synthetic confirm record',onClick:()=>onConfirmRecord(turn.id,turn.toolRuns[0].id,0)},turn.toolRuns[0].actions[0].savedAt?'Synthetic saved':'Synthetic confirm'))}`,
     './captain-avatar': `${react}export function CaptainAvatar(){return h('span',null,'Captain avatar')}`,
   };
   const source = ts
@@ -200,6 +238,7 @@ await test('Captain detail navigation preserves the composer and its actions wor
     globalThis.fetch = originalFetch;
     await win.happyDOM.close();
   });
+  let dashboardRefreshes = 0;
   const render = async (settingsRequest = 0) =>
     act(async () =>
       root.render(
@@ -210,6 +249,9 @@ await test('Captain detail navigation preserves the composer and its actions wor
           blocked: false,
           settingsRequest,
           selectDate() {},
+          async onRecordsChanged() {
+            dashboardRefreshes++;
+          },
         }),
       ),
     );
@@ -250,6 +292,57 @@ await test('Captain detail navigation preserves the composer and its actions wor
     composer.value = 'Synthetic unsent draft';
     composer.dispatchEvent(new win.Event('input', { bubbles: true }));
   });
+  state.turns.push({
+    ...state.opening!,
+    id: 'synthetic-record-turn',
+    kind: 'chat',
+    toolRuns: [
+      {
+        id: 'synthetic-run',
+        name: 'prepare_record',
+        title: '合成草稿',
+        summary: '',
+        status: 'complete',
+        actions: [
+          {
+            type: 'record',
+            label: '',
+            draft: true,
+            baseUpdatedAt: null,
+            entry: {
+              id: 'synthetic-record',
+              kind: 'body',
+              date: '2026-09-09',
+              createdAt: now,
+              updatedAt: now,
+              primaryMorning: 0,
+              planId: null,
+              data: {
+                weight: 80,
+                waist: null,
+                bodyFat: null,
+                primary: false,
+                estimated: false,
+                condition: 'morning',
+                note: '',
+              },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  await act(async () => win.dispatchEvent(new win.Event('focus')));
+  await click('[aria-label="Synthetic confirm record"]');
+  assert.equal(dashboardRefreshes, 1);
+  assert(
+    container.querySelector('.coach-sheet'),
+    'confirmation keeps Captain open',
+  );
+  assert(!container.querySelector('.coach-chat-panel')!.hasAttribute('hidden'));
+  assert.equal(container.querySelector('textarea'), composer);
+  assert.equal(composer.value, 'Synthetic unsent draft');
+  assert(container.textContent.includes('Synthetic saved'));
   await click('[data-annotate="coach.memory"]');
   assert(container.querySelector('.coach-chat-panel')!.hasAttribute('hidden'));
   assert(
@@ -280,6 +373,84 @@ await test('Captain detail navigation preserves the composer and its actions wor
     calls.some((c) => c.method === 'DELETE' && c.body.id === 'memory-fixture'),
   );
   assert(container.textContent.includes('越了解你，越懂怎么陪你'));
+  const archive = container.querySelector('.coach-archive')!;
+  assert(archive.textContent.includes('Synthetic preference'));
+  assert(archive.textContent.includes('已忘掉'));
+  await click('.coach-archive .secondary');
+  assert(
+    container.querySelector('.coach-editor')!.textContent.includes('恢复记忆'),
+  );
+  assert.equal(
+    calls.filter((c) => c.path.endsWith('/memories') && c.method === 'POST')
+      .length,
+    0,
+    'opening restore requires confirmation',
+  );
+  await act(async () =>
+    container
+      .querySelector('.coach-editor')!
+      .dispatchEvent(
+        new win.Event('submit', { bubbles: true, cancelable: true }),
+      ),
+  );
+  assert(
+    calls.some(
+      (c) =>
+        c.body.action === 'restore' &&
+        c.body.id === 'memory-fixture' &&
+        c.body.expiresAt === null,
+    ),
+  );
+  assert(
+    !container
+      .querySelector('.coach-archive')!
+      .textContent.includes('Synthetic preference'),
+  );
+  const forgetAgain = [
+    ...container.querySelectorAll('[aria-label="记得你的事"] button'),
+  ].find((b) => b.textContent.includes('忘掉'))!;
+  await act(async () => (forgetAgain as unknown as HTMLButtonElement).click());
+  await click('.coach-forget .danger-button');
+  await click('.coach-archive .text-button');
+  assert(
+    container
+      .querySelector('.coach-forget')!
+      .textContent.includes('永久删除后无法恢复'),
+  );
+  assert(
+    !calls.some((c) => c.body.permanent),
+    'opening delete confirmation does not delete',
+  );
+  await click('.coach-forget .danger-button');
+  assert(calls.some((c) => c.method === 'DELETE' && c.body.permanent === true));
+  assert(
+    !container
+      .querySelector('.coach-archive')!
+      .textContent.includes('Synthetic preference'),
+  );
+  state.commitments.push({
+    ...state.commitments[0],
+    id: 'expired-fixture',
+    title: 'Expired synthetic commitment',
+    status: 'expired',
+    dueAt: '2000-01-01T10:00:00Z',
+    expiresAt: '2000-01-01T16:00:00Z',
+  });
+  await act(async () => win.dispatchEvent(new win.Event('focus')));
+  await click('.coach-archive .secondary');
+  const reminder = container.querySelector(
+    '.coach-editor input[type="datetime-local"]',
+  )! as unknown as HTMLInputElement;
+  assert.equal(
+    reminder.value,
+    '',
+    'expired reminders require a new future time',
+  );
+  assert(reminder.required);
+  assert(
+    container.querySelector('.coach-editor')!.textContent.includes('恢复约定'),
+  );
+  await click('.coach-editor .text-button');
   await click('[aria-label="返回聊天"]');
   assert.equal(container.querySelector('textarea'), composer);
   assert.equal(composer.value, 'Synthetic unsent draft');

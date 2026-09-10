@@ -298,8 +298,10 @@ try {
   console.log('PASS coach included in owner backup without connection secrets');
 } finally {
   if (enabledHere) await call('/api/coach', { enabled: false }, 'PATCH');
-  for (const id of memoryIds)
+  for (const id of memoryIds) {
     await call('/api/coach/memories', { id }, 'DELETE');
+    await call('/api/coach/memories', { id, permanent: true }, 'DELETE');
+  }
   const clauses = [
     `DELETE FROM coach_commitments WHERE owner='local_seedy' AND id IN (${commitmentIds.map(q).join(',')})${live ? '' : ` AND title LIKE '${marker}%'`}`,
   ];

@@ -150,6 +150,27 @@ await test('conversation component preserves drafting, retries, reading anchors 
     }),
   });
   const { createRoot } = await import('react-dom/client');
+  const toolSource = ts
+    .transpileModule(
+      readFileSync(
+        new URL('../app/coach-tool-cards.tsx', import.meta.url),
+        'utf8',
+      ),
+      {
+        compilerOptions: {
+          jsx: ts.JsxEmit.ReactJSX,
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+        },
+      },
+    )
+    .outputText.replace(
+      /from (["'])([^"']+)\1/g,
+      (_match, _quote, specifier: string) =>
+        `from ${JSON.stringify(import.meta.resolve(specifier))}`,
+    );
+  const toolUrl =
+    'data:text/javascript;base64,' + Buffer.from(toolSource).toString('base64');
   const source = ts
     .transpileModule(
       readFileSync(
@@ -167,9 +188,13 @@ await test('conversation component preserves drafting, retries, reading anchors 
     .outputText.replace(
       /from (["'])([^"']+)\1/g,
       (_match, _quote, specifier: string) => {
-        const target = specifier.startsWith('@/')
-          ? new URL('../' + specifier.slice(2) + '.ts', import.meta.url).href
-          : import.meta.resolve(specifier);
+        const target =
+          specifier === './coach-tool-cards'
+            ? toolUrl
+            : specifier.startsWith('@/')
+              ? new URL('../' + specifier.slice(2) + '.ts', import.meta.url)
+                  .href
+              : import.meta.resolve(specifier);
         return `from ${JSON.stringify(target)}`;
       },
     );
@@ -267,7 +292,33 @@ await test('conversation component preserves drafting, retries, reading anchors 
     });
     return event;
   }
-  await render();
+  await render({
+    turns: [
+      turn('a', {
+        toolRuns: [
+          {
+            id: 'tool-fixture',
+            name: 'search_knowledge',
+            title: '研究查询',
+            summary: '合成连接错误',
+            status: 'error',
+          },
+        ],
+      }),
+    ],
+  });
+  assert.equal(container.querySelectorAll('.coach-tool-results').length, 1);
+  assert.equal(
+    container.querySelector('.coach-outgoing .coach-tool-results'),
+    null,
+  );
+  await act(async () =>
+    container.querySelector<TestButton>('.coach-tool-card button')!.click(),
+  );
+  assert.deepEqual(sent, ['合成测试消息']);
+  assert.equal(field().value, '下一句草稿');
+  sent.length = 0;
+  await render({ turns: [turn('a')] });
   await key({ isComposing: true });
   await key({ shiftKey: true });
   mobile = true;
@@ -437,4 +488,55 @@ await test('conversation component preserves drafting, retries, reading anchors 
       .textContent.includes('已编辑的偏好'),
   );
   assert.equal(container.querySelector('.coach-attachment-save'), null);
+  await render({
+    state: { ...props.state!, memories: [] },
+    turns: [turn('proposal-turn', { proposals: [proposal] })],
+  });
+  await act(async () =>
+    container.querySelector<TestButton>('.coach-proposal-dismiss')!.click(),
+  );
+  assert.deepEqual(mutations.at(-1), [
+    '/api/coach/proposals',
+    { turnId: 'proposal-turn', proposalId: 'proposal-1' },
+    'PATCH',
+    '这条暂不记录',
+  ]);
+  await render({
+    turns: [
+      turn('proposal-turn', {
+        proposals: [{ ...proposal, status: 'dismissed' }],
+      }),
+    ],
+  });
+  assert.equal(container.querySelector('.coach-attachment-save'), null);
+  assert(container.textContent.includes('这条暂不记录'));
+  await render({
+    turns: [
+      turn('proposal-turn', {
+        proposals: [{ ...proposal, status: 'deleted', text: '', quote: '' }],
+      }),
+    ],
+  });
+  assert(container.textContent.includes('已永久忘掉'));
+  assert(!container.textContent.includes('喜欢短回复'));
+  assert.equal(container.querySelector('.coach-attachment-save'), null);
+  await render({
+    turns: [
+      turn('proposal-turn', {
+        proposals: [{ ...proposal, expiresAt: '2000-01-01T00:00:00Z' }],
+      }),
+    ],
+  });
+  assert(container.textContent.includes('有效期已过'));
+  assert.equal(container.querySelector('.coach-attachment-save'), null);
+  await render({
+    turns: [
+      turn('proposal-turn', { status: 'pending', proposals: [proposal] }),
+    ],
+  });
+  assert.equal(
+    container.querySelector('.coach-proposal'),
+    null,
+    'partial replies cannot offer confirmation',
+  );
 });

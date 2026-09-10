@@ -1,4 +1,8 @@
 'use client';
+import type {
+  CoachToolAction,
+  CoachToolProgress,
+} from '@/lib/coach-tool-types';
 import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import {
   Bell,
@@ -44,6 +48,9 @@ import {
   localDateTime,
   coachOpeningKey,
   coachOpeningHours,
+  memoryActive,
+  commitmentPending,
+  commitmentExpiry,
 } from '@/lib/coach';
 import { today } from '@/lib/model';
 import type {
@@ -99,14 +106,25 @@ async function coachRequest<T>(
   return data as T;
 }
 type Editor =
-  | { type: 'memory'; item?: CoachMemory }
-  | { type: 'commitment'; item?: Commitment };
+  | {
+      type: 'memory';
+      item?: CoachMemory;
+      restore?: boolean;
+      expectedUpdatedAt?: string;
+    }
+  | {
+      type: 'commitment';
+      item?: Commitment;
+      restore?: boolean;
+      expectedUpdatedAt?: string;
+    };
 type EditorDraft = {
   id: string;
   text: string;
   category: MemoryCategory;
   kind: CommitmentKind;
   dueAt: string;
+  expiresAt: string;
   dirty: boolean;
 };
 export function Coach({
@@ -116,6 +134,8 @@ export function Coach({
   blocked,
   selectDate,
   settingsRequest = 0,
+  onToolAction,
+  onRecordsChanged,
 }: {
   date: string;
   ready: boolean;
@@ -123,8 +143,15 @@ export function Coach({
   blocked: boolean;
   selectDate: (date: string) => void;
   settingsRequest?: number;
+  onToolAction?: (action: CoachToolAction) => Promise<void>;
+  onRecordsChanged?: () => Promise<unknown>;
 }) {
   const toneId = useId();
+  const editorGeneration = useRef(0);
+  const confirmingRecord = useRef(false);
+  const [toolProgress, setToolProgress] = useState<CoachToolProgress | null>(
+    null,
+  );
   const [state, setState] = useState<CoachState | null>(null),
     [open, setOpen] = useState(false);
   const [tab, setTab] = useState('chat'),
@@ -138,7 +165,12 @@ export function Coach({
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [olderAvailable, setOlderAvailable] = useState<boolean | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null),
-    [removing, setRemoving] = useState<CoachMemory | null>(null);
+    [removing, setRemoving] = useState<{
+      type: 'memory' | 'commitment';
+      id: string;
+      text: string;
+      permanent?: boolean;
+    } | null>(null);
   const [editorDraft, setEditorDraft] = useState<EditorDraft | null>(null);
   const working = useRef(false),
     refreshSequence = useRef(0),
@@ -183,6 +215,7 @@ export function Coach({
     if (sequence === refreshSequence.current) setState(next);
   }, []);
   function edit(next: Editor) {
+    editorGeneration.current++;
     setEditor(next);
     setEditorDraft({
       id: next.item?.id ?? crypto.randomUUID(),
@@ -198,11 +231,91 @@ export function Coach({
       kind:
         next.type === 'commitment' ? (next.item?.kind ?? 'checkin') : 'checkin',
       dueAt:
-        next.type === 'commitment' && next.item
+        next.type === 'commitment' &&
+        next.item &&
+        next.item.dueAt > new Date().toISOString()
           ? localDateTime(next.item.dueAt)
+          : '',
+      expiresAt:
+        next.item?.expiresAt && !next.restore
+          ? localDateTime(next.item.expiresAt)
           : '',
       dirty: false,
     });
+  }
+  async function handleToolAction(action: CoachToolAction) {
+    if (blocked || saving || (editor && editorDraft?.dirty))
+      throw new Error('请先保存或关闭当前编辑内容，再打开这条建议。');
+    if (action.type === 'memory' || action.type === 'commitment') {
+      const generation = editorGeneration.current;
+      const fresh = await coachRequest<CoachState>('/api/coach');
+      if (editorGeneration.current !== generation)
+        throw new Error('请先完成当前编辑，再打开这条建议。');
+      setState(fresh);
+      const item =
+        action.type === 'memory'
+          ? fresh.memories.find((m) => m.id === action.id && memoryActive(m))
+          : fresh.commitments.find(
+              (c) => c.id === action.id && commitmentPending(c),
+            );
+      if (!item || item.updatedAt !== action.baseUpdatedAt)
+        throw new Error('该条目已修改、过期或忘掉，请重新核对后再整理。');
+      const next = { ...item, ...action.changes };
+      if (action.type === 'memory')
+        edit({
+          type: 'memory',
+          item: next as CoachMemory,
+          expectedUpdatedAt: action.baseUpdatedAt,
+        });
+      else
+        edit({
+          type: 'commitment',
+          item: next as Commitment,
+          expectedUpdatedAt: action.baseUpdatedAt,
+        });
+      setEditorDraft((current) =>
+        current ? { ...current, dirty: true } : current,
+      );
+      setTab('memory');
+      return;
+    }
+    if (!onToolAction) throw new Error('暂时无法打开日记，请刷新后重试。');
+    await onToolAction(action);
+    setOpen(false);
+  }
+  async function confirmRecord(
+    turnId: string,
+    runId: string,
+    actionIndex: number,
+  ) {
+    if (confirmingRecord.current || saving || blocked)
+      throw new Error('正在处理其他记录，请稍后再确认。');
+    confirmingRecord.current = true;
+    setSaving(true);
+    try {
+      const result = await coachRequest<{ turn: CoachTurn }>(
+        '/api/coach/records',
+        { turnId, runId, actionIndex },
+      );
+      ++refreshSequence.current;
+      setOlder((old) => mergeCoachTurns([...old, result.turn], []));
+      setState((current) =>
+        current
+          ? {
+              ...current,
+              turns: mergeCoachTurns([...current.turns, result.turn], []),
+            }
+          : current,
+      );
+      // The record is already saved. A dashboard refresh failure must not turn success into a retryable write.
+      await onRecordsChanged?.().catch(() =>
+        setFeedback('已记录，看板暂未刷新；重新打开页面即可同步。'),
+      );
+      void refresh(false).catch(() => {});
+    } finally {
+      confirmingRecord.current = false;
+      setSaving(false);
+    }
   }
   useEffect(() => {
     if (!ready) return;
@@ -269,15 +382,20 @@ export function Coach({
         setDraft((value) => (value.trim() === message ? '' : value));
         scrollPosition.current.pinned = true;
       }
+      setToolProgress(null);
       try {
-        const result = await requestCoachStream(request, (delta) =>
-          setLocalTurns((turns) =>
-            turns.map((turn) =>
-              turn.id === request.id
-                ? { ...turn, reply: (turn.reply ?? '') + delta }
-                : turn,
+        const result = await requestCoachStream(
+          request,
+          (delta) =>
+            setLocalTurns((turns) =>
+              turns.map((turn) =>
+                turn.id === request.id
+                  ? { ...turn, reply: (turn.reply ?? '') + delta }
+                  : turn,
+              ),
             ),
-          ),
+          fetch,
+          setToolProgress,
         );
         if (result.turn) {
           setState((current) =>
@@ -377,7 +495,16 @@ export function Coach({
     setError('');
     setFeedback('');
     try {
-      await coachRequest(path, body, method);
+      const result = await coachRequest<{
+        turn?: CoachTurn;
+        turns?: CoachTurn[];
+      }>(path, body, method);
+      const changedTurns = [
+        ...(result.turn ? [result.turn] : []),
+        ...(result.turns ?? []),
+      ];
+      if (changedTurns.length)
+        setOlder((old) => mergeCoachTurns([...old, ...changedTurns], []));
       await refresh();
       setFeedback(message);
       return true;
@@ -408,14 +535,20 @@ export function Coach({
     ? []
     : (state?.commitments ?? []).filter(
         (c) =>
-          c.status === 'pending' &&
+          commitmentPending(c) &&
           c.dueAt <= (state?.now ?? '') &&
           !c.notifiedAt,
       );
-  const pending =
-    state?.commitments.filter((c) => c.status === 'pending') ?? [];
+  const pending = state?.commitments.filter((c) => commitmentPending(c)) ?? [];
   const ended =
-    state?.commitments.filter((c) => c.status !== 'pending').reverse() ?? [];
+    state?.commitments.filter((c) => c.status === 'completed').reverse() ?? [];
+  const memories = state?.memories.filter((m) => memoryActive(m)) ?? [];
+  const archivedMemories =
+    state?.memories.filter((m) => !memoryActive(m)) ?? [];
+  const archivedCommitments =
+    state?.commitments.filter(
+      (c) => c.status !== 'completed' && !commitmentPending(c),
+    ) ?? [];
   const awaiting = busy || allTurns.some((turn) => turn.status === 'pending');
   const headline =
     error && !state
@@ -582,6 +715,10 @@ export function Coach({
                   />
                 }
                 state={state}
+                onToolAction={handleToolAction}
+                records={snapshot.records}
+                onConfirmRecord={confirmRecord}
+                toolProgress={toolProgress}
                 turns={allTurns}
                 errors={sendErrors}
                 saving={saving}
@@ -627,7 +764,12 @@ export function Coach({
                       editor.type === 'memory'
                         ? '/api/coach/memories'
                         : '/api/coach/commitments',
-                      body,
+                      {
+                        ...(body as Record<string, unknown>),
+                        ...(editor.expectedUpdatedAt
+                          ? { expectedUpdatedAt: editor.expectedUpdatedAt }
+                          : {}),
+                      },
                     );
                     if (ok) setEditor(null);
                   }}
@@ -693,6 +835,9 @@ export function Coach({
                               {shanghaiDateTime(c.dueAt)} ·{' '}
                               {commitmentLabels[c.kind]}
                             </span>
+                            <span className="coach-validity">
+                              有效至 {shanghaiDateTime(commitmentExpiry(c))}
+                            </span>
                           </div>
                           <div className="coach-actions">
                             <button
@@ -727,11 +872,11 @@ export function Coach({
                                   '/api/coach/commitments',
                                   { id: c.id, status: 'cancelled' },
                                   'PATCH',
-                                  '约定已取消',
+                                  '约定已移入忘掉的历史',
                                 )
                               }
                             >
-                              取消约定
+                              忘掉约定
                             </button>
                           </div>
                         </div>
@@ -739,18 +884,16 @@ export function Coach({
                     ))}
                     {!!ended.length && (
                       <details className="coach-ended">
-                        <summary>已结束的约定 · {ended.length}</summary>
+                        <summary>已完成的约定 · {ended.length}</summary>
                         {ended.map((c) => (
                           <div className="coach-saved" key={c.id}>
                             <div>
                               <b>{c.title}</b>
                               <span>
                                 {shanghaiDateTime(c.dueAt)} ·{' '}
-                                {c.status === 'cancelled'
-                                  ? '已取消'
-                                  : c.completion === 'record'
-                                    ? '已由记录确认完成'
-                                    : '你已确认完成'}
+                                {c.completion === 'record'
+                                  ? '已由记录确认完成'
+                                  : '你已确认完成'}
                               </span>
                             </div>
                           </div>
@@ -771,9 +914,9 @@ export function Coach({
                         <Bookmark size={22} />
                       </span>
                       <h3>
-                        记得你的事 <span>{state?.memories.length ?? 0}</span>
+                        记得你的事 <span>{memories.length}</span>
                       </h3>
-                      {!!state?.memories.length && (
+                      {!!memories.length && (
                         <button
                           className="text-button"
                           onClick={() => edit({ type: 'memory' })}
@@ -783,7 +926,7 @@ export function Coach({
                         </button>
                       )}
                     </div>
-                    {!state?.memories.length && (
+                    {!memories.length && (
                       <div className="coach-empty-card">
                         <span className="coach-empty-symbol">
                           <Bookmark size={30} />
@@ -804,7 +947,7 @@ export function Coach({
                         </button>
                       </div>
                     )}
-                    {state?.memories.map((m) => (
+                    {memories.map((m) => (
                       <div className="coach-saved" key={m.id}>
                         <div>
                           <span className="coach-memory-tag">
@@ -818,6 +961,11 @@ export function Coach({
                             {memoryLabels[m.category]}
                           </span>
                           <p>{m.content}</p>
+                          <span className="coach-validity">
+                            {m.expiresAt
+                              ? `有效至 ${shanghaiDateTime(m.expiresAt)}`
+                              : '长期记忆'}
+                          </span>
                           <details>
                             <summary>记忆来源</summary>
                             <p>{m.source}</p>
@@ -833,7 +981,13 @@ export function Coach({
                           </button>
                           <button
                             className="text-button"
-                            onClick={() => setRemoving(m)}
+                            onClick={() =>
+                              setRemoving({
+                                type: 'memory',
+                                id: m.id,
+                                text: m.content,
+                              })
+                            }
                           >
                             <Trash2 size={14} />
                             忘掉
@@ -842,6 +996,115 @@ export function Coach({
                       </div>
                     ))}
                   </section>
+                  <details
+                    className="coach-detail-card coach-archive"
+                    data-annotate="coach.archive"
+                  >
+                    <summary>
+                      <span>
+                        <RotateCcw size={18} /> 已过期/忘掉的记忆和约定
+                      </span>
+                      <span>
+                        {archivedMemories.length + archivedCommitments.length}
+                      </span>
+                    </summary>
+                    <p className="coach-muted">
+                      这里的内容不再用于陪伴或提醒。恢复前可以调整内容和有效期。
+                    </p>
+                    {!archivedMemories.length &&
+                      !archivedCommitments.length && (
+                        <p className="coach-archive-empty">
+                          暂时没有过期或忘掉的内容。
+                        </p>
+                      )}
+                    {archivedMemories.map((m) => (
+                      <article className="coach-saved" key={m.id}>
+                        <span className="coach-memory-tag">
+                          记忆 ·{' '}
+                          {m.status === 'forgotten' ? '已忘掉' : '已过期'} ·{' '}
+                          {memoryLabels[m.category]}
+                        </span>
+                        <p>{m.content}</p>
+                        <span>
+                          {m.expiresAt
+                            ? `原有效期至 ${shanghaiDateTime(m.expiresAt)}`
+                            : '原为长期记忆'}
+                        </span>
+                        <details>
+                          <summary>记忆来源</summary>
+                          <p>{m.source}</p>
+                        </details>
+                        <div className="coach-actions">
+                          <button
+                            className="secondary"
+                            disabled={saving}
+                            onClick={() =>
+                              edit({ type: 'memory', item: m, restore: true })
+                            }
+                          >
+                            <RotateCcw size={14} /> 恢复记忆
+                          </button>
+                          <button
+                            className="text-button"
+                            disabled={saving}
+                            onClick={() =>
+                              setRemoving({
+                                type: 'memory',
+                                id: m.id,
+                                text: m.content,
+                                permanent: true,
+                              })
+                            }
+                          >
+                            <Trash2 size={14} /> 永久忘掉
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                    {archivedCommitments.map((c) => (
+                      <article className="coach-saved" key={c.id}>
+                        <span className="coach-memory-tag">
+                          约定 ·{' '}
+                          {c.status === 'cancelled' ? '已忘掉' : '已过期'} ·{' '}
+                          {commitmentLabels[c.kind]}
+                        </span>
+                        <p>{c.title}</p>
+                        <span>原提醒 {shanghaiDateTime(c.dueAt)}</span>
+                        <span>
+                          原有效期至 {shanghaiDateTime(commitmentExpiry(c))}
+                        </span>
+                        <div className="coach-actions">
+                          <button
+                            className="secondary"
+                            disabled={saving}
+                            onClick={() =>
+                              edit({
+                                type: 'commitment',
+                                item: c,
+                                restore: true,
+                              })
+                            }
+                          >
+                            <RotateCcw size={14} /> 恢复约定
+                          </button>
+                          <button
+                            className="text-button"
+                            disabled={saving}
+                            onClick={() =>
+                              setRemoving({
+                                type: 'commitment',
+                                id: c.id,
+                                text: c.title,
+                                permanent: true,
+                              })
+                            }
+                          >
+                            <Trash2 size={14} /> 永久忘掉
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </details>
                 </>
               )}
             </section>
@@ -902,7 +1165,8 @@ export function Coach({
                 </div>
                 <p className="coach-setting-copy">
                   启用后，Captain
-                  会将你的近期身体、饮食和训练摘要、所选日明细、个人资料、近期聊天以及已保存的记忆与约定发送到上方模型服务，用于回应你。
+                  会将你的近期身体、饮食和训练摘要、所选日明细、个人资料、近期聊天以及已保存的记忆与约定发送到上方模型服务，用于回应你。按需查询的历史记录也会提供给模型。知识查询只向
+                  Europe PMC 发送通用主题词，来源可在回复中展开查看。
                 </p>
                 <p className="coach-setting-copy">
                   聊天与记忆保存在本机账本。调用模型需要联网；通过 Codex
@@ -1062,9 +1326,14 @@ export function Coach({
         }}
       >
         <AlertDialogContent className="coach-forget">
-          <AlertDialogTitle>忘掉这条记忆？</AlertDialogTitle>
+          <AlertDialogTitle>
+            {removing?.permanent ? '永久忘掉这条内容？' : '忘掉这条记忆？'}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            {removing?.content}。删除后不再作为长期记忆使用，原聊天仍保留。
+            {removing?.text}。
+            {removing?.permanent
+              ? '永久删除后无法恢复。原聊天仍可查看，关联的建议卡片内容会删除，该轮聊天不再提供给 Captain。'
+              : '不再作为记忆使用，可在“已过期/忘掉的记忆和约定”中恢复。'}
           </AlertDialogDescription>
           <div className="coach-actions">
             <button
@@ -1081,16 +1350,20 @@ export function Coach({
                 if (
                   removing &&
                   (await mutate(
-                    '/api/coach/memories',
-                    { id: removing.id },
+                    removing.type === 'memory'
+                      ? '/api/coach/memories'
+                      : '/api/coach/commitments',
+                    { id: removing.id, permanent: !!removing.permanent },
                     'DELETE',
-                    '这条长期记忆已删除',
+                    removing.permanent
+                      ? '已永久忘掉'
+                      : '已忘掉，可以在历史中恢复',
                   ))
                 )
                   setRemoving(null);
               }}
             >
-              忘掉
+              {removing?.permanent ? '永久忘掉' : '忘掉'}
             </button>
           </div>
         </AlertDialogContent>
@@ -1114,7 +1387,7 @@ function CoachEditor({
   close: () => void;
   save: (body: unknown) => Promise<void>;
 }) {
-  const { id, text, category, kind, dueAt, dirty } = draft;
+  const { id, text, category, kind, dueAt, expiresAt, dirty } = draft;
   const [discard, setDiscard] = useState(false);
   return (
     <form
@@ -1123,14 +1396,35 @@ function CoachEditor({
         e.preventDefault();
         void save(
           editor.type === 'memory'
-            ? { id, content: text, category }
-            : { id, title: text, kind, dueAt: dueAt + ':00+08:00' },
+            ? {
+                id,
+                content: text,
+                category,
+                expiresAt: expiresAt ? expiresAt + ':00+08:00' : null,
+                ...(editor.restore
+                  ? { action: 'restore' }
+                  : editor.item
+                    ? { action: 'update' }
+                    : {}),
+              }
+            : {
+                id,
+                title: text,
+                kind,
+                dueAt: dueAt + ':00+08:00',
+                expiresAt: expiresAt ? expiresAt + ':00+08:00' : null,
+                ...(editor.restore
+                  ? { action: 'restore' }
+                  : editor.item
+                    ? { action: 'update' }
+                    : {}),
+              },
         );
       }}
     >
       <div className="coach-section-heading">
         <h3>
-          {editor.item ? '调整' : '添加'}
+          {editor.restore ? '恢复' : editor.item ? '调整' : '添加'}
           {editor.type === 'memory' ? '记忆' : '约定'}
         </h3>
         <button
@@ -1217,8 +1511,24 @@ function CoachEditor({
           </p>
         </>
       )}
+      <Field label="有效期至（北京时间，可不填）">
+        <input
+          type="datetime-local"
+          value={expiresAt}
+          onChange={(e) =>
+            change({ ...draft, expiresAt: e.target.value, dirty: true })
+          }
+        />
+      </Field>
+      <p className="coach-muted">
+        {editor.type === 'memory'
+          ? editor.restore
+            ? '请重新确认有效期；不填写表示恢复为长期记忆。'
+            : '有截止时间的安排请填写；不填写则作为长期记忆。'
+          : '不填写时，约定在提醒当天结束后失效。恢复已过期的约定需重新选择未来的提醒时间。'}
+      </p>
       <button className="primary" disabled={busy}>
-        {busy ? '正在保存…' : '保存'}
+        {busy ? '正在保存…' : editor.restore ? '确认恢复' : '保存'}
       </button>
     </form>
   );

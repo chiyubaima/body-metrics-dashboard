@@ -20,6 +20,9 @@ import {
   getDailyOpening,
   listCoachTurns,
   acceptCoachProposal,
+  dismissCoachProposal,
+  permanentlyForgetCoachItem,
+  expireCoachItems,
   exportCoach,
 } from '../db/coach.ts';
 import {
@@ -36,6 +39,9 @@ import {
   coachTime,
   validateCommitment,
   coachOpeningKey,
+  memoryActive,
+  validateMemory,
+  commitmentExpiry,
 } from '../lib/coach.ts';
 import { buildCoachContext, commitmentEvidence } from '../lib/coach-context.ts';
 import { parseCoachOutput } from '../lib/coach-prompt.ts';
@@ -740,7 +746,11 @@ await test('memory proposals require acceptance, are owner isolated, editable, r
     assert.equal((await listCoachMemories(db, 'a')).length, 1);
     assert.equal((await listCoachMemories(db, 'a'))[0].content, '喜欢详细回复');
     await deleteCoachMemory(db, 'a', p.id);
-    assert.equal((await listCoachMemories(db, 'a')).length, 0);
+    assert.equal((await listCoachMemories(db, 'a'))[0].status, 'forgotten');
+    assert.equal(
+      (await listCoachMemories(db, 'a')).filter((m) => memoryActive(m)).length,
+      0,
+    );
     for (let i = 0; i < 50; i++)
       await saveCoachMemory(db, 'a', {
         id: randomUUID(),
@@ -754,7 +764,7 @@ await test('memory proposals require acceptance, are owner isolated, editable, r
         category: 'goal',
       }),
     );
-    const m = (await listCoachMemories(db, 'a'))[0];
+    const m = (await listCoachMemories(db, 'a')).find((m) => memoryActive(m))!;
     await saveCoachMemory(db, 'a', { ...m, content: 'updated at cap' });
   } finally {
     close();
@@ -997,7 +1007,10 @@ await test('streamed prose stays pending until validation; a broken stream retri
                   controller = c;
                   c.enqueue(
                     new TextEncoder().encode(
-                      streamFrame({ type: 'delta', delta: '{"reply":"先聊聊' }),
+                      streamFrame({
+                        type: 'delta',
+                        delta: '{"toolCalls":[],"reply":"先聊聊',
+                      }),
                     ),
                   );
                 },
@@ -1040,6 +1053,389 @@ await test('streamed prose stays pending until validation; a broken stream retri
         })
       ).turn?.reply,
       baseOutput.reply,
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('temporary proposals wait for confirmation, retain independent decisions and cannot revive forgotten items', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const quote =
+      '今天出差只能徒手练。我喜欢短回复。明天上午十点聊聊出差安排。';
+    const dueAt = new Date(Date.now() + 86_400_000).toISOString();
+    const expiresAt = nextShanghaiDay();
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      request(quote),
+      async () => ({
+        ...baseOutput,
+        memories: [
+          {
+            content: '今天出差只能徒手练',
+            category: 'constraint',
+            quote: '今天出差只能徒手练',
+            expiresAt,
+          },
+          {
+            content: '喜欢短回复',
+            category: 'preference',
+            quote: '我喜欢短回复',
+            expiresAt: null,
+          },
+        ],
+        commitments: [
+          {
+            title: '聊聊出差安排',
+            kind: 'checkin',
+            dueAt,
+            expiresAt: null,
+            quote: '明天上午十点聊聊出差安排',
+          },
+        ],
+      }),
+    );
+    const turn = response.turn!;
+    const [temporary, declined, commitment] = turn.proposals;
+    assert.equal((await listCoachMemories(db, 'a')).length, 0);
+    assert.equal((await listCommitments(db, 'a')).length, 0);
+    await assert.rejects(dismissCoachProposal(db, 'b', turn.id, declined.id));
+    await assert.rejects(acceptCoachProposal(db, 'b', turn.id, temporary.id));
+    await Promise.all([
+      acceptCoachProposal(db, 'a', turn.id, temporary.id),
+      acceptCoachProposal(db, 'a', turn.id, temporary.id),
+      dismissCoachProposal(db, 'a', turn.id, declined.id),
+      acceptCoachProposal(db, 'a', turn.id, commitment.id),
+    ]);
+    assert.equal((await listCoachMemories(db, 'a')).length, 1);
+    assert.equal((await listCoachMemories(db, 'a'))[0].expiresAt, expiresAt);
+    assert.equal(
+      (await listCommitments(db, 'a'))[0].expiresAt,
+      nextShanghaiDay(new Date(dueAt)),
+    );
+    assert.deepEqual(
+      (await getCoachTurn(db, 'a', turn.id))!.proposals.map((p) => p.status),
+      ['accepted', 'dismissed', 'accepted'],
+    );
+    await assert.rejects(acceptCoachProposal(db, 'a', turn.id, declined.id));
+    await assert.rejects(dismissCoachProposal(db, 'a', turn.id, temporary.id));
+    await assert.rejects(
+      permanentlyForgetCoachItem(db, 'a', 'memory', temporary.id),
+      /条目已变化/,
+    );
+    await deleteCoachMemory(db, 'a', temporary.id);
+    await acceptCoachProposal(db, 'a', turn.id, temporary.id);
+    assert.equal((await listCoachMemories(db, 'a'))[0].status, 'forgotten');
+    const data = await snapshot(db, 'a');
+    const forgottenContext = buildCoachContext(
+      data,
+      today(),
+      await listCoachMemories(db, 'a'),
+      await listCommitments(db, 'a'),
+      [turn],
+    );
+    assert.equal(forgottenContext.context.memories.length, 0);
+    assert.equal(forgottenContext.context.conversation.length, 0);
+    await saveCoachMemory(db, 'a', {
+      id: temporary.id,
+      content: '新的安排',
+      category: 'constraint',
+      action: 'restore',
+      expiresAt,
+    });
+    assert.equal((await listCoachMemories(db, 'a'))[0].status, 'active');
+    await acceptCoachProposal(db, 'a', turn.id, temporary.id);
+    assert.equal((await listCoachMemories(db, 'a'))[0].content, '新的安排');
+    await deleteCoachMemory(db, 'a', temporary.id);
+    await assert.rejects(
+      permanentlyForgetCoachItem(db, 'b', 'memory', temporary.id),
+    );
+    await permanentlyForgetCoachItem(db, 'a', 'memory', temporary.id);
+    const deletedTurn = (await getCoachTurn(db, 'a', turn.id))!;
+    assert.equal(deletedTurn.userText, quote, 'original chat remains readable');
+    assert.equal(deletedTurn.proposals[0].status, 'deleted');
+    assert.equal(deletedTurn.proposals[0].text, '');
+    assert.equal(deletedTurn.proposals[0].quote, '');
+    assert.equal(deletedTurn.proposals[1].status, 'dismissed');
+    assert.equal(deletedTurn.proposals[2].text, commitment.text);
+    await assert.rejects(acceptCoachProposal(db, 'a', turn.id, temporary.id));
+    await assert.rejects(
+      saveCoachMemory(db, 'a', {
+        id: temporary.id,
+        content: '旧内容',
+        category: 'constraint',
+        action: 'restore',
+      }),
+    );
+    await assert.rejects(
+      saveCoachMemory(db, 'a', {
+        id: temporary.id,
+        content: '旧内容',
+        category: 'constraint',
+        action: 'update',
+      }),
+    );
+    await assert.rejects(
+      saveCoachMemory(db, 'a', {
+        id: temporary.id,
+        content: '旧卡片内容',
+        category: 'constraint',
+      }),
+    );
+    assert.equal((await exportCoach(db, 'a')).memories.length, 0);
+    assert.equal(
+      buildCoachContext(data, today(), [], [], [deletedTurn]).context
+        .conversation.length,
+      0,
+    );
+    await changeCommitment(db, 'a', { id: commitment.id, status: 'cancelled' });
+    await permanentlyForgetCoachItem(db, 'a', 'commitment', commitment.id);
+    assert.equal((await listCommitments(db, 'a')).length, 0);
+    await assert.rejects(acceptCoachProposal(db, 'a', turn.id, commitment.id));
+    assert.equal(
+      (await getCoachTurn(db, 'a', turn.id))!.proposals[2].status,
+      'deleted',
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('expiration is inclusive at the cutoff, preserves indefinite memory and never revives archived commitments', async () => {
+  const { db, close } = connect();
+  const now = new Date('2030-12-31T15:00:00.000Z');
+  const cutoff = '2030-12-31T16:00:00.000Z';
+  try {
+    const temporary = {
+      id: randomUUID(),
+      content: '今天只有徒手器械',
+      category: 'constraint',
+      expiresAt: cutoff,
+    };
+    const permanent = {
+      id: randomUUID(),
+      content: '喜欢简洁',
+      category: 'preference',
+    };
+    await saveCoachMemory(db, 'a', temporary, 'synthetic source', now);
+    await saveCoachMemory(
+      db,
+      'b',
+      { ...temporary, id: randomUUID() },
+      'synthetic source',
+      now,
+    );
+    await saveCoachMemory(db, 'a', permanent, 'synthetic source', now);
+    const c = {
+      id: randomUUID(),
+      title: '记录身体',
+      kind: 'body',
+      dueAt: '2030-12-31T15:30:00.000Z',
+    };
+    await saveCommitment(db, 'a', c, now);
+    assert.equal((await listCommitments(db, 'a'))[0].expiresAt, cutoff);
+    await expireCoachItems(db, 'a', new Date('2030-12-31T15:59:59.999Z'));
+    assert.equal(
+      dueCommitments(
+        await listCommitments(db, 'a'),
+        defaultCoachSettings,
+        new Date('2030-12-31T15:59:59.999Z'),
+      ).length,
+      1,
+    );
+    await expireCoachItems(db, 'a', new Date(cutoff));
+    const memories = await listCoachMemories(db, 'a');
+    const items = await listCommitments(db, 'a');
+    assert.equal(
+      memories.find((m) => m.id === temporary.id)?.status,
+      'expired',
+    );
+    assert.equal(memories.find((m) => m.id === permanent.id)?.status, 'active');
+    assert.equal(
+      (await listCoachMemories(db, 'b'))[0].status,
+      'active',
+      'expiry is owner-scoped',
+    );
+    assert.equal(items[0].status, 'expired');
+    assert.equal(
+      dueCommitments(items, defaultCoachSettings, new Date(cutoff)).length,
+      0,
+    );
+    const context = buildCoachContext(
+      await snapshot(db, 'a'),
+      '2030-12-31',
+      memories,
+      items,
+      [],
+      new Date(cutoff),
+    ).context;
+    assert.deepEqual(
+      context.memories.map((m) => m.id),
+      [permanent.id],
+    );
+    assert.equal(context.commitments.length, 0);
+    await reconcileCommitments(
+      db,
+      'a',
+      [body('2030-12-31') as Entry],
+      new Date(cutoff),
+    );
+    assert.equal(
+      (await listCommitments(db, 'a'))[0].status,
+      'expired',
+      'late records do not revive expiry',
+    );
+    await assert.rejects(
+      saveCoachMemory(
+        db,
+        'a',
+        { ...temporary, action: 'restore' },
+        'synthetic',
+        new Date(cutoff),
+      ),
+      /有效期已过/,
+    );
+    await assert.rejects(
+      saveCommitment(db, 'a', { ...c, action: 'restore' }, new Date(cutoff)),
+      /时间已过/,
+    );
+    const restored = {
+      ...c,
+      action: 'restore',
+      dueAt: '2031-01-01T10:00:00.000Z',
+    };
+    await assert.rejects(saveCommitment(db, 'b', restored, new Date(cutoff)));
+    await saveCommitment(db, 'a', restored, new Date(cutoff));
+    assert.equal((await listCommitments(db, 'a'))[0].status, 'pending');
+    assert.equal((await listCommitments(db, 'a'))[0].notifiedAt, null);
+    assert.equal(
+      (await listCommitments(db, 'a'))[0].expiresAt,
+      '2031-01-01T16:00:00.000Z',
+    );
+    await saveCoachMemory(
+      db,
+      'a',
+      { ...temporary, expiresAt: null, action: 'restore' },
+      'synthetic',
+      new Date(cutoff),
+    );
+    assert.equal(
+      (await listCoachMemories(db, 'a')).find((m) => m.id === temporary.id)
+        ?.expiresAt,
+      null,
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('legacy rows get safe validity defaults, completed history stays complete and old proposals cannot be accepted late', async () => {
+  const { db, close } = connect();
+  const now = new Date('2032-02-29T10:00:00.000Z');
+  try {
+    const id = randomUUID();
+    await db
+      .prepare(
+        "INSERT INTO coach_memories (id,owner,content,category,source,created_at,updated_at) VALUES (?,'a','legacy memory','goal','synthetic',?,?)",
+      )
+      .bind(id, now.toISOString(), now.toISOString())
+      .run();
+    const c = {
+      id: randomUUID(),
+      title: 'legacy reminder',
+      kind: 'checkin',
+      dueAt: now.toISOString(),
+    };
+    await db
+      .prepare(
+        "INSERT INTO coach_commitments (id,owner,title,kind,due_at,status,created_at,updated_at) VALUES (?,'a',?,?,?,'pending',?,?)",
+      )
+      .bind(c.id, c.title, c.kind, c.dueAt, c.dueAt, c.dueAt)
+      .run();
+    assert.equal((await listCoachMemories(db, 'a'))[0].status, 'active');
+    assert.equal((await listCoachMemories(db, 'a'))[0].expiresAt, null);
+    assert.equal(
+      (await listCommitments(db, 'a'))[0].expiresAt,
+      '2032-02-29T16:00:00.000Z',
+    );
+    const completed = { ...c, id: randomUUID() };
+    await saveCommitment(db, 'a', completed, now);
+    await changeCommitment(db, 'a', { id: completed.id, status: 'completed' });
+    await expireCoachItems(db, 'a', new Date('2032-03-01T00:00:00.000Z'));
+    assert.equal(
+      (await listCommitments(db, 'a')).find((c) => c.id === completed.id)
+        ?.status,
+      'completed',
+    );
+    assert.equal(
+      (await listCommitments(db, 'a')).find((item) => item.id === c.id)?.status,
+      'expired',
+    );
+    const input = { ...request('仅在今天记住这个安排'), date: '2032-02-29' };
+    const claimed = await claimCoachTurn(
+      db,
+      'a',
+      { id: input.id, kind: 'chat', date: input.date, userText: input.message },
+      now,
+    );
+    const parsed = parseCoachOutput(
+      {
+        ...baseOutput,
+        memories: [
+          {
+            content: input.message,
+            category: 'constraint',
+            quote: input.message,
+            expiresAt: '2032-02-29T16:00:00.000Z',
+          },
+        ],
+      },
+      [],
+      input.message,
+      now,
+    );
+    await finishCoachTurn(db, 'a', claimed.turn, parsed);
+    await assert.rejects(
+      acceptCoachProposal(
+        db,
+        'a',
+        input.id,
+        parsed.proposals[0].id,
+        new Date('2032-02-29T16:00:00.000Z'),
+      ),
+      /有效期已过/,
+    );
+    assert.equal((await listCoachMemories(db, 'a')).length, 1);
+    assert.throws(() =>
+      validateMemory(
+        {
+          id,
+          content: 'temporary',
+          category: 'goal',
+          expiresAt: '2032-02-30T16:00:00Z',
+        },
+        now,
+      ),
+    );
+    assert.throws(
+      () =>
+        validateCommitment(
+          {
+            ...c,
+            dueAt: '2032-02-29T11:00:00Z',
+            expiresAt: '2032-02-29T11:00:00Z',
+          },
+          now,
+        ),
+      /失效时间必须晚于提醒时间/,
+    );
+    assert.equal(
+      commitmentExpiry({ dueAt: '2032-02-29T15:59:59Z' }),
+      '2032-02-29T16:00:00.000Z',
     );
   } finally {
     close();

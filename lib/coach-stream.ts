@@ -1,7 +1,9 @@
+import type { CoachToolProgress } from './coach-tool-types.ts';
 import type { CoachTurn } from './coach.ts';
 
 export type CoachStreamEvent =
   | { type: 'delta'; delta: string }
+  | { type: 'tool'; progress: CoachToolProgress }
   | { type: 'done'; turn: CoachTurn | null }
   | { type: 'error'; error: string };
 
@@ -108,6 +110,7 @@ export async function requestCoachStream(
   },
   onDelta: (delta: string) => void,
   fetcher: typeof fetch = fetch,
+  onProgress?: (progress: CoachToolProgress) => void,
 ) {
   let failure = '回复中断了，消息已保留，恢复连接后可以原地重试。';
   try {
@@ -138,6 +141,7 @@ export async function requestCoachStream(
       const event = JSON.parse(raw) as CoachStreamEvent;
       if (event.type === 'delta' && typeof event.delta === 'string')
         onDelta(event.delta);
+      else if (event.type === 'tool') onProgress?.(event.progress);
       else if (event.type === 'done') return { turn: event.turn };
       else {
         failure =

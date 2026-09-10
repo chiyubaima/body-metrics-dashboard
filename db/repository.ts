@@ -6,6 +6,7 @@ import {
   validateProfile,
   validId,
 } from '../lib/model.ts';
+import { coachObject } from '../lib/coach.ts';
 import type { Body, Entry, Plan, Snapshot } from '../lib/model.ts';
 type Row = {
   id: string;
@@ -74,9 +75,55 @@ export async function snapshot(
       : null,
   };
 }
-export async function saveEntry(db: D1Database, owner: string, value: unknown) {
-  const v = validateEntry(value),
-    now = new Date().toISOString();
+type CoachRecordConfirmation = {
+  turnId: string;
+  actionPath: string;
+  actionJson: string;
+  source?: { id: string; updatedAt: string };
+};
+export async function saveEntry(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  confirmation?: CoachRecordConfirmation,
+) {
+  const v = validateEntry(value);
+  const expected = coachObject(value).expectedUpdatedAt;
+  if (
+    expected !== undefined &&
+    expected !== null &&
+    (typeof expected !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(expected))
+  )
+    throw new InputError('记录版本有误，请重新打开草稿。');
+  const guarded = expected !== undefined;
+  let versionClause = `( ?=0 OR (? IS NULL AND NOT EXISTS(SELECT 1 FROM records WHERE id=?)) OR EXISTS(SELECT 1 FROM records WHERE owner=? AND id=? AND deleted_at IS NULL AND updated_at=?))`;
+  const versionArgs = [
+    guarded ? 1 : 0,
+    expected ?? null,
+    v.id,
+    owner,
+    v.id,
+    expected ?? null,
+  ];
+  if (confirmation) {
+    versionClause += ` AND EXISTS(SELECT 1 FROM coach_turns WHERE owner=? AND id=? AND status='complete' AND json_extract(tool_runs,?)=?)`;
+    versionArgs.push(
+      owner,
+      confirmation.turnId,
+      confirmation.actionPath,
+      confirmation.actionJson,
+    );
+    if (confirmation.source) {
+      versionClause +=
+        ' AND EXISTS(SELECT 1 FROM records WHERE owner=? AND id=? AND updated_at=? AND deleted_at IS NULL)';
+      versionArgs.push(
+        owner,
+        confirmation.source.id,
+        confirmation.source.updatedAt,
+      );
+    }
+  }
   const existing = await db
     .prepare('SELECT * FROM records WHERE id=?')
     .bind(v.id)
@@ -87,6 +134,9 @@ export async function saveEntry(db: D1Database, owner: string, value: unknown) {
     throw new InputError('记录已在回收站，请先恢复再编辑。');
   if (existing && existing.kind !== v.kind)
     throw new InputError('不能更改记录类型。');
+  const now = new Date(
+    Math.max(Date.now(), existing ? Date.parse(existing.updated_at) + 1 : 0),
+  ).toISOString();
   const result = await db
     .prepare(
       'SELECT * FROM plans WHERE owner=? ORDER BY date DESC, created_at DESC',
@@ -118,14 +168,14 @@ export async function saveEntry(db: D1Database, owner: string, value: unknown) {
     statements.push(
       db
         .prepare(
-          "UPDATE records SET primary_morning=0 WHERE owner=? AND date=? AND kind='body' AND deleted_at IS NULL AND id<>? AND NOT EXISTS (SELECT 1 FROM records previous WHERE previous.id=? AND previous.deleted_at IS NOT NULL)",
+          `UPDATE records SET primary_morning=0 WHERE owner=? AND date=? AND kind='body' AND deleted_at IS NULL AND id<>? AND NOT EXISTS (SELECT 1 FROM records previous WHERE previous.id=? AND previous.deleted_at IS NOT NULL) AND ${versionClause}`,
         )
-        .bind(owner, v.date, v.id, v.id),
+        .bind(owner, v.date, v.id, v.id, ...versionArgs),
     );
   statements.push(
     db
       .prepare(
-        `INSERT INTO records (id,owner,kind,date,payload,primary_morning,plan_id,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,${v.kind === 'diet' ? "COALESCE((SELECT id FROM plans WHERE owner=? AND kind='diet' AND date=? AND json_extract(payload,'$.scope')='day' ORDER BY created_at DESC,id DESC LIMIT 1),?)" : '?'},?,?,NULL) ON CONFLICT(id) DO UPDATE SET date=excluded.date,payload=excluded.payload,primary_morning=excluded.primary_morning,plan_id=excluded.plan_id,updated_at=excluded.updated_at,deleted_at=NULL WHERE records.owner=excluded.owner AND records.deleted_at IS NULL`,
+        `INSERT INTO records (id,owner,kind,date,payload,primary_morning,plan_id,created_at,updated_at,deleted_at) SELECT ?,?,?,?,?,?,${v.kind === 'diet' ? "COALESCE((SELECT id FROM plans WHERE owner=? AND kind='diet' AND date=? AND json_extract(payload,'$.scope')='day' ORDER BY created_at DESC,id DESC LIMIT 1),?)" : '?'},?,?,NULL WHERE ${versionClause} ON CONFLICT(id) DO UPDATE SET date=excluded.date,payload=excluded.payload,primary_morning=excluded.primary_morning,plan_id=excluded.plan_id,updated_at=excluded.updated_at,deleted_at=NULL WHERE records.owner=excluded.owner AND records.deleted_at IS NULL`,
       )
       .bind(
         v.id,
@@ -138,12 +188,29 @@ export async function saveEntry(db: D1Database, owner: string, value: unknown) {
         planId,
         now,
         now,
+        ...versionArgs,
       ),
   );
+  if (confirmation)
+    statements.push(
+      db
+        .prepare(
+          `UPDATE coach_turns SET tool_runs=json_set(tool_runs,?,?),updated_at=? WHERE owner=? AND id=? AND changes()=1`,
+        )
+        .bind(
+          confirmation.actionPath + '.savedAt',
+          now,
+          now,
+          owner,
+          confirmation.turnId,
+        ),
+    );
   try {
     const saved = await db.batch(statements);
     if (!saved.at(-1)?.meta.changes)
-      throw new InputError('记录已在回收站，请先恢复再编辑。');
+      throw new InputError(
+        '记录已修改或进入回收站，请重新读取后再整理，当前输入已保留。',
+      );
   } catch (error) {
     if (String(error).includes('UNIQUE'))
       throw new InputError('当天已有饮食记录，请打开已有记录修改。');
