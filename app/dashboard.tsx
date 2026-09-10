@@ -23,6 +23,7 @@ import { HistoryView } from './history';
 import { JournalCalendar } from './calendar';
 import { TrashView } from './trash';
 import { DeveloperMode } from './developer-mode';
+import { AppUpdate } from './app-update';
 import { Coach } from './coach';
 import { Onboarding } from './onboarding';
 import { today, activePlan } from '@/lib/model';
@@ -444,6 +445,7 @@ export default function Dashboard({
           </div>
         </div>
         <div className="topbar-tools">
+          {localPreview && <AppUpdate />}
           {localPreview && <DeveloperMode date={date} ready={statsReady} />}
           <button
             className="secondary small trash-open"

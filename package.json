@@ -6,7 +6,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "node scripts/dev-server.mjs",
     "build": "vinext build",
     "start": "npm run dev --",
     "lint": "oxlint app lib db tests vite.config.ts drizzle.config.ts",
@@ -20,7 +20,6 @@
     "foods:audit": "node scripts/audit-food-translations.mjs",
     "setup": "node scripts/setup-local.mjs",
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "predev": "npm run setup",
     "prebuild": "node scripts/setup-local.mjs --config-only",
     "check:share": "node scripts/check-repository.mjs",
     "coach:setup": "node scripts/setup-coach.mjs",

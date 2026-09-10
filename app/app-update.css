@@ -1,0 +1,205 @@
+html .app-update-button {
+  --glass-accent: #555;
+  --glass-ink: #333;
+  --glass-reading: #ffffffeb;
+  --glass-tint: #f4f4f4;
+  --glass-line: #d4d4d4;
+  --ring: #737373;
+  position: relative;
+  color: #404040;
+  white-space: nowrap;
+}
+html .app-update-button.has-update {
+  color: #222;
+  border-color: #a3a3a3;
+  background: #f5f5f5;
+}
+.app-update-button i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #404040;
+}
+.app-update-spinner {
+  animation: app-update-spin 1s linear infinite;
+}
+
+/* The shared dialog has !important dimensions; keep this override local. */
+html .dialog-popup.app-update-dialog {
+  --foreground: #171717;
+  --glass-accent: #555;
+  --glass-fill: #222;
+  --glass-ink: #333;
+  --glass-tint: #f4f4f4;
+  --glass-blur: blur(20px) saturate(0%);
+  --ring: #737373;
+  width: min(26.25rem, calc(100vw - 2rem)) !important;
+  max-width: 26.25rem !important;
+  padding: 1.5rem !important;
+  border: 1px solid #ffffffed !important;
+  border-radius: 20px !important;
+  background: #fffffff2 !important;
+  color: #171717;
+  box-shadow:
+    0 24px 80px #00000024,
+    0 4px 16px #0000000a,
+    inset 0 1px 0 #fff !important;
+}
+html [data-slot='dialog-overlay']:has(+ .app-update-dialog) {
+  background: #00000026;
+}
+.app-update-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 28px;
+}
+.app-update-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e8e8e8;
+  border-radius: 11px;
+  color: #333;
+  background: #f5f5f5;
+}
+html .dialog-popup.app-update-dialog [data-slot='dialog-title'] {
+  margin: 0;
+  padding: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+html .dialog-popup.app-update-dialog [data-slot='dialog-description'] {
+  margin: 16px 0 0;
+  padding: 0;
+  color: #525252;
+  font-size: 0.875rem;
+  line-height: 1.75;
+}
+.app-update-version {
+  width: fit-content;
+  margin: 12px 0 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f2f2f2;
+  color: #666;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+html .dialog-popup.app-update-dialog .form-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #d4d4d4;
+  border-radius: 10px;
+  background: #f5f5f5;
+  color: #404040;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+html .dialog-popup.app-update-dialog .form-actions {
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  border: 0;
+}
+html .dialog-popup.app-update-dialog .form-actions > button {
+  flex: 0 1 auto;
+  min-width: 80px;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: 0.875rem;
+  font-weight: 550;
+  line-height: 1.4;
+}
+html .dialog-popup.app-update-dialog .secondary {
+  background: #f0f0f0;
+  color: #404040;
+}
+html .dialog-popup.app-update-dialog .secondary:hover:not(:disabled) {
+  background: #e8e8e8;
+}
+html .dialog-popup.app-update-dialog .primary {
+  background: #222;
+  color: #fff;
+}
+html .dialog-popup.app-update-dialog .primary:hover:not(:disabled) {
+  background: #3a3a3a;
+  box-shadow: none;
+}
+html .dialog-popup.app-update-dialog .primary:active:not(:disabled) {
+  box-shadow: none;
+}
+html .dialog-popup.app-update-dialog [data-slot='dialog-close'] {
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: transparent;
+  color: #737373;
+  box-shadow: none;
+}
+html .dialog-popup.app-update-dialog [data-slot='dialog-close']:hover {
+  background: #ededed;
+  color: #222;
+}
+html .dialog-popup.app-update-dialog button:focus-visible,
+html .app-update-button:focus-visible {
+  outline: 2px solid #737373;
+  outline-offset: 3px;
+}
+.app-update-notice {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  max-width: calc(100vw - 32px);
+  padding: 12px 18px;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  background: #fafafa;
+  color: #333;
+  box-shadow: 0 8px 28px #00000014;
+  font-size: 0.875rem;
+}
+@keyframes app-update-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 420px) {
+  html .dialog-popup.app-update-dialog {
+    padding: 1.25rem !important;
+  }
+}
+@media (pointer: coarse) {
+  html .dialog-popup.app-update-dialog .form-actions > button {
+    min-height: 44px;
+  }
+}
+@supports not
+((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html .dialog-popup.app-update-dialog {
+    background: #fff !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html .dialog-popup.app-update-dialog {
+    --glass-blur: none;
+    background: #fff !important;
+    border-color: #aaa !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-update-spinner {
+    animation: none;
+  }
+}

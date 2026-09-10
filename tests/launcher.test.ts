@@ -187,14 +187,17 @@ await test(
   async () => {
     const root = fixture();
     mkdirSync(join(root, 'scripts'));
-    cpSync(
-      new URL('scripts/launch.mjs', sourceRoot),
-      join(root, 'scripts/launch.mjs'),
-    );
-    cpSync(
-      new URL('scripts/local-server.mjs', sourceRoot),
-      join(root, 'scripts/local-server.mjs'),
-    );
+    for (const name of [
+      'launch.mjs',
+      'local-server.mjs',
+      'dev-server.mjs',
+      'local-update.mjs',
+      'update-manager.mjs',
+    ])
+      cpSync(
+        new URL('scripts/' + name, sourceRoot),
+        join(root, 'scripts', name),
+      );
     writeFileSync(
       join(root, 'scripts/setup-local.mjs'),
       `import {writeFileSync} from 'node:fs';writeFileSync('.wrangler/setup-ran','synthetic');`,

@@ -1,5 +1,20 @@
 # Application working rules
 
+## Header and calendar color annotations (2026-09-10)
+
+- Use black, white and gray for topbar tools and the journal calendar, including its month navigation, default/hover/selected/today/focus states. Preserve body/diet/training footprints and legend colors, especially diet green; keep module editors' existing themes.
+- Keep the developer entry neutral with a distinct enabled state. Replace internal review greens with red for controls, selection, save actions and element highlights; use readable neutral text and retain all annotation behavior.
+- Limit this revision to `app/glass.css` and `app/developer-mode.css`. Reuse existing interaction checks and run test/typecheck/lint/build plus a local read-only route check. Resolve only the three initially read annotations if their text and update time are unchanged. Preserve existing work and preview; no automatic commit, push or deployment.
+
+## Local version updates (2026-09-10)
+
+- Update UI uses only black, white and gray. Keep its dialog at most 420px wide, with a compact icon/title row, readable copy and quiet footer actions without a divider. Override the existing forced dialog width with scoped selectors in `app/app-update.css`; match its trigger and status notice to the neutral palette. Preserve confirmation/update behavior and other modules; reuse existing interaction tests and run test/typecheck/lint/build.
+- Add the update reminder immediately before DeveloperMode. Check the current branch's GitHub upstream on page opening, foreground return and every 15 minutes, with server-side coalescing. Apply only after a click using fetch plus fast-forward; never stash, reset, overwrite conflicts, commit or push.
+- `scripts/update-manager.mjs` owns bounded Git operations and ignored `.wrangler/update-state.json`; validate repository root, GitHub remote, upstream, clean worktree and protected local-state paths. ZIP/no-Git installs and diverged branches get actionable explanations. Documentation-only changes need no restart; freeze file watching before runtime-code checkout to prevent automatic Vite restart before consent.
+- `scripts/dev-server.mjs` supervises only its own child; reuse it from npm dev and the double-click launcher. After explicit restart confirmation, stop the child, install changed dependencies, run existing setup/migrations, restart on the same port and report readiness. Persist pending state across page reloads/manual shutdown and failures. No health-data cleanup or automatic rollback of migrated data.
+- `scripts/local-update.mjs` supplies development-only, loopback/same-origin control routes through bounded IPC; no arbitrary command, path, branch, URL or PID from the browser. `app/app-update.tsx` and `app/app-update.css` own progress, errors, deferred confirmation and reconnect UI using existing dialog primitives and visual style.
+- Synthetic tests belong in `tests/update*.test.ts`, with exact temporary Git fixtures and fake startup programs. Cover real fast-forward/divergence/dirty/untracked/private-path cases, concurrency, failed preparation, owned restart, origin restrictions and UI confirmation. Run test/typecheck/lint/build and a local read-only check; preserve the real preview and records, no real-checkout pull, automatic commit/push or deployment.
+
 This is the application checkout for the body metrics dashboard. The parent project's AGENT.md and design document are authoritative when present.
 
 - Preserve the body, diet, and training desktop columns and accessible mobile module switching.

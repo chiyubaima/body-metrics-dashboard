@@ -6,6 +6,7 @@ import type { ViteDevServer } from 'vite';
 import hostingConfig from './.openai/hosting.json';
 import { startCodexBridge } from './scripts/coach-codex-bridge.mjs';
 import { localServerPlugin } from './scripts/local-server.mjs';
+import { localUpdatePlugin } from './scripts/local-update.mjs';
 import { fileURLToPath } from 'node:url';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -70,6 +71,7 @@ export default defineConfig(async ({ command }) => {
     },
     plugins: [
       localServerPlugin(fileURLToPath(new URL('.', import.meta.url))),
+      localUpdatePlugin(),
       {
         name: 'local-coach-codex',
         configureServer(server: ViteDevServer) {

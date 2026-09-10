@@ -4,9 +4,9 @@
   white-space: nowrap;
 }
 .developer-toggle.enabled {
-  border-color: #83ba4a;
-  background: #edf8df;
-  color: #4a812b;
+  border-color: #a3a3a3;
+  background: #f2f2f2;
+  color: #262626;
 }
 html[data-developer-picking] body,
 html[data-developer-picking] body * {
@@ -25,7 +25,7 @@ html[data-developer-picking] [data-developer-ui] button {
   flex-shrink: 0;
 }
 .developer-tools {
-  color: #3e503a;
+  color: #333333;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.5;
@@ -53,7 +53,7 @@ html[data-developer-picking] [data-developer-ui] button {
 }
 .developer-tools button:focus-visible,
 .developer-tools textarea:focus-visible {
-  outline: 3px solid #abd875;
+  outline: 3px solid #b42335;
   outline-offset: 2px;
 }
 .developer-toolbar {
@@ -70,17 +70,17 @@ html[data-developer-picking] [data-developer-ui] button {
   max-width: calc(100vw - 24px);
   width: max-content;
   background: #fff;
-  border: 1.5px solid #d7e5cb;
-  border-bottom: 4px solid #b5cc9c;
+  border: 1.5px solid #efc3c9;
+  border-bottom: 4px solid #dda1aa;
   border-radius: 17px;
   padding: 10px 12px;
-  box-shadow: 0 8px 32px #34502d26;
+  box-shadow: 0 8px 32px #00000026;
 }
 .developer-mode-label {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: #749447;
+  color: #b42335;
   font-size: 11px;
   padding-right: 3px;
 }
@@ -89,55 +89,55 @@ html[data-developer-picking] [data-developer-ui] button {
 }
 .developer-mode-switch {
   display: flex;
-  background: #f2f6ed;
+  background: #fff1f2;
   padding: 3px;
   border-radius: 10px;
 }
 .developer-mode-switch button {
   background: transparent;
   border-radius: 8px;
-  color: #839276;
+  color: #737373;
   padding: 6px 9px;
   font-size: 12px;
   white-space: nowrap;
 }
 .developer-mode-switch button.selected {
   background: #fff;
-  color: #53832d;
-  box-shadow: 0 1px 3px #50633624;
+  color: #b42335;
+  box-shadow: 0 1px 3px #00000024;
 }
 .developer-list-button {
   background: transparent;
   padding: 6px 7px;
   border-radius: 9px;
-  color: #687b59;
+  color: #525252;
   font-size: 12px !important;
 }
 .developer-list-button b {
-  background: #edf6df;
+  background: #ffe4e7;
   border-radius: 5px;
   min-width: 20px;
   padding: 0 4px;
   font-size: 11px;
-  color: #628b32;
+  color: #b42335;
 }
 .developer-list-button.selected {
-  background: #f0f7e7;
+  background: #fff1f2;
 }
 .developer-tools .developer-exit,
 .developer-tools .developer-icon {
   width: 29px;
   height: 29px;
   border-radius: 8px;
-  color: #89977c;
-  background: #f4f7ef;
+  color: #737373;
+  background: #f5f5f5;
   flex-shrink: 0;
 }
 .developer-instruction {
   display: block;
   flex-basis: 100%;
   text-align: center;
-  color: #98a38e;
+  color: #737373;
   font-size: 10px;
   line-height: 1.25;
 }
@@ -152,10 +152,10 @@ html[data-developer-picking] [data-developer-ui] button {
   display: flex;
   flex-direction: column;
   background: #fff;
-  border: 1.5px solid #d9e4cf;
-  border-bottom: 4px solid #b8cf9e;
+  border: 1.5px solid #efc3c9;
+  border-bottom: 4px solid #dda1aa;
   border-radius: 21px;
-  box-shadow: 0 18px 80px #30452a30;
+  box-shadow: 0 18px 80px #00000030;
   overflow: hidden;
   outline: none;
   animation: developer-enter 0.18s ease-out;
@@ -166,13 +166,13 @@ html[data-developer-picking] [data-developer-ui] button {
   justify-content: space-between;
   gap: 15px;
   padding: 19px 20px 15px;
-  border-bottom: 1px solid #e8eede;
-  background: #fbfdf8;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fffafa;
   flex-shrink: 0;
 }
 .developer-panel > header span {
   font-size: 10px;
-  color: #91a27d;
+  color: #737373;
   letter-spacing: 1px;
 }
 .developer-panel h2 {
@@ -180,7 +180,7 @@ html[data-developer-picking] [data-developer-ui] button {
   line-height: 1.4;
   margin: 3px 0 0;
   font-weight: 750;
-  color: #465c3b;
+  color: #262626;
 }
 .developer-editor {
   padding: 16px 20px 18px;
@@ -193,8 +193,8 @@ html[data-developer-picking] [data-developer-ui] button {
   margin: 0;
 }
 .developer-target {
-  background: #f4f8ee;
-  border-left: 3px solid #a7cf72;
+  background: #fff1f2;
+  border-left: 3px solid #c43a4b;
   border-radius: 2px 9px 9px 2px;
   padding: 10px 12px;
   flex-shrink: 0;
@@ -203,7 +203,7 @@ html[data-developer-picking] [data-developer-ui] button {
   gap: 4px;
 }
 .developer-target > span {
-  color: #83986d;
+  color: #9f2434;
   font-size: 10px;
 }
 .developer-target > strong {
@@ -212,42 +212,42 @@ html[data-developer-picking] [data-developer-ui] button {
   max-height: 64px;
   overflow: auto;
   overflow-wrap: anywhere;
-  color: #536347;
+  color: #404040;
 }
 .developer-target > small {
   font-size: 10px;
-  color: #a0ab95;
+  color: #737373;
 }
 .developer-editor > label {
   font-size: 12px;
-  color: #687e55;
+  color: #525252;
   font-weight: 650;
   margin-top: 2px;
 }
 .developer-editor > textarea {
   display: block;
   resize: vertical;
-  border: 1.5px solid #dfe8d6;
+  border: 1.5px solid #e5c8cd;
   border-radius: 11px;
   background: white;
   padding: 11px 12px;
   min-height: 116px;
   flex: 1;
   width: 100%;
-  color: #42513d;
+  color: #333333;
   line-height: 1.8;
   font-family: inherit;
   font-size: 13px;
   outline: none;
 }
 .developer-editor > textarea::placeholder {
-  color: #aeb8a3;
+  color: #737373;
 }
 .developer-editor-meta {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: #9aa88e;
+  color: #737373;
   font-size: 10px;
 }
 .developer-editor > footer {
@@ -259,9 +259,9 @@ html[data-developer-picking] [data-developer-ui] button {
   flex-shrink: 0;
 }
 .developer-tools .developer-primary {
-  border: 1px solid #83b848;
-  border-bottom: 3px solid #78a93d;
-  background: #93c656;
+  border: 1px solid #a51d2e;
+  border-bottom: 3px solid #8f1d2b;
+  background: #b42335;
   color: white;
   border-radius: 11px;
   padding: 9px 14px;
@@ -269,9 +269,9 @@ html[data-developer-picking] [data-developer-ui] button {
   font-weight: 700;
 }
 .developer-tools .developer-secondary {
-  background: #f5f8f0;
-  color: #819369;
-  border: 1px solid #e5eadc;
+  background: #f5f5f5;
+  color: #525252;
+  border: 1px solid #e5e5e5;
   border-radius: 11px;
   padding: 9px 12px;
   font-size: 11px;
@@ -285,18 +285,18 @@ html[data-developer-picking] [data-developer-ui] button {
   padding: 12px 16px;
   background: #fff;
   flex-shrink: 0;
-  border-bottom: 1px solid #eff2e9;
+  border-bottom: 1px solid #e5e5e5;
 }
 .developer-list-tabs > button {
   font-size: 11px;
-  color: #98a58b;
+  color: #737373;
   background: transparent;
   padding: 5px 10px;
   border-radius: 8px;
 }
 .developer-list-tabs > button.selected {
-  background: #edf6e1;
-  color: #6c983d;
+  background: #fff1f2;
+  color: #b42335;
   font-weight: 650;
 }
 .developer-list-tabs .developer-icon {
@@ -311,20 +311,20 @@ html[data-developer-picking] [data-developer-ui] button {
 }
 .developer-note {
   padding: 15px 0;
-  border-bottom: 1px solid #e9edde;
+  border-bottom: 1px solid #e5e5e5;
 }
 .developer-note-context {
   display: flex;
   gap: 7px;
   align-items: center;
   font-size: 10px;
-  color: #8b9c7a;
+  color: #737373;
 }
 .developer-note-context b {
   font-size: 10px;
-  color: #81a45a;
-  border: 1px solid #e4ecd8;
-  background: #f7faef;
+  color: #9f2434;
+  border: 1px solid #efc3c9;
+  background: #fff1f2;
   border-radius: 5px;
   padding: 1px 5px;
 }
@@ -333,7 +333,7 @@ html[data-developer-picking] [data-developer-ui] button {
   margin: 5px 0;
   font-size: 11px;
   font-weight: 600;
-  color: #a0ad92;
+  color: #737373;
   overflow-wrap: anywhere;
   max-height: 45px;
   overflow: auto;
@@ -341,14 +341,14 @@ html[data-developer-picking] [data-developer-ui] button {
 .developer-note > p {
   font-size: 13px;
   line-height: 1.8;
-  color: #4c5c42;
+  color: #333333;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   margin: 7px 0;
 }
 .developer-note > small {
   font-size: 9px;
-  color: #a8b19e;
+  color: #737373;
 }
 .developer-note-actions {
   display: flex;
@@ -359,16 +359,16 @@ html[data-developer-picking] [data-developer-ui] button {
 .developer-note-actions > button {
   font-size: 10px;
   padding: 5px 7px;
-  background: #f7f9f3;
-  color: #8a9a78;
+  background: #f5f5f5;
+  color: #525252;
   border-radius: 7px;
 }
 .developer-list-footer {
   padding: 12px 17px;
   font-size: 10px;
-  color: #9eab90;
-  background: #fbfcf8;
-  border-top: 1px solid #edf0e6;
+  color: #737373;
+  background: #fafafa;
+  border-top: 1px solid #e5e5e5;
   line-height: 1.7;
   flex-shrink: 0;
 }
@@ -381,16 +381,16 @@ html[data-developer-picking] [data-developer-ui] button {
   gap: 12px;
   text-align: center;
   padding: 20px;
-  color: #bdcdb0;
+  color: #c4c4c4;
 }
 .developer-empty > strong {
   font-size: 13px;
-  color: #829872;
+  color: #525252;
   font-weight: 600;
 }
 .developer-empty > p {
   font-size: 11px;
-  color: #9dad90;
+  color: #737373;
   line-height: 1.7;
   margin: 0;
 }
@@ -404,13 +404,13 @@ html[data-developer-picking] [data-developer-ui] button {
   gap: 6px;
   padding: 8px 13px;
   max-width: calc(100vw - 24px);
-  border: 1px solid #dce9cc;
-  background: #f3f9ec;
-  color: #7c995b;
+  border: 1px solid #efc3c9;
+  background: #fff1f2;
+  color: #9f2434;
   border-radius: 10px;
   z-index: 10004;
   font-size: 11px;
-  box-shadow: 0 4px 16px #24421d14;
+  box-shadow: 0 4px 16px #00000014;
 }
 .developer-error {
   font-size: 11px;
@@ -470,10 +470,10 @@ html[data-developer-picking] [data-developer-ui] button {
   position: fixed;
   pointer-events: none;
   z-index: 9999;
-  border: 2px solid #83c346;
-  background: #a6d86e13;
+  border: 2px solid #c43a4b;
+  background: #c43a4b13;
   border-radius: 6px;
-  box-shadow: 0 0 0 3px #8acb3f21;
+  box-shadow: 0 0 0 3px #c43a4b21;
 }
 .developer-highlight > span {
   position: absolute;
@@ -483,7 +483,7 @@ html[data-developer-picking] [data-developer-ui] button {
   overflow: hidden;
   text-overflow: ellipsis;
   color: white;
-  background: #78ae42;
+  background: #b42335;
   font-size: 10px;
   padding: 4px 8px;
   border-radius: 6px;

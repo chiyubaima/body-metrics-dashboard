@@ -238,8 +238,7 @@ export async function launch({ root = rootDirectory, open = true } = {}) {
       `正在启动页面${port !== 3000 ? `，自动使用空闲端口 ${port}` : ''}…`,
     );
     const exited = run(process.execPath, [
-      resolve(root, 'node_modules/vinext/dist/cli.js'),
-      'dev',
+      resolve(root, 'scripts/dev-server.mjs'),
       '--port',
       String(port),
     ]);
