@@ -36,6 +36,13 @@
       "when": 1789011489776,
       "tag": "0004_little_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789048632800,
+      "tag": "0005_serious_bug",
+      "breakpoints": true
     }
   ]
 }

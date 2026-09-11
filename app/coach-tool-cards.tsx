@@ -17,8 +17,17 @@ import {
   cardioEntries,
 } from '../lib/progress.ts';
 import { cardioTypes, exerciseDefinition } from '../lib/exercises.ts';
+import { DishDetails } from './dish-details';
 
-function RecordPreview({ entry, meals }: { entry: Entry; meals?: MealSlot[] }) {
+function RecordPreview({
+  entry,
+  meals,
+  pending = false,
+}: {
+  entry: Entry;
+  meals?: MealSlot[];
+  pending?: boolean;
+}) {
   if (entry.kind === 'body') {
     const body = entry.data as Body;
     return (
@@ -93,6 +102,14 @@ function RecordPreview({ entry, meals }: { entry: Entry; meals?: MealSlot[] }) {
                     <b>
                       {food.grams} g<small>{basisLabels[food.basis]}</small>
                     </b>
+                    {food.dish && (
+                      <DishDetails
+                        recipe={food.dish.recipe}
+                        grams={food.grams}
+                        estimatedPortion={food.estimatedPortion}
+                        pending={pending && food.dishDraft}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -325,6 +342,7 @@ export function CoachToolCards({
                       <RecordPreview
                         entry={action.entry}
                         meals={previewDietMeals(action, records)}
+                        pending
                       />
                     )}
                     <div className="coach-tool-actions coach-record-actions">
@@ -346,7 +364,12 @@ export function CoachToolCards({
                         >
                           {busy === `${run.id}:${i}:save`
                             ? '正在记录…'
-                            : '确认记录'}
+                            : action.entry.kind === 'diet' &&
+                                (action.entry.data as Diet).foods.some(
+                                  (f) => f.dishDraft,
+                                )
+                              ? '确认菜品并记录'
+                              : '确认记录'}
                         </button>
                       )}
                       <button

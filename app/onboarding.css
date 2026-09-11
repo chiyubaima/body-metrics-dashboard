@@ -146,9 +146,6 @@ html .onboarding-dialog .onboarding-footer .primary {
   color: white;
   min-height: 44px;
 }
-.onboarding-reopen {
-  margin-top: 20px;
-}
 @media (max-width: 520px) {
   html .dialog-popup.onboarding-dialog {
     padding: 20px 16px !important;

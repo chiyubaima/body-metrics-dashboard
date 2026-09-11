@@ -6,6 +6,7 @@ import type {
   Entry,
   Exercise,
   Food,
+  MealSlot,
   Nutrition,
   Training,
   WorkoutSet,
@@ -17,6 +18,20 @@ export const mealLabels = {
   snack: '加餐',
   unsorted: '未分餐',
 };
+export function defaultMealSlot(foods: Food[], now = new Date()): MealSlot {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(now),
+  );
+  const slots = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+  const index = hour < 11 ? 0 : hour < 16 ? 1 : 2;
+  return slots[
+    index + (foods.some((food) => food.meal === slots[index]) ? 1 : 0)
+  ];
+}
 export const basisLabels = { raw: '生重', cooked: '熟重', asSold: '食用份量' };
 export const loadLabels = {
   total: '总重量',

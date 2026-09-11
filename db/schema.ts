@@ -48,6 +48,23 @@ export const profiles = sqliteTable('profiles', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const customDishes = sqliteTable(
+  'custom_dishes',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    nameKey: text('name_key').notNull(),
+    payload: text('payload').notNull(),
+    createdAt: text('created_at').notNull(),
+    deletedAt: text('deleted_at'),
+  },
+  (t) => [
+    uniqueIndex('idx_custom_dishes_owner_name')
+      .on(t.owner, t.nameKey)
+      .where(sql`deleted_at IS NULL`),
+  ],
+);
+
 export const annotations = sqliteTable(
   'annotations',
   {

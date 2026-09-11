@@ -215,6 +215,7 @@ await test('owner isolation blocks cross-account reads, changes, deletes and res
     });
     assert.deepEqual(await snapshot(db, 'bob'), {
       records: [],
+      dishes: [],
       plans: [],
       profile: null,
     });
@@ -766,6 +767,7 @@ await test('developer annotations persist independently, keep target evidence, r
     assert.equal(edited.createdAt, created.createdAt);
     assert.deepEqual(await snapshot(connection.db, 'alice'), {
       records: [],
+      dishes: [],
       plans: [],
       profile: null,
     });

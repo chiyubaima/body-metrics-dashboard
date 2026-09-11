@@ -1719,7 +1719,7 @@ html .coach-sheet .coach-proposal-dismiss {
 }
 .coach-record-heading,
 .coach-record-line,
-.coach-record-group li {
+.coach-record-group > ul > li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1769,22 +1769,22 @@ html .coach-sheet .coach-proposal-dismiss {
 .coach-record-group > strong {
   font-size: 12px;
 }
-.coach-record-group ul {
+.coach-record-group > ul {
   list-style: none;
   margin: 4px 0 0;
   padding: 0;
 }
-.coach-record-group li,
+.coach-record-group > ul > li,
 .coach-record-line {
   padding: 7px 0;
   line-height: 1.6;
   border-bottom: 1px solid #eeeeef;
 }
-.coach-record-group li > span {
+.coach-record-group > ul > li > span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.coach-record-group li > b,
+.coach-record-group > ul > li > b,
 .coach-record-line > b {
   flex-shrink: 0;
   text-align: right;
@@ -1837,7 +1837,7 @@ html .coach-sheet .coach-proposal-dismiss {
 /* Every conversation action has a visible button surface, including disclosures. */
 .coach-sheet
   .coach-chat-panel
-  :is(button, summary, a.text-button):not(.coach-send) {
+  :is(button, summary, a.text-button):not(.coach-send, .dish-disclosure) {
   border-radius: 12px;
 }
 .coach-sheet
@@ -1846,7 +1846,8 @@ html .coach-sheet .coach-proposal-dismiss {
     .coach-send,
     .primary,
     .secondary,
-    .coach-record-confirm
+    .coach-record-confirm,
+    .dish-disclosure
   ) {
   display: inline-flex;
   align-items: center;
@@ -1872,35 +1873,43 @@ html .coach-sheet .coach-proposal-dismiss {
     .coach-send,
     .primary,
     .secondary,
-    .coach-record-confirm
+    .coach-record-confirm,
+    .dish-disclosure
   ):hover:not(:disabled) {
   background: #e9e9ec;
   border-color: #bdbdc3;
 }
 .coach-sheet
   .coach-chat-panel
-  :is(button, summary, a.text-button):not(.coach-send):active:not(:disabled) {
+  :is(button, summary, a.text-button):not(
+    .coach-send,
+    .dish-disclosure
+  ):active:not(:disabled) {
   box-shadow: inset 0 1px 3px #00000014;
 }
 .coach-sheet
   .coach-chat-panel
-  :is(button, summary, a.text-button):focus-visible {
+  :is(button, summary, a.text-button):not(.dish-disclosure):focus-visible {
   outline: 2px solid #4b4b50;
   outline-offset: 3px;
 }
-.coach-sheet .coach-chat-panel button:not(.coach-send):disabled {
+.coach-sheet
+  .coach-chat-panel
+  button:not(.coach-send, .dish-disclosure):disabled {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
 }
-.coach-sheet .coach-chat-panel summary {
+.coach-sheet .coach-chat-panel summary:not(.dish-disclosure) {
   list-style: none;
   margin: 3px 0;
 }
-.coach-sheet .coach-chat-panel summary::-webkit-details-marker {
+.coach-sheet
+  .coach-chat-panel
+  summary:not(.dish-disclosure)::-webkit-details-marker {
   display: none;
 }
-.coach-sheet .coach-chat-panel summary::after {
+.coach-sheet .coach-chat-panel summary:not(.dish-disclosure)::after {
   content: '';
   width: 6px;
   height: 6px;
@@ -1910,7 +1919,10 @@ html .coach-sheet .coach-proposal-dismiss {
   border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg) translateY(-2px);
 }
-.coach-sheet .coach-chat-panel details[open] > summary::after {
+.coach-sheet
+  .coach-chat-panel
+  details[open]
+  > summary:not(.dish-disclosure)::after {
   transform: rotate(225deg) translate(-1px, -1px);
 }
 .coach-tool-action-list {
@@ -1930,7 +1942,7 @@ html .coach-sheet .coach-proposal-dismiss {
 @media (pointer: coarse) {
   .coach-sheet
     .coach-chat-panel
-    :is(button, summary, a.text-button):not(.coach-send) {
+    :is(button, summary, a.text-button):not(.coach-send, .dish-disclosure) {
     min-height: 44px;
   }
 }

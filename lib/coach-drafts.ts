@@ -1,7 +1,13 @@
 import { coachObject, coachText, coachChoice } from './coach.ts';
-import { InputError, validateEntry, validId } from './model.ts';
-import type { Entry, Food, Diet } from './model.ts';
+import {
+  InputError,
+  validateEntry,
+  validId,
+  validateDishRecipe,
+} from './model.ts';
+import type { Entry, Food, Diet, CustomDish } from './model.ts';
 import { foodById } from './food-search.ts';
+import { dishFood, dishNameKey, searchFoodLibraries } from './dishes.ts';
 import { resistanceExercises } from './exercises.ts';
 import type { CoachToolAction } from './coach-tool-types.ts';
 import { changedDietMeals } from './coach-tool-types.ts';
@@ -105,6 +111,7 @@ export function prepareRecord(
   message: string,
   now = new Date(),
   conversation: RecordConversation = [],
+  dishes: CustomDish[] = [],
 ): CoachToolAction {
   const quote = recordQuote(args, message, conversation);
   const existing = args.id
@@ -177,8 +184,86 @@ export function prepareRecord(
       throw new InputError(
         '请明确要记录的食物及克数，不能用一碗等份量猜克数。',
       );
+    const estimatedDishes = new Map<string, CustomDish>();
     data.foods = input.foods.map((item: unknown) => {
       const food = coachObject(item);
+      let dish: CustomDish | undefined;
+      let dishDraft = false;
+      if (food.dishId !== undefined) {
+        dish = dishes.find((d) => d.id === validId(food.dishId));
+        if (!dish)
+          throw new InputError('这道自建菜品已不可用，请重新搜索菜品库。');
+      } else if (food.estimatedDish !== undefined) {
+        const recipe = validateDishRecipe(food.estimatedDish),
+          key = dishNameKey(recipe.name);
+        if (!dishNameKey(quote).includes(key))
+          throw new InputError(
+            '估算菜名需来自这次记录的用户原话，请先核对菜名。',
+          );
+        dish = dishes.find((d) => dishNameKey(d.recipe.name) === key);
+        if (!dish) {
+          const found = searchFoodLibraries(dishes, recipe.name);
+          if (
+            found.foods.some((f) =>
+              [f.name, f.originalName ?? ''].some(
+                (name) => dishNameKey(name) === key,
+              ),
+            )
+          )
+            throw new InputError(
+              '菜品已有目录记录，请选择查到的菜品ID，不要重新估算。',
+            );
+          dish = estimatedDishes.get(key);
+          if (dish && JSON.stringify(dish.recipe) !== JSON.stringify(recipe))
+            throw new InputError(
+              '同一道菜的估算配方不一致，请合并后重新整理。',
+            );
+          dish ??= {
+            id: crypto.randomUUID(),
+            recipe,
+            createdAt: now.toISOString(),
+          };
+          estimatedDishes.set(key, dish);
+          dishDraft = true;
+        }
+      }
+      if (dish) {
+        const previousDish =
+          base && !daily
+            ? (base.data as Diet).foods.find(
+                (f) => f.dish?.id === dish.id && f.meal === food.meal,
+              )
+            : undefined;
+        let grams: number;
+        if (food.grams !== undefined) {
+          requireReportedNumber(food.grams, previousDish?.grams, quote, 'g');
+          grams = food.grams as number;
+        } else {
+          const servings = food.servings ?? 1;
+          if (
+            typeof servings !== 'number' ||
+            !Number.isFinite(servings) ||
+            servings <= 0 ||
+            servings > 20
+          )
+            throw new InputError('请核对菜品份数。');
+          if (
+            food.servings !== undefined &&
+            !(servings === 0.5 && /半(?:份|碗|盘|个)/.test(quote))
+          )
+            requireReportedNumber(servings, undefined, quote, 'count');
+          grams = Math.round(dish.recipe.portionGrams * servings * 10) / 10;
+        }
+        return {
+          ...dishFood(dish, grams),
+          meal: food.meal,
+          ...(dishDraft ? { dishDraft: true } : {}),
+          ...(food.grams === undefined ||
+          (previousDish?.estimatedPortion && previousDish.grams === grams)
+            ? { estimatedPortion: true }
+            : {}),
+        };
+      }
       const previous = (
         base?.data as { foods?: Food[] } | undefined
       )?.foods?.find(
@@ -198,9 +283,21 @@ export function prepareRecord(
         const canonical = foodById(food.fdcId);
         if (!canonical || canonical.basis !== food.basis)
           throw new InputError('食物目录与生熟重不匹配，请先查询目录。');
+        if (
+          dishes.some((d) =>
+            [food.name, canonical.name].some(
+              (name) =>
+                typeof name === 'string' &&
+                dishNameKey(name) === dishNameKey(d.recipe.name),
+            ),
+          )
+        )
+          throw new InputError(
+            '这道菜已有自建配方，请先查询并使用它的dishId。',
+          );
         return { ...canonical, grams: food.grams, meal: food.meal };
       }
-      // Unknown foods stay unknown; model-generated nutrition is never authoritative.
+      // Only a reviewed recipe can carry model-estimated nutrition.
       return {
         name: food.name,
         grams: food.grams,

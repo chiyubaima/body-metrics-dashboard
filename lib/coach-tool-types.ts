@@ -92,6 +92,8 @@ function foodContents(foods: Diet['foods']) {
             f.nutrition.fat,
           ]
         : null,
+      dish: f.dish,
+      estimatedPortion: f.estimatedPortion,
     })),
   );
 }

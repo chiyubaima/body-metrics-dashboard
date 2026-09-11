@@ -1,7 +1,6 @@
 'use client';
 import { useState, type SubmitEvent } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download } from 'lucide-react';
 import { today, trainingDraft } from '@/lib/model';
 import type {
   Body,
@@ -116,7 +115,7 @@ function BodyForm({
   return (
     <form
       id={formId}
-      className="dialog-body"
+      className="dialog-body body-record-form"
       data-record-date={recordDate}
       onSubmit={submit}
       onChange={onDirty}
@@ -153,7 +152,7 @@ function BodyForm({
             min="20"
             max="400"
             defaultValue={body?.weight ?? ''}
-            placeholder="输入这次测量的体重"
+            placeholder="—"
           />
         </Field>
         <Field label="腰围 · cm">
@@ -165,6 +164,7 @@ function BodyForm({
             min="30"
             max="300"
             defaultValue={body?.waist ?? ''}
+            placeholder="—"
           />
         </Field>
         <Field label="体脂率 · %">
@@ -176,6 +176,7 @@ function BodyForm({
             min="1"
             max="75"
             defaultValue={body?.bodyFat ?? ''}
+            placeholder="—"
           />
         </Field>
         <div className="field full">
@@ -477,6 +478,7 @@ export function ProfileForm({
     [error, setError] = useState('');
   async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError('');
     const f = new FormData(e.currentTarget);
     try {
       await save('/api/profile', {
@@ -491,7 +493,11 @@ export function ProfileForm({
     }
   }
   return (
-    <form onSubmit={submit} onChange={onDirty} className="dialog-body">
+    <form
+      onSubmit={submit}
+      onChange={onDirty}
+      className="dialog-body profile-form"
+    >
       <Field label="称呼">
         <input
           name="name"
@@ -542,13 +548,6 @@ export function ProfileForm({
           placeholder="可保留饭后体重或估计体脂等参考，不会自动计入晨重趋势。"
         />
       </Field>
-      <a className="backup-link" href="/api/export" download>
-        <Download size={18} />
-        导出全部记录与计划
-      </a>
-      <p className="detail-text">
-        备份包含身体、饮食、训练、个人信息及历史计划。请保存在你信任的位置。
-      </p>
       {error && (
         <p className="form-error" role="alert">
           {error}

@@ -26,6 +26,7 @@ import {
   today,
   trainingDraft,
   weekDates,
+  weekCounts,
 } from '@/lib/model';
 import type {
   Body,
@@ -40,6 +41,7 @@ import type {
 } from '@/lib/model';
 import {
   bodyPoints,
+  defaultMealSlot,
   bodyMassIndex,
   cardioEntries,
   bodyDomain,
@@ -149,7 +151,7 @@ function Panel({
             {kind === 'body'
               ? '记录身体'
               : kind === 'diet'
-                ? '记一餐'
+                ? '记录饮食'
                 : '记录训练'}
           </button>
           <button
@@ -229,12 +231,14 @@ function TrendChart({
   unit,
   mean = false,
   minimumSpan = false,
+  connectGaps = false,
 }: {
   points: { date: string; value: number | null; mean?: number | null }[];
   color: string;
   unit: string;
   mean?: boolean;
   minimumSpan?: boolean;
+  connectGaps?: boolean;
 }) {
   return (
     <figure
@@ -293,7 +297,7 @@ function TrendChart({
             strokeWidth={mean ? 1.5 : 3}
             dot={{ r: 3, fill: mean ? '#a3d3ea' : color, strokeWidth: 0 }}
             activeDot={{ r: 5 }}
-            connectNulls={false}
+            connectNulls={connectGaps}
             isAnimationActive={false}
           />
           {mean && (
@@ -302,7 +306,7 @@ function TrendChart({
               stroke={color}
               strokeWidth={3}
               dot={false}
-              connectNulls={false}
+              connectNulls={connectGaps}
               isAnimationActive={false}
             />
           )}
@@ -420,6 +424,7 @@ export function BodyPanel(props: PanelProps & { height: number | null }) {
             color="#168fca"
             mean={metric === 'bmi' || (metric === 'weight' && morningOnly)}
             minimumSpan
+            connectGaps
           />
         ) : (
           <EmptyChart
@@ -468,9 +473,8 @@ export function DietPanel(
     (diet?.foods ?? []).map((f) => f.meal ?? 'unsorted'),
   );
   const selectedFoods = (diet?.foods ?? []).filter(
-      (f) => (f.meal ?? 'unsorted') === meal,
-    ),
-    selectedSummary = nutritionSummary(selectedFoods);
+    (f) => (f.meal ?? 'unsorted') === meal,
+  );
   const slots: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
   return (
     <Panel
@@ -479,7 +483,7 @@ export function DietPanel(
       subtitle="吃得明白，记录轻松"
       active={props.module === 'diet'}
       disabled={!ready || date > today()}
-      action={() => edit('diet', row, meal)}
+      action={() => edit('diet', row, defaultMealSlot(diet?.foods ?? []))}
       history={() => history('diet')}
     >
       <div
@@ -544,46 +548,42 @@ export function DietPanel(
         </SectionTitle>
         <div className="plate-surface">
           <div className="plate-tabs" aria-label="选择餐次">
-            {slots.map((slot) => (
-              <button
-                key={slot}
-                data-annotate={`diet.meal.${slot}`}
-                aria-pressed={meal === slot}
-                className={`${meal === slot ? 'selected' : ''} ${loggedSlots.has(slot) ? 'logged' : ''}`}
-                onClick={() => setMeal(slot)}
-              >
-                <span>
-                  <MealIcon meal={slot} />
-                </span>
-                <b>{mealLabels[slot]}</b>
-                <small>{loggedSlots.has(slot) ? '已记录' : '待记录'}</small>
-              </button>
-            ))}
+            {slots.map((slot) => {
+              const mealSummary = nutritionSummary(
+                (diet?.foods ?? []).filter((food) => food.meal === slot),
+              );
+              const energy = !mealSummary.count
+                ? '待记录'
+                : mealSummary.total.energy === null
+                  ? '热量待补全'
+                  : `${numeric(mealSummary.total.energy, 0)} 大卡${mealSummary.known.energy < mealSummary.count ? '（部分）' : ''}`;
+              return (
+                <button
+                  key={slot}
+                  data-annotate={`diet.meal.${slot}`}
+                  aria-pressed={meal === slot}
+                  className={`${meal === slot ? 'selected' : ''} ${loggedSlots.has(slot) ? 'logged' : ''}`}
+                  onClick={() => setMeal(slot)}
+                >
+                  <span>
+                    <MealIcon meal={slot} />
+                  </span>
+                  <b>{mealLabels[slot]}</b>
+                  <small>{energy}</small>
+                </button>
+              );
+            })}
           </div>
           {loggedSlots.has('unsorted') && (
             <button className="text-button" onClick={() => setMeal('unsorted')}>
               查看未分餐旧记录
             </button>
           )}
-          <div className="plate-detail" key={date + meal}>
-            <div className="section-heading plate-meal-heading">
-              <strong>{mealLabels[meal]}</strong>
-              <span className="plate-energy">
-                {selectedFoods.length ? (
-                  <>
-                    <b>{numeric(selectedSummary.total.energy, 0)}</b>
-                    <small>
-                      大卡
-                      {selectedSummary.known.energy < selectedSummary.count
-                        ? '（部分）'
-                        : ''}
-                    </small>
-                  </>
-                ) : (
-                  '还没记'
-                )}
-              </span>
-            </div>
+          <section
+            className="plate-detail"
+            key={date + meal}
+            aria-label={`${mealLabels[meal]}餐食明细`}
+          >
             {selectedFoods.map((food, i) => (
               <div className="plate-food" key={i}>
                 <div className="plate-food-description">
@@ -604,9 +604,7 @@ export function DietPanel(
                 </b>
               </div>
             ))}
-            {!selectedFoods.length && (
-              <p className="empty-inline">记下吃了什么，系统帮你算好营养。</p>
-            )}
+            {!selectedFoods.length && <p className="empty-inline">暂无记录</p>}
             <button
               className="secondary plate-edit"
               disabled={!ready || date > today()}
@@ -617,7 +615,7 @@ export function DietPanel(
                 ? '补充 / 修改这一餐'
                 : `记录${mealLabels[meal]}`}
             </button>
-          </div>
+          </section>
         </div>
       </div>
       {diet?.note && <p className="daily-note">{diet.note}</p>}
@@ -693,11 +691,32 @@ export function TrainingPanel(props: PanelProps) {
     first = timeline[0];
   const cp = activePlan(plans, 'training', date),
     target = (cp?.data as TrainingPlan) ?? trainingDraft;
-  const sessions = records.filter(
-      (r) => r.kind === 'training' && r.date <= date,
-    ),
+  const sessions = records
+      .filter((r) => r.kind === 'training' && r.date <= date)
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) ||
+          b.createdAt.localeCompare(a.createdAt) ||
+          b.id.localeCompare(a.id),
+      ),
     rows = sessions.filter((r) => r.date === date),
-    latest = sessions.find((r) => (r.data as Training).status === 'completed');
+    latest = sessions.find(
+      (r) =>
+        (r.data as Training).status === 'completed' &&
+        (r.data as Training).type !== 'rest',
+    );
+  const counts = weekCounts(sessions, date),
+    goal = target.resistance + target.cardio,
+    completed =
+      Math.min(counts.resistance, target.resistance) +
+      Math.min(counts.cardio, target.cardio),
+    latestTraining = latest?.data as Training | undefined,
+    latestActivities = latestTraining ? cardioEntries(latestTraining) : [],
+    latestMinutes = latestActivities.length
+      ? latestActivities.every((activity) => activity.minutes !== null)
+        ? latestActivities.reduce((sum, activity) => sum + activity.minutes!, 0)
+        : null
+      : latestTraining?.minutes;
   const growth = strengthGrowth(overview);
   const bodyOnly = exercise
     ? exerciseDefinition(exercise)?.bodyOnly ||
@@ -797,17 +816,54 @@ export function TrainingPanel(props: PanelProps) {
             })}
           </div>
         ) : (
-          <div className="training-empty">
-            <Dumbbell size={24} />
-            <strong>
-              {schedule === 'rest'
-                ? '今天，留一点时间恢复'
-                : '训练过的每一组，都值得记下来'}
-            </strong>
-            <p>
-              {latest
-                ? `上次训练在 ${compactDate(latest.date)}，可在记录时复用动作。`
-                : '添加第一个动作，建立你的能力基线。'}
+          <div className="training-week-card">
+            <div className="training-week-heading">
+              <strong>
+                {cp && goal > 0
+                  ? `本周计划已完成 ${completed} / ${goal} 次`
+                  : cp
+                    ? '本周未安排训练目标'
+                    : `本周已完成 ${counts.resistance + counts.cardio} 次训练`}
+              </strong>
+              {schedule === 'rest' && (
+                <small>{date === today() ? '今日休息' : '当日休息'}</small>
+              )}
+            </div>
+            <div className="training-week-metrics">
+              {(
+                [
+                  ['resistance', '抗阻'],
+                  ['cardio', '有氧'],
+                ] as const
+              ).map(([type, label]) => (
+                <div key={type}>
+                  <div>
+                    <span>{label}</span>
+                    <strong>
+                      {counts[type]}
+                      <small>
+                        {cp && target[type] > 0
+                          ? ` / ${target[type]} 次`
+                          : ' 次'}
+                      </small>
+                    </strong>
+                  </div>
+                  {cp && target[type] > 0 ? (
+                    <progress
+                      max={target[type]}
+                      value={Math.min(counts[type], target[type])}
+                      aria-label={`本周${label}计划完成度`}
+                    />
+                  ) : (
+                    <small>{cp ? '未安排目标' : '尚未设置目标'}</small>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="training-last-session">
+              {latest && latestTraining
+                ? `上次训练：${compactDate(latest.date)}，${latestTraining.type === 'cardio' ? '有氧运动' : '抗阻训练'}${latestMinutes != null ? `${latestMinutes}分钟` : ' · 时长未记录'}`
+                : '暂无已完成的训练记录'}
             </p>
           </div>
         )}

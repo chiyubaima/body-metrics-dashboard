@@ -17,6 +17,16 @@ export type Nutrition = {
   carbs: number | null;
   fat: number | null;
 };
+export type DishRecipe = {
+  name: string;
+  ingredients: { name: string; grams: number }[];
+  cookingMethod: string;
+  portionGrams: number;
+  basis: 'raw' | 'cooked' | 'asSold';
+  nutrition: { energy: number; protein: number; carbs: number; fat: number };
+  assumptions: string;
+};
+export type CustomDish = { id: string; recipe: DishRecipe; createdAt: string };
 export type Food = {
   name: string;
   grams: number;
@@ -25,6 +35,9 @@ export type Food = {
   nutrition?: Nutrition | null;
   source?: string;
   fdcId?: number;
+  dish?: CustomDish;
+  dishDraft?: boolean;
+  estimatedPortion?: boolean;
   originalName?: string;
   localizedName?: string;
 };
@@ -106,6 +119,7 @@ export type Snapshot = {
   records: Entry[];
   plans: Plan[];
   profile: Profile | null;
+  dishes?: CustomDish[];
 };
 export const trainingDraft: TrainingPlan = {
   resistance: 0,
@@ -257,6 +271,53 @@ function validateNutrition(value: unknown): Nutrition {
     fat: number(v.fat, 0, 100, true),
   };
 }
+export function validateDishRecipe(value: unknown): DishRecipe {
+  const v = object(value),
+    name = text(v.name, 80),
+    cookingMethod = text(v.cookingMethod, 300),
+    assumptions = text(v.assumptions, 600);
+  if (!name || !cookingMethod || !assumptions)
+    throw new InputError('请补全菜名、烹饪方式和估算假设。');
+  if (
+    !Array.isArray(v.ingredients) ||
+    !v.ingredients.length ||
+    v.ingredients.length > 30
+  )
+    throw new InputError('请列出1～30种原料，包括用到的油和调味料。');
+  const nutrition = object(v.nutrition);
+  return {
+    name,
+    cookingMethod,
+    assumptions,
+    portionGrams: number(v.portionGrams, 1, 10000)!,
+    basis: choice(v.basis, ['raw', 'cooked', 'asSold']),
+    ingredients: v.ingredients.map((item) => {
+      const ingredient = object(item),
+        label = text(ingredient.name, 80);
+      if (!label) throw new InputError('请补全原料名称。');
+      return { name: label, grams: number(ingredient.grams, 0.1, 10000)! };
+    }),
+    nutrition: {
+      energy: number(nutrition.energy, 0, 1000)!,
+      protein: number(nutrition.protein, 0, 100)!,
+      carbs: number(nutrition.carbs, 0, 100)!,
+      fat: number(nutrition.fat, 0, 100)!,
+    },
+  };
+}
+export function validateCustomDish(value: unknown): CustomDish {
+  const v = object(value);
+  if (
+    typeof v.createdAt !== 'string' ||
+    !Number.isFinite(Date.parse(v.createdAt))
+  )
+    throw new InputError('菜品时间有误，请重新整理。');
+  return {
+    id: validId(v.id),
+    recipe: validateDishRecipe(v.recipe),
+    createdAt: new Date(v.createdAt).toISOString(),
+  };
+}
 function validateExercises(value: unknown): Exercise[] {
   if (!Array.isArray(value) || value.length > 20)
     throw new InputError('一次训练最多添加20个动作。');
@@ -357,6 +418,9 @@ export function validateEntry(value: unknown) {
           ...(a.fdcId !== undefined
             ? { fdcId: number(a.fdcId, 1, 99999999)! }
             : {}),
+          ...(a.dish !== undefined ? { dish: validateCustomDish(a.dish) } : {}),
+          ...(a.dishDraft === true ? { dishDraft: true } : {}),
+          ...(a.estimatedPortion === true ? { estimatedPortion: true } : {}),
           ...(a.originalName !== undefined
             ? { originalName: text(a.originalName, 500) }
             : {}),

@@ -1,0 +1,513 @@
+/* Personal settings keep a neutral palette without changing diary themes. */
+html :is(.personal-settings-dialog, .personal-settings-confirm) {
+  --foreground: #29292d;
+  --primary: #29292d;
+  --primary-foreground: #fff;
+  --ring: #8b8b91;
+  --accent: #eeeef0;
+  --accent-foreground: #29292d;
+  --glass-accent: #343437;
+  --glass-fill: #343437;
+  --glass-ink: #343437;
+  --glass-tint: #efeff1;
+  --glass-line: #e2e2e6;
+  color: #29292d;
+}
+html .dialog-popup.personal-settings-dialog {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0;
+  width: min(640px, calc(100vw - 28px)) !important;
+  max-width: 640px !important;
+  height: min(680px, calc(100dvh - 48px));
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid #e0e0e4 !important;
+  border-radius: 24px !important;
+  background: #fafafa !important;
+  box-shadow: 0 24px 80px #00000026 !important;
+}
+.personal-settings-header {
+  position: relative;
+  flex-shrink: 0;
+  padding: 24px 24px 0;
+}
+html .personal-settings-header [data-slot='dialog-title'] {
+  color: #242427;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+html .personal-settings-header .dialog-close {
+  top: 20px;
+  right: 20px;
+  background: #eeeeef;
+  color: #59595e;
+}
+html .personal-settings-dialog > [data-slot='dialog-description'] {
+  flex-shrink: 0;
+  padding: 0 24px;
+  margin: 7px 0 0;
+  color: #74747a;
+  font-size: 14px;
+}
+.personal-settings-dialog .dialog-form-region {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.personal-settings-dialog > .dialog-body {
+  padding: 24px;
+}
+.personal-settings {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.settings-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 20px 24px 0;
+  padding: 4px;
+  border: 1px solid #e5e5e8;
+  border-radius: 14px;
+  background: #eeeef0;
+}
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #69696f;
+  font-size: 14px;
+  font-weight: 550;
+}
+.settings-nav button[aria-pressed='true'] {
+  background: #303033;
+  color: #fff;
+  box-shadow: 0 2px 4px #00000012;
+}
+.settings-nav button:hover:not([aria-pressed='true']):not(:disabled) {
+  background: #e2e2e5;
+  color: #303033;
+}
+.personal-settings .settings-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.personal-settings .settings-panel[hidden] {
+  display: none !important;
+}
+.personal-settings .settings-intro {
+  margin: 0;
+  color: #737379;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.personal-settings .profile-form {
+  padding-top: 20px;
+  gap: 18px;
+}
+html .dialog-popup.personal-settings-dialog .field > span {
+  color: #505057;
+  font-size: 14px;
+  font-weight: 550;
+}
+html .dialog-popup.personal-settings-dialog .field :is(input, textarea) {
+  background: #fff;
+  color: #2e2e33;
+  border: 1px solid #dcdce0;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px #00000003;
+  font-size: 16px;
+}
+html .dialog-popup.personal-settings-dialog .field :is(input, textarea):hover {
+  border-color: #b8b8c0;
+}
+html .dialog-popup.personal-settings-dialog .field :is(input, textarea):focus {
+  border-color: #75757e;
+  outline: 2px solid #d3d3d9;
+  outline-offset: 2px;
+}
+html
+  .dialog-popup.personal-settings-dialog
+  .field
+  :is(input, textarea)::placeholder {
+  color: #96969d;
+  font-size: 14px;
+}
+html .dialog-popup.personal-settings-dialog .choice-list > label {
+  flex: 1;
+  justify-content: center;
+  padding: 10px 8px;
+  border-color: #dedee3;
+  background: #fff;
+  color: #65656e;
+}
+html
+  .dialog-popup.personal-settings-dialog
+  .choice-list
+  > label:has([aria-checked='true']),
+html
+  .dialog-popup.personal-settings-dialog
+  .choice-list
+  > label:has([data-checked]) {
+  border-color: #9b9ba5;
+  background: #ebebef;
+  color: #303035;
+  box-shadow: none;
+}
+html .personal-settings-dialog .form-actions {
+  position: sticky;
+  bottom: -24px;
+  margin-top: 2px;
+  padding: 16px 0 24px;
+  background: #fafafa;
+  border: 0;
+}
+html
+  .dialog-popup:is(.personal-settings-dialog, .personal-settings-confirm)
+  .primary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 1px solid #303033;
+  border-radius: 12px;
+  background: #303033;
+  color: #fff;
+  box-shadow: 0 2px 4px #0000000a;
+  font-size: 14px;
+  text-decoration: none;
+}
+html
+  :is(.personal-settings-dialog, .personal-settings-confirm)
+  .primary:hover:not(:disabled) {
+  background: #48484e;
+  border-color: #48484e;
+}
+html
+  .dialog-popup:is(.personal-settings-dialog, .personal-settings-confirm)
+  .secondary {
+  border: 1px solid #dcdce2;
+  border-radius: 11px;
+  background: #f3f3f5;
+  color: #515159;
+  box-shadow: none;
+  font-size: 14px;
+}
+html
+  :is(.personal-settings-dialog, .personal-settings-confirm)
+  .secondary:hover:not(:disabled) {
+  background: #e9e9ee;
+  border-color: #bcbcc5;
+}
+.personal-settings :is(button, a):focus-visible {
+  outline: 2px solid #777782;
+  outline-offset: 3px;
+}
+.personal-settings button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.personal-settings .settings-dishes {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.settings-library-controls {
+  flex-shrink: 0;
+  padding: 22px 24px 14px;
+}
+.settings-library-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.settings-library-heading h3 {
+  margin: 0;
+  color: #303035;
+  font-size: 16px;
+  font-weight: 600;
+}
+.settings-library-heading > span {
+  color: #81818b;
+  font-size: 12px;
+}
+.settings-dish-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid #dedee3;
+  border-radius: 12px;
+  background: #fff;
+  color: #84848e;
+}
+.settings-dish-search:focus-within {
+  border-color: #81818d;
+  outline: 2px solid #dcdce3;
+  outline-offset: 2px;
+}
+.settings-dish-search > svg {
+  flex-shrink: 0;
+}
+.settings-dish-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #303038;
+  outline: none;
+  font-size: 16px;
+}
+.settings-dish-search input::placeholder {
+  color: #92929c;
+}
+.settings-dish-search button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f1f4;
+  color: #666670;
+}
+.settings-library-controls .settings-intro {
+  margin-top: 10px;
+}
+.settings-library-notice {
+  display: block;
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #ebebf0;
+  color: #565661;
+  font-size: 14px;
+}
+.settings-library-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px 24px;
+  scrollbar-gutter: stable;
+}
+.settings-dish {
+  padding: 18px 0;
+  border-bottom: 1px solid #e6e6eb;
+}
+.settings-dish:first-child {
+  padding-top: 4px;
+}
+.settings-dish:last-of-type {
+  border-bottom: 0;
+}
+.settings-dish > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.settings-dish > header > div {
+  min-width: 0;
+}
+.settings-dish h4 {
+  margin: 0;
+  color: #2e2e36;
+  font-size: 16px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.settings-dish header p {
+  margin: 5px 0 0;
+  color: #85858f;
+  font-size: 12px;
+}
+.settings-dish-remove {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 7px 9px;
+  min-height: 36px;
+  border: 1px solid #dedee4;
+  border-radius: 10px;
+  background: #f5f5f7;
+  color: #6d6d78;
+  font-size: 12px;
+}
+.settings-dish-remove:hover:not(:disabled) {
+  background: #e9e9ef;
+  color: #35353f;
+}
+.settings-library-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 55px 20px;
+  text-align: center;
+  color: #96969f;
+}
+.settings-library-empty h4 {
+  margin: 0;
+  color: #53535f;
+  font-size: 16px;
+  font-weight: 600;
+}
+.settings-library-empty p {
+  max-width: 300px;
+  margin: 0;
+  color: #848490;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.settings-show-more {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  min-height: 44px;
+}
+.settings-backup-card {
+  padding: 24px;
+  border: 1px solid #e1e1e6;
+  border-radius: 18px;
+  background: #fff;
+}
+.settings-card-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  background: #f0f0f3;
+  color: #60606b;
+}
+.settings-backup h3 {
+  margin: 0;
+  color: #30303a;
+  font-size: 18px;
+  font-weight: 600;
+}
+.settings-backup-card > p {
+  margin: 10px 0 20px;
+  color: #74747e;
+  font-size: 16px;
+  line-height: 1.75;
+}
+.settings-backup-card > small {
+  display: block;
+  margin-top: 12px;
+  color: #96969f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.settings-guide-card {
+  display: flex;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 24px 2px 0;
+  color: #747480;
+}
+.settings-guide-card > svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.settings-guide-card > div {
+  flex: 1;
+  min-width: 160px;
+}
+.settings-guide-card h3 {
+  font-size: 16px;
+}
+.settings-guide-card p {
+  margin: 5px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.settings-guide-card button {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.settings-guide-card .settings-guide-hint {
+  width: 100%;
+  margin: 0 0 0 32px;
+  color: #666672;
+}
+html .personal-settings-confirm {
+  background: #fff !important;
+  color: #303036;
+}
+html .personal-settings-confirm :is(.danger-button, .delete-symbol) {
+  background: #eeeeef;
+  border-color: #d6d6dd;
+  color: #41414a;
+}
+html .personal-settings-confirm [data-slot='dialog-title'] {
+  color: #303036;
+}
+@media (max-width: 560px) {
+  html .dialog-popup.personal-settings-dialog {
+    height: calc(100dvh - 28px);
+    max-height: calc(100dvh - 28px);
+  }
+  .personal-settings-header {
+    padding: 20px 18px 0;
+  }
+  html .personal-settings-dialog > [data-slot='dialog-description'] {
+    padding: 0 18px;
+  }
+  .settings-nav {
+    margin: 18px 14px 0;
+  }
+  .settings-nav button {
+    gap: 5px;
+  }
+  .settings-nav button > svg {
+    display: none;
+  }
+  .personal-settings .settings-panel {
+    padding: 20px 18px;
+  }
+  .personal-settings .settings-dishes {
+    padding: 0;
+  }
+  .settings-library-controls {
+    padding: 20px 18px 14px;
+  }
+  .settings-library-list {
+    padding: 0 18px 20px;
+  }
+  .settings-backup-card {
+    padding: 20px;
+  }
+}

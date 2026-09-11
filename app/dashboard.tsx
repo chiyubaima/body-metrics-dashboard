@@ -4,6 +4,8 @@ import type { CoachToolAction } from '@/lib/coach-tool-types';
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import {
   Activity,
+  Dumbbell,
+  Utensils,
   Trash2,
   Settings2,
   X,
@@ -17,7 +19,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { RecordForm, PlanForm, ProfileForm } from './forms';
+import { RecordForm, PlanForm } from './forms';
+import { PersonalSettings } from './personal-settings';
 import { BodyPanel, DietPanel, TrainingPanel, compactDate } from './panels';
 import { HistoryView } from './history';
 import { JournalCalendar } from './calendar';
@@ -305,6 +308,22 @@ export default function Dashboard({
       setBusy(false);
     }
   }
+  async function removeDish(id: string) {
+    if (working.current) throw new Error('正在处理，请稍后重试。');
+    working.current = true;
+    setBusy(true);
+    try {
+      await request('/api/dishes', { id }, 'DELETE');
+      requestSequence.current++;
+      setData((current) => ({
+        ...current,
+        dishes: (current.dishes ?? []).filter((dish) => dish.id !== id),
+      }));
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  }
   async function restore(ids: string[]) {
     if (working.current) throw new Error('正在处理，请稍后重试。');
     working.current = true;
@@ -520,7 +539,6 @@ export default function Dashboard({
           <span className="footer-dot" />{' '}
           {localPreview ? '记录保存在这台电脑' : '记录随账户保存'}
         </span>
-        <span>北京时间 · 每一栏都可以独立滚动</span>
       </footer>
       {notice && (
         <output className="notice">
@@ -577,7 +595,7 @@ export default function Dashboard({
           data-record-date={
             modal?.type === 'record' ? (modal.entry?.date ?? date) : date
           }
-          className={`dialog-popup ${modal?.type === 'record' ? 'record-dialog' : ''} ${modal?.type === 'history' ? 'history-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'body' ? 'body-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
+          className={`dialog-popup ${modal?.type === 'settings' ? 'personal-settings-dialog' : ''} ${modal?.type === 'record' ? 'record-dialog' : ''} ${modal?.type === 'history' ? 'history-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'body' ? 'body-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'training' ? 'training-dialog' : ''} ${modal?.type === 'record' && modal.kind === 'diet' ? 'meal-dialog' : ''} ${modal?.type === 'history' || modal?.type === 'trash' || (modal?.type === 'record' && modal.kind !== 'body') ? 'wide-dialog' : ''}`}
           showCloseButton={false}
         >
           <div
@@ -586,9 +604,22 @@ export default function Dashboard({
                 ? 'record-dialog-header'
                 : modal?.type === 'history'
                   ? 'history-dialog-header'
-                  : undefined
+                  : modal?.type === 'settings'
+                    ? 'personal-settings-header'
+                    : undefined
             }
           >
+            {modal?.type === 'record' && (
+              <span className="record-title-icon" aria-hidden="true">
+                {modal.kind === 'body' ? (
+                  <Activity size={20} />
+                ) : modal.kind === 'diet' ? (
+                  <Utensils size={20} />
+                ) : (
+                  <Dumbbell size={20} />
+                )}
+              </span>
+            )}
             <DialogTitle>{title}</DialogTitle>
             {modal?.type === 'record' && (
               <button
@@ -628,7 +659,7 @@ export default function Dashboard({
                     ? modal.kind === 'diet'
                       ? '按所选日期调整营养目标，实际饮食记录保持原样。'
                       : '训练计划从今天或未来生效，历史版本会保留。'
-                    : '资料可以选填，记录可以随时带走。'}
+                    : '管理你的资料、常用配方与账本备份。'}
             </DialogDescription>
           )}
           {confirmClose && (
@@ -689,25 +720,19 @@ export default function Dashboard({
               />
             )}
             {modal?.type === 'settings' && (
-              <>
-                <button
-                  className="text-button onboarding-reopen"
-                  disabled={busy || dirty}
-                  title={dirty ? '保存个人资料后可以重新打开引导' : undefined}
-                  onClick={() => {
-                    setModal(null);
-                    setOnboardingRequest((value) => value + 1);
-                  }}
-                >
-                  重新查看使用引导
-                </button>
-                <ProfileForm
-                  profile={data.profile}
-                  save={save}
-                  busy={busy}
-                  onDirty={() => setDirty(true)}
-                />
-              </>
+              <PersonalSettings
+                profile={data.profile}
+                dishes={data.dishes ?? []}
+                save={save}
+                busy={busy}
+                dirty={dirty}
+                onDirty={() => setDirty(true)}
+                onRemoveDish={removeDish}
+                onOpenGuide={() => {
+                  setModal(null);
+                  setOnboardingRequest((value) => value + 1);
+                }}
+              />
             )}
             {modal?.type === 'trash' && <TrashView restore={restore} />}
             {modal?.type === 'history' && (

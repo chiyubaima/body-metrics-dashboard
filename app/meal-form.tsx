@@ -3,10 +3,15 @@ import { useEffect, useState, type SubmitEvent } from 'react';
 import { Check, Copy, Plus, Search, Trash2, Utensils } from 'lucide-react';
 import type { Diet, Entry, Food, MealSlot, Nutrition } from '@/lib/model';
 import { today } from '@/lib/model';
-import { basisLabels, mealLabels, nutritionSummary } from '@/lib/progress';
+import {
+  basisLabels,
+  defaultMealSlot,
+  mealLabels,
+  nutritionSummary,
+} from '@/lib/progress';
 import { DatePicker } from './calendar';
 import { DeleteConfirm } from './delete-confirm';
-import type { FoodMatch } from '@/lib/food-search';
+import { DishDetails } from './dish-details';
 import { Field } from './form-controls';
 import type { Save } from './forms';
 import { compactDate, numeric } from './panels';
@@ -39,18 +44,25 @@ export function MealForm({
       draft?.date ?? existing?.date ?? date,
     ),
     [slot, setSlot] = useState<MealSlot>(
-      meal ??
+      () =>
+        meal ??
         (original?.foods.length
           ? (original.foods[0].meal ?? 'unsorted')
-          : 'lunch'),
+          : defaultMealSlot(
+              records.flatMap((row) =>
+                row.kind === 'diet' && row.date === date
+                  ? (row.data as Diet).foods
+                  : [],
+              ),
+            )),
     );
   const [foods, setFoods] = useState<Food[]>(() =>
       structuredClone(original?.foods ?? []),
     ),
     [note, setNote] = useState(original?.note ?? ''),
     [query, setQuery] = useState(''),
-    [tab, setTab] = useState('library'),
-    [results, setResults] = useState<FoodMatch[]>([]),
+    [tab, setTab] = useState('custom'),
+    [results, setResults] = useState<Food[]>([]),
     [total, setTotal] = useState(0),
     [catalogCount, setCatalogCount] = useState(0),
     [searching, setSearching] = useState(false),
@@ -78,7 +90,9 @@ export function MealForm({
   )) {
     for (const food of (row.data as Diet).foods) {
       const key =
-        (food.fdcId ?? food.originalName ?? food.name) + ':' + food.basis;
+        (food.dish?.id ?? food.fdcId ?? food.originalName ?? food.name) +
+        ':' +
+        food.basis;
       if (!recentMap.has(key)) recentMap.set(key, food);
     }
   }
@@ -91,17 +105,18 @@ export function MealForm({
       setSearchError('');
       try {
         const response = await fetch(
-          `/api/foods?q=${encodeURIComponent(query)}&basis=${basisFilter}&offset=${offset}`,
+          `/api/${tab === 'custom' ? 'dishes' : 'foods'}?q=${encodeURIComponent(query)}&basis=${basisFilter}&offset=${offset}`,
           { signal: controller.signal },
         );
         const result = (await response.json()) as {
           error?: string;
-          foods: FoodMatch[];
+          foods: Food[];
           total: number;
           catalogCount: number;
           hint: string;
         };
         if (!response.ok) throw new Error(result.error);
+        if (controller.signal.aborted) return;
         setResults(result.foods);
         setTotal(result.total);
         setCatalogCount(result.catalogCount);
@@ -132,7 +147,14 @@ export function MealForm({
       setError('一天最多记录60项食物。');
       return;
     }
-    setFoods((rows) => [...rows, { ...structuredClone(food), meal: slot }]);
+    setFoods((rows) => [
+      ...rows,
+      {
+        ...structuredClone(food),
+        ...(food.dish && tab === 'custom' ? { estimatedPortion: true } : {}),
+        meal: slot,
+      },
+    ]);
     setQuery('');
     setOffset(0);
     setFeedback(`${displayFoodName(food)}已加入，调整份量后保存`);
@@ -323,7 +345,7 @@ export function MealForm({
                   setResults([]);
                   setSearching(true);
                   setOffset(0);
-                  setTab('library');
+                  if (tab === 'recent') setTab('custom');
                 }}
                 maxLength={80}
               />
@@ -331,17 +353,44 @@ export function MealForm({
             <div className="library-tabs">
               <button
                 type="button"
-                className={tab === 'recent' ? 'selected' : ''}
-                onClick={() => setTab('recent')}
+                className={tab === 'custom' ? 'selected' : ''}
+                aria-pressed={tab === 'custom'}
+                onClick={() => {
+                  if (tab === 'custom') return;
+                  setTab('custom');
+                  setOffset(0);
+                  setResults([]);
+                  setSearching(true);
+                }}
               >
-                最近吃过
+                自建菜品
               </button>
               <button
                 type="button"
                 className={tab === 'library' ? 'selected' : ''}
-                onClick={() => setTab('library')}
+                aria-pressed={tab === 'library'}
+                onClick={() => {
+                  if (tab === 'library') return;
+                  setTab('library');
+                  setOffset(0);
+                  setResults([]);
+                  setSearching(true);
+                }}
               >
                 USDA 食物库
+              </button>
+              <button
+                type="button"
+                className={tab === 'recent' ? 'selected' : ''}
+                aria-pressed={tab === 'recent'}
+                onClick={() => {
+                  setTab('recent');
+                  setQuery('');
+                  setOffset(0);
+                  setSearching(false);
+                }}
+              >
+                最近吃过
               </button>
             </div>
             <details className="library-sources">
@@ -355,6 +404,10 @@ export function MealForm({
                   USDA FoodData Central
                 </a>{' '}
                 提供参考值；按实际份量计算，可根据包装标签更正。
+              </p>
+              <p>
+                自建菜品使用确认过的 AI
+                估算配方，原料、做法、参考份量与估算假设可展开查看。
               </p>
               {[
                 ...new Map(
@@ -379,7 +432,7 @@ export function MealForm({
                 常吃的食物会自动留在这里。先从下面选一种。
               </p>
             )}
-            {(tab === 'library' || query) && (
+            {(tab !== 'recent' || query) && (
               <>
                 <div className="library-basis">
                   {[
@@ -415,31 +468,37 @@ export function MealForm({
             )}
             <div className="food-options" aria-busy={searching}>
               {options.map((f, i) => (
-                <button
-                  type="button"
-                  key={f.name + i}
-                  className="food-option"
-                  onClick={() => add(f)}
-                  disabled={busy || foods.length >= 60 || searching}
+                <div
+                  className="food-library-item"
+                  key={(f.dish?.id ?? f.fdcId ?? f.name) + ':' + i}
                 >
-                  <span>
-                    <strong>{displayFoodName(f)}</strong>
-                    {f.originalName && (
-                      <small
-                        className="original-food-name"
-                        title={f.originalName}
-                      >
-                        {f.originalName}
+                  <button
+                    type="button"
+                    key={f.name + i}
+                    className="food-option"
+                    onClick={() => add(f)}
+                    disabled={busy || foods.length >= 60 || searching}
+                  >
+                    <span>
+                      <strong>{displayFoodName(f)}</strong>
+                      {f.originalName && (
+                        <small
+                          className="original-food-name"
+                          title={f.originalName}
+                        >
+                          {f.originalName}
+                        </small>
+                      )}
+                      <small>
+                        {f.dish ? 'AI估算 · ' : ''}
+                        {basisLabels[f.basis]} ·{' '}
+                        {numeric(f.nutrition?.energy, 0)} 大卡 / 100g
                       </small>
-                    )}
-                    <small>
-                      {basisLabels[f.basis]} · {numeric(f.nutrition?.energy, 0)}{' '}
-                      大卡 / 100g
-                    </small>
-                    <MacroLine foods={[f]} per100 />
-                  </span>
-                  <Plus size={18} />
-                </button>
+                      <MacroLine foods={[f]} per100 />
+                    </span>
+                    <Plus size={18} />
+                  </button>
+                </div>
               ))}
               {!options.length && (
                 <p className="empty-note">
@@ -447,11 +506,13 @@ export function MealForm({
                     ? '正在搜索…'
                     : tab === 'recent'
                       ? '记录后，常吃的食物会留在这里。'
-                      : '试试主要食材，或英文名称。'}
+                      : tab === 'custom'
+                        ? '还没有匹配的自建菜品。可以切换 USDA；或告诉 Captain 菜名，分析并确认后会保存在这里。'
+                        : '试试主要食材，或让 Captain 分析这道菜。'}
                 </p>
               )}
             </div>
-            {tab === 'library' && total > 24 && (
+            {tab !== 'recent' && total > 24 && (
               <div className="food-pagination">
                 <button
                   type="button"
@@ -536,7 +597,8 @@ export function MealForm({
               {visible.map(({ f, i }) => (
                 <article className="selected-food" key={i}>
                   <div className="selected-food-title">
-                    {f.originalName && f.source?.startsWith('USDA FDC ') ? (
+                    {f.dish ||
+                    (f.originalName && f.source?.startsWith('USDA FDC ')) ? (
                       <strong
                         className="selected-food-name"
                         title={f.originalName}
@@ -557,6 +619,8 @@ export function MealForm({
                             source: '手动记录',
                             fdcId: undefined,
                             originalName: undefined,
+                            dish: undefined,
+                            dishDraft: undefined,
                           })
                         }
                       />
@@ -586,7 +650,10 @@ export function MealForm({
                         required
                         value={f.grams || ''}
                         onChange={(e) =>
-                          update(i, { grams: Number(e.target.value) })
+                          update(i, {
+                            grams: Number(e.target.value),
+                            estimatedPortion: false,
+                          })
                         }
                       />
                       <span>g</span>
@@ -601,6 +668,8 @@ export function MealForm({
                           source: '手动记录',
                           fdcId: undefined,
                           originalName: undefined,
+                          dish: undefined,
+                          dishDraft: undefined,
                         })
                       }
                     >
@@ -615,6 +684,14 @@ export function MealForm({
                       <small>大卡</small>
                     </strong>
                   </div>
+                  {f.dish && (
+                    <DishDetails
+                      recipe={f.dish.recipe}
+                      grams={f.grams}
+                      estimatedPortion={f.estimatedPortion}
+                      pending={f.dishDraft}
+                    />
+                  )}
                   <div className="food-nutrition-reference">
                     <p className="nutrition-reference-label">
                       每 100g 营养参考 <span>可调整 · 未知留空</span>
@@ -654,6 +731,8 @@ export function MealForm({
                                 source: '手动营养值',
                                 fdcId: undefined,
                                 originalName: undefined,
+                                dish: undefined,
+                                dishDraft: undefined,
                               })
                             }
                           />

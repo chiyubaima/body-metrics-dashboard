@@ -1,3 +1,4 @@
+import { dishDetailsModule } from './dish-details-module.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -38,6 +39,33 @@ import {
 import { saveEntry, snapshot, removeEntry } from '../db/repository.ts';
 import { buildCoachContext } from '../lib/coach-context.ts';
 import { streamFrame, requestCoachStream } from '../lib/coach-stream.ts';
+import { dishFood, searchFoodLibraries } from '../lib/dishes.ts';
+import { listDishes, deleteDish } from '../db/dishes.ts';
+import { foodById, searchFoods } from '../lib/food-search.ts';
+import type { DishRecipe, CustomDish } from '../lib/model.ts';
+import { validateDishRecipe } from '../lib/model.ts';
+import { nutritionSummary } from '../lib/progress.ts';
+
+const recipe = (): DishRecipe => ({
+  name: '合成香菇豆腐煲',
+  ingredients: [
+    { name: '豆腐', grams: 220 },
+    { name: '香菇', grams: 80 },
+    { name: '食用油', grams: 10 },
+  ],
+  cookingMethod: '少油煎豆腐，加香菇和水焖煮。',
+  portionGrams: 300,
+  basis: 'cooked',
+  nutrition: { energy: 125, protein: 9, carbs: 8, fat: 6 },
+  assumptions:
+    '合成测试配方：参考用油10g，成品约300g，实际做法和用量可能不同。',
+});
+const recipeArgs = (dish = recipe()) => ({
+  kind: 'diet',
+  date: today(),
+  quote: `午餐吃了一份${dish.name}`,
+  data: { foods: [{ estimatedDish: dish, servings: 1, meal: 'lunch' }] },
+});
 
 const date = today(),
   now = new Date(),
@@ -1726,7 +1754,7 @@ await test('tool cards preview records, confirm in place, retain failures, and e
     .outputText.replace(
       /from (["'])([^"']+)\1/g,
       (_match, _quote, specifier: string) =>
-        `from ${JSON.stringify(import.meta.resolve(specifier))}`,
+        `from ${JSON.stringify(specifier === './dish-details' ? dishDetailsModule : import.meta.resolve(specifier))}`,
     );
   const { CoachToolCards } = (await import(
     'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
@@ -1858,6 +1886,94 @@ await test('tool cards preview records, confirm in place, retain failures, and e
       ?.textContent.includes('已记录'),
   );
   assert(container.textContent.includes('查看日记'));
+
+  const recipeAction = draftAction(
+    prepareRecord(recipeArgs(), [], recipeArgs().quote, now),
+  );
+  const renderRecipe = () =>
+    root.render(
+      createElement(CoachToolCards, {
+        key: 'recipe-preview',
+        runs: [
+          {
+            id: 'recipe',
+            name: 'prepare_record',
+            title: '菜品分析',
+            summary: '',
+            status: 'complete',
+            actions: [recipeAction],
+          },
+        ],
+        onConfirmRecord: async () => {},
+      }),
+    );
+  await act(async () => renderRecipe());
+  assert.equal(
+    container.querySelector('.coach-record-confirm')?.textContent,
+    '确认菜品并记录',
+  );
+  assert(container.textContent.includes('份量按参考配方估算'));
+  assert(container.textContent.includes('375'));
+  assert(container.textContent.includes('食用油'));
+  assert(container.textContent.includes(recipe().assumptions));
+  assert(container.textContent.includes('同时加入自建菜品库'));
+  const styles = win.document.createElement('style');
+  styles.textContent =
+    readFileSync(new URL('../app/glass.css', import.meta.url), 'utf8') +
+    readFileSync(new URL('../app/coach.css', import.meta.url), 'utf8');
+  win.document.head.append(styles);
+  win.document.body.classList.add('coach-sheet');
+  container.classList.add('coach-chat-panel');
+  const recipeCard =
+    container.querySelector<import('happy-dom').HTMLDetailsElement>(
+      '.dish-details',
+    )!;
+  const disclosure = recipeCard.querySelector<import('happy-dom').HTMLElement>(
+    '.dish-details-summary',
+  )!;
+  assert.equal(recipeCard.open, false);
+  await act(async () => disclosure.click());
+  assert.equal(recipeCard.open, true);
+  assert.equal(
+    win.getComputedStyle(disclosure).display,
+    'flex',
+    'recipe disclosure keeps its own layout inside the chat action styles',
+  );
+  assert.equal(win.getComputedStyle(disclosure).fontSize, '14px');
+  assert.equal(win.getComputedStyle(recipeCard).borderRadius, '18px');
+  assert.equal(
+    recipeCard.querySelector('.dish-energy strong')?.textContent,
+    '375',
+  );
+  assert.equal(recipeCard.querySelectorAll('.dish-macros > div').length, 3);
+  assert.equal(
+    recipeCard.querySelectorAll('.dish-ingredients > li').length,
+    recipe().ingredients.length,
+  );
+  const references =
+    recipeCard.querySelector<import('happy-dom').HTMLDetailsElement>(
+      '.dish-reference',
+    )!;
+  assert.equal(references.open, false);
+  await act(async () =>
+    references
+      .querySelector<import('happy-dom').HTMLElement>('summary')!
+      .click(),
+  );
+  assert.equal(references.open, true);
+  assert.equal(
+    recipeCard.open,
+    true,
+    'opening estimate assumptions keeps the main recipe open',
+  );
+  assert(references.textContent.includes(recipe().assumptions));
+  assert(references.textContent.includes('每100g'));
+  await act(async () => disclosure.click());
+  assert.equal(recipeCard.open, false);
+  recipeAction.savedAt = stamp;
+  await act(async () => renderRecipe());
+  assert(!container.textContent.includes('同时加入自建菜品库'));
+  assert(container.querySelector('.coach-record-saved'));
 
   const previews: Entry[] = [
     entry('diet', {
@@ -2029,4 +2145,401 @@ await test('tool cards preview records, confirm in place, retain failures, and e
   );
   assert(container.textContent.includes('将清空本餐食物'));
   assert(!container.textContent.includes('保持原样的合成早餐'));
+});
+
+await test('custom dishes take precedence, canonical USDA stays authoritative, and estimates require a complete reviewable recipe', async () => {
+  const dish: CustomDish = {
+    id: crypto.randomUUID(),
+    recipe: { ...recipe(), name: '米饭' },
+    createdAt: stamp,
+  };
+  assert(searchFoods('米饭').total > 0);
+  const found = await executeCoachTool(
+    call('search_catalog', { kind: 'food', query: '米饭' }),
+    context({ ...empty(), dishes: [dish] }),
+  );
+  assert.equal(found.run.status, 'complete');
+  assert.equal((found.result as { library: string }).library, 'custom');
+  assert.deepEqual((found.result as { foods: unknown[] }).foods, [
+    dishFood(dish),
+  ]);
+  assert.equal(searchFoodLibraries([], '米饭').library, 'usda');
+  assert.equal(searchFoodLibraries([dish], '不存在的合成菜').total, 0);
+  const args = recipeArgs();
+  const action = draftAction(prepareRecord(args, [], args.quote, now));
+  const food = (action.entry.data as Diet).foods[0];
+  assert.equal(food.dishDraft, true);
+  assert.equal(food.estimatedPortion, true);
+  assert.equal(food.grams, 300);
+  assert.deepEqual(food.dish?.recipe, recipe());
+  assert.deepEqual(nutritionSummary([food]).total, {
+    energy: 375,
+    protein: 27,
+    carbs: 24,
+    fat: 18,
+  });
+  for (const invalid of [
+    { ...recipe(), ingredients: [] },
+    { ...recipe(), cookingMethod: '' },
+    { ...recipe(), assumptions: '' },
+    { ...recipe(), portionGrams: 0 },
+    { ...recipe(), nutrition: { energy: 125, protein: 9, fat: 6 } },
+    { ...recipe(), nutrition: { ...recipe().nutrition, carbs: Infinity } },
+  ])
+    assert.throws(() => validateDishRecipe(invalid));
+  assert.throws(() => prepareRecord(args, [], '午餐是别的菜', now), /原话/);
+  assert.throws(
+    () =>
+      prepareRecord(
+        { ...args, data: { foods: [{ ...args.data.foods[0], grams: 450 }] } },
+        [],
+        args.quote,
+        now,
+      ),
+    /数值/,
+  );
+  assert.throws(
+    () =>
+      prepareRecord(
+        {
+          ...args,
+          data: { foods: [{ dishId: crypto.randomUUID(), meal: 'lunch' }] },
+        },
+        [],
+        args.quote,
+        now,
+      ),
+    /不可用/,
+  );
+  const reused = draftAction(
+    prepareRecord(
+      recipeArgs(dish.recipe),
+      [],
+      `午餐吃了一份${dish.recipe.name}`,
+      now,
+      [],
+      [dish],
+    ),
+  );
+  assert.equal((reused.entry.data as Diet).foods[0].dish?.id, dish.id);
+  assert.equal((reused.entry.data as Diet).foods[0].dishDraft, undefined);
+  const usda = searchFoods('米饭').foods[0];
+  const canonical = foodById(usda.fdcId)!;
+  const usdaQuote = `午餐吃了150克${usda.name}`;
+  const direct = draftAction(
+    prepareRecord(
+      {
+        kind: 'diet',
+        date,
+        quote: usdaQuote,
+        data: {
+          foods: [
+            {
+              ...usda,
+              grams: 150,
+              meal: 'lunch',
+              nutrition: { energy: 999, protein: 99, carbs: 99, fat: 99 },
+            },
+          ],
+        },
+      },
+      [],
+      usdaQuote,
+    ),
+  );
+  assert.deepEqual(
+    (direct.entry.data as Diet).foods[0].nutrition,
+    canonical.nutrition,
+  );
+  assert.equal((direct.entry.data as Diet).foods[0].dish, undefined);
+  assert.throws(
+    () =>
+      prepareRecord(
+        {
+          kind: 'diet',
+          date,
+          quote: usdaQuote,
+          data: {
+            foods: [{ ...usda, name: '米饭', grams: 150, meal: 'lunch' }],
+          },
+        },
+        [],
+        usdaQuote,
+        now,
+        [],
+        [dish],
+      ),
+    /自建配方/,
+  );
+  assert.throws(
+    () =>
+      prepareRecord(
+        recipeArgs({ ...recipe(), name: usda.name }),
+        [],
+        recipeArgs({ ...recipe(), name: usda.name }).quote,
+        now,
+      ),
+    /目录记录/,
+  );
+  const halfQuote = '午餐吃了半份米饭';
+  const half = draftAction(
+    prepareRecord(
+      {
+        kind: 'diet',
+        date,
+        quote: halfQuote,
+        data: { foods: [{ dishId: dish.id, servings: 0.5, meal: 'lunch' }] },
+      },
+      [],
+      halfQuote,
+      now,
+      [],
+      [dish],
+    ),
+  );
+  assert.equal((half.entry.data as Diet).foods[0].grams, 150);
+  assert.equal((half.entry.data as Diet).foods[0].estimatedPortion, true);
+  const edited = draftAction(
+    prepareRecord(
+      {
+        kind: 'diet',
+        date,
+        id: half.entry.id,
+        quote: '补充备注',
+        data: {
+          foods: [{ dishId: dish.id, grams: 150, meal: 'lunch' }],
+          note: '合成备注',
+        },
+      },
+      [half.entry],
+      '补充备注',
+      now,
+      [],
+      [dish],
+    ),
+  );
+  assert.equal((edited.entry.data as Diet).foods[0].grams, 150);
+});
+
+await test('model analysis becomes a dish and a meal only on confirmation, with owner isolation and durable recipe snapshots', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const args = recipeArgs();
+    const generate: typeof generateCoachReply = async (
+      _env,
+      _prompt,
+      input,
+    ) => {
+      const supplied = JSON.parse(input);
+      const results = supplied.toolResults;
+      if (!results.length)
+        return toolOutput(
+          call('search_catalog', { kind: 'food', query: recipe().name }),
+        );
+      if (results.length === 1) return toolOutput(call('prepare_record', args));
+      return { ...output, reply: '配方是估算，请核对后确认。' };
+    };
+    const reply = await coachChat(db, 'a', env, message(args.quote), generate);
+    assert.deepEqual(
+      reply.turn?.toolRuns?.map((r) => [r.name, r.status]),
+      [
+        ['search_catalog', 'complete'],
+        ['prepare_record', 'complete'],
+      ],
+    );
+    const run = reply.turn!.toolRuns![1];
+    const action = draftAction(run.actions![0]);
+    assert.equal((await snapshot(db, 'a')).records.length, 0);
+    assert.equal(
+      (await listDishes(db, 'a')).length,
+      0,
+      'analysis alone never creates a library entry',
+    );
+    const request = { turnId: reply.turn!.id, runId: run.id, actionIndex: 0 };
+    await assert.rejects(confirmCoachRecord(db, 'b', request));
+    await confirmCoachRecord(db, 'a', request);
+    const state = await snapshot(db, 'a');
+    assert.equal(state.dishes!.length, 1);
+    assert.equal(state.records.length, 1);
+    const savedFood = (state.records[0].data as Diet).foods[0];
+    assert.deepEqual(savedFood.dish, state.dishes![0]);
+    assert.equal(savedFood.dishDraft, undefined);
+    assert.equal(savedFood.estimatedPortion, true);
+    await confirmCoachRecord(db, 'a', request);
+    assert.deepEqual(await snapshot(db, 'a'), state);
+    assert.deepEqual((await snapshot(db, 'b')).dishes, []);
+    await assert.rejects(
+      saveEntry(
+        db,
+        'b',
+        entry('diet', { status: 'logged', note: '', foods: [savedFood] }),
+      ),
+      /来源不一致/,
+    );
+    const altered = structuredClone(savedFood);
+    altered.dish!.recipe.nutrition.energy = 800;
+    await assert.rejects(
+      saveEntry(
+        db,
+        'a',
+        entry(
+          'diet',
+          { status: 'logged', note: '', foods: [altered] },
+          shiftDate(date, -1),
+        ),
+      ),
+      /来源不一致/,
+    );
+    const laterArgs = {
+      kind: 'diet',
+      date: shiftDate(date, -1),
+      quote: `晚餐吃了150克${recipe().name}`,
+      data: {
+        foods: [{ dishId: state.dishes![0].id, grams: 150, meal: 'dinner' }],
+      },
+    };
+    const later = draftAction(
+      prepareRecord(
+        laterArgs,
+        state.records,
+        laterArgs.quote,
+        now,
+        [],
+        state.dishes,
+      ),
+    );
+    const laterFood = (later.entry.data as Diet).foods[0];
+    assert.equal(laterFood.dishDraft, undefined);
+    assert.equal(laterFood.estimatedPortion, undefined);
+    assert.equal(nutritionSummary([laterFood]).total.energy, 187.5);
+    await assert.rejects(deleteDish(db, 'b', state.dishes![0].id));
+    await deleteDish(db, 'a', state.dishes![0].id);
+    assert.equal((await listDishes(db, 'a')).length, 0);
+    assert.deepEqual(
+      (await snapshot(db, 'a')).records,
+      state.records,
+      'removing a dish never changes the historical recipe or nutrition',
+    );
+    await saveEntry(db, 'a', later.entry);
+    assert.equal(
+      (await listDishes(db, 'a')).length,
+      0,
+      'explicit reuse of a historical recipe never silently revives it',
+    );
+    assert.deepEqual(
+      (await snapshot(db, 'a')).records.find((r) => r.id === action.entry.id)
+        ?.data,
+      state.records[0].data,
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('recipe, diary and chat receipt roll back together on conflicts, stale records and failed writes', async () => {
+  const { db, sqlite, close } = connect();
+  try {
+    const args = recipeArgs();
+    const makeDraft = () =>
+      draftAction(prepareRecord(args, [], args.quote, now));
+    const first = makeDraft();
+    const request = await storeDraft(db, first);
+    sqlite.exec(
+      "CREATE TRIGGER synthetic_dish_failure BEFORE INSERT ON custom_dishes BEGIN SELECT RAISE(ABORT,'synthetic dish failure'); END",
+    );
+    await assert.rejects(
+      confirmCoachRecord(db, 'a', request),
+      /synthetic dish failure/,
+    );
+    assert.equal((await snapshot(db, 'a')).records.length, 0);
+    assert.equal((await listDishes(db, 'a')).length, 0);
+    assert.equal(
+      draftAction(
+        (await getCoachTurn(db, 'a', request.turnId))!.toolRuns![0].actions![0],
+      ).savedAt,
+      undefined,
+    );
+    sqlite.exec('DROP TRIGGER synthetic_dish_failure');
+    const competing = makeDraft();
+    competing.entry.date = shiftDate(date, -1);
+    await saveEntry(db, 'a', competing.entry);
+    const before = await snapshot(db, 'a');
+    await assert.rejects(confirmCoachRecord(db, 'a', request), /同名菜品/);
+    assert.deepEqual(await snapshot(db, 'a'), before);
+    assert.equal(
+      draftAction(
+        (await getCoachTurn(db, 'a', request.turnId))!.toolRuns![0].actions![0],
+      ).savedAt,
+      undefined,
+    );
+    const staleArgs = recipeArgs({ ...recipe(), name: '合成新配方' });
+    const stale = draftAction(
+      prepareRecord(staleArgs, [], staleArgs.quote, now),
+    );
+    await assert.rejects(
+      saveEntry(db, 'a', {
+        ...stale.entry,
+        expectedUpdatedAt: '2000-01-01T00:00:00.000Z',
+      }),
+      /已修改/,
+    );
+    assert.deepEqual(
+      await snapshot(db, 'a'),
+      before,
+      'a failed record guard cannot insert a recipe',
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('one confirmation deduplicates a shared recipe, saves multiple new dishes and preserves other meals', async () => {
+  const { db, close } = connect();
+  try {
+    const breakfast = entry('diet', {
+      status: 'logged',
+      note: '',
+      foods: [
+        { name: '合成早餐', grams: 60, meal: 'breakfast', basis: 'asSold' },
+      ],
+    });
+    await saveEntry(db, 'a', breakfast);
+    const state = await snapshot(db, 'a');
+    const other = { ...recipe(), name: '合成番茄鸡蛋煲' };
+    const quote = `午餐和晚餐都吃了一份${recipe().name}，还吃了一份${other.name}`;
+    const action = draftAction(
+      prepareRecord(
+        {
+          kind: 'diet',
+          date,
+          quote,
+          data: {
+            foods: [
+              { estimatedDish: recipe(), servings: 1, meal: 'lunch' },
+              { estimatedDish: recipe(), servings: 1, meal: 'dinner' },
+              { estimatedDish: other, servings: 1, meal: 'dinner' },
+            ],
+          },
+        },
+        state.records,
+        quote,
+        now,
+      ),
+    );
+    assert.deepEqual(action.dietMeals, ['lunch', 'dinner']);
+    const foods = (action.entry.data as Diet).foods;
+    assert.equal(foods[1].dish?.id, foods[2].dish?.id);
+    await confirmCoachRecord(db, 'a', await storeDraft(db, action));
+    const saved = await snapshot(db, 'a');
+    assert.equal(saved.dishes!.length, 2);
+    assert.equal(saved.records.length, 1);
+    assert.deepEqual(
+      (saved.records[0].data as Diet).foods[0],
+      (breakfast.data as Diet).foods[0],
+    );
+    assert((saved.records[0].data as Diet).foods.every((f) => !f.dishDraft));
+  } finally {
+    close();
+  }
 });

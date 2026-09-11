@@ -401,158 +401,165 @@ html .nutrition-orbit .orbit-dial strong {
 html :is(.orbit-label, .orbit-goal, .orbit-dial small, .nutrition-coverage) {
   color: #687c6b;
 }
-/* Neutral frosted plate surfaces with black text. */
+/* Plate: a floating selector and a clear reading surface, with dietary accents. */
 html .diet-panel .plate-card {
-  --glass-accent: #171717;
-  --glass-ink: #171717;
-  --glass-tint: #f3f3f3;
-  color: #171717;
+  color: var(--surface-text);
 }
 html .plate-card > .section-heading {
   flex-wrap: wrap;
   gap: 8px;
 }
-html :is(.plate-tabs, .plate-detail) {
-  background:
-    linear-gradient(140deg, #ffffff70, #ffffff00 65%), var(--glass-plate);
+html .plate-card .plate-surface {
+  padding: 7px;
+  background: var(--surface-frost);
   border: 1px solid var(--glass-edge);
-  border-radius: 22px;
-  box-shadow:
-    0 8px 24px #0000000d,
-    inset 0 1px 0 #fff,
-    inset 0 -1px 0 #ffffff59;
+  border-radius: 26px;
+  box-shadow: var(--surface-shadow);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
-html .plate-tabs {
-  padding: 5px;
+html .plate-card .plate-tabs {
+  margin: 0 0 7px;
+  padding: 3px;
   gap: 3px;
-  margin: 0 0 12px;
+  border: 0;
+  border-radius: 20px;
+  background: #7676800d;
+  box-shadow: inset 0 1px 2px #00000005;
 }
-html .plate-tabs button,
-html .plate-tabs .logged {
+html .plate-card .plate-tabs button {
   min-width: 0;
-  min-height: 88px;
-  padding: 9px 2px;
+  min-height: 92px;
+  padding: 10px 2px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 17px;
-  box-shadow: none;
-}
-html .plate-tabs button:hover {
-  background: #ffffff73;
-}
-html .plate-tabs .selected {
-  background: #ffffffd9;
-  border-color: #ffffff;
   outline: none;
+  box-shadow: none;
+  color: var(--surface-text);
+}
+html .plate-card .plate-tabs button:hover {
+  background: #ffffff80;
+}
+html .plate-card .plate-tabs .selected {
+  background: var(--surface-raised);
+  border-color: var(--glass-edge);
   box-shadow:
-    0 3px 10px #00000014,
-    inset 0 0 0 1px #0000000d;
+    0 3px 10px #0000000d,
+    inset 0 1px 0 #fff;
 }
-html .plate-tabs button > span {
-  border-radius: 11px;
+html .plate-card .plate-tabs button > span {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   background: transparent;
+  color: var(--surface-muted);
 }
-html .plate-tabs .logged > span {
-  background: linear-gradient(145deg, #ffffffa6, #ffffff00), #eaeaea;
-  box-shadow: inset 0 1px 0 #ffffffc7;
+html .plate-card .plate-tabs :is(.selected, .logged) > span {
+  color: var(--surface-accent);
+  background: var(--glass-tint);
 }
-html .plate-tabs button b {
-  font-size: 14px;
+html .plate-card .plate-tabs button b {
+  font-size: 13px;
+  color: var(--surface-text);
 }
-html .plate-tabs button small {
-  font-size: 12px;
+html .plate-card .plate-tabs button small {
+  color: var(--surface-muted);
+  font-size: 11px;
 }
-html .plate-complete {
-  font-size: 12px;
+html .plate-card .plate-tabs .selected b,
+html .plate-card .plate-tabs .logged small {
+  color: var(--surface-accent);
 }
-html .plate-detail {
+html .plate-card .plate-detail {
   padding: 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: var(--surface-raised);
+  box-shadow:
+    0 2px 8px #00000003,
+    inset 0 1px 0 #fff;
 }
 html .plate-surface > .text-button {
-  margin-bottom: 12px;
+  margin: 4px 8px 12px;
 }
-html .plate-meal-heading {
-  gap: 10px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #00000014;
+html .plate-card .plate-food-description > small {
+  font-size: 11px;
+  color: var(--surface-muted);
 }
-html .plate-meal-heading > strong {
-  font-size: 16px;
-  font-weight: 650;
+html .plate-card .plate-food:first-child {
+  padding-top: 2px;
 }
-html .plate-meal-heading .plate-energy {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 5px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+html .plate-card .plate-food:last-of-type {
+  border-bottom: 0;
 }
-html .plate-energy b {
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.6px;
-}
-html .plate-energy small {
-  font-size: 12px;
-}
-html .plate-food {
+html .plate-card .plate-food {
   align-items: flex-start;
   gap: 12px;
-  padding-block: 13px;
+  padding-block: 14px;
+  border-color: var(--surface-line);
 }
-html .plate-food-description > strong {
+html .plate-card .plate-food-description > strong {
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+  color: var(--surface-text);
 }
-html .plate-food-description > small {
-  font-size: 12px;
+html .plate-card .plate-food .inline-macros {
+  font-size: 11px;
+  gap: 3px 8px;
+  color: var(--surface-muted);
 }
-html .plate-food .inline-macros {
-  font-size: 12px;
-  gap: 2px 8px;
+html .plate-card .plate-food .inline-macros b {
+  font-size: 11px;
+  color: var(--surface-text);
 }
-html .plate-food .inline-macros b {
-  font-size: 12px;
-}
-html .plate-food > b {
+html .plate-card .plate-food > b {
   flex-shrink: 0;
   padding-top: 3px;
   font-size: 16px;
+  font-weight: 600;
+  color: var(--surface-text);
   font-variant-numeric: tabular-nums;
 }
-html .plate-food > b > small {
-  font-size: 12px;
+html .plate-card .plate-food > b > small {
+  font-size: 10px;
   font-weight: 400;
+  color: var(--surface-muted);
 }
-html .plate-detail .empty-inline {
-  padding-block: 16px;
-  font-size: 14px;
+html .plate-card .empty-inline {
+  padding-block: 24px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--surface-muted);
 }
 html .plate-card .plate-edit {
   min-height: 44px;
   margin-top: 14px;
-  font-size: 14px;
-  border-color: #ffffffd9;
-  background: #ffffff9c;
+  font-size: 13px;
+  color: var(--surface-accent);
+  border-color: color-mix(in srgb, var(--glass-accent) 18%, transparent);
+  background: var(--glass-tint);
+  border-radius: 14px;
   box-shadow:
     inset 0 1px 0 #fff,
-    0 2px 5px #00000008;
+    0 2px 5px #00000005;
 }
 html .plate-card .plate-edit:hover:not(:disabled) {
-  background: #ffffffde;
-  border-color: #c9c9c9;
+  background: color-mix(in srgb, var(--glass-tint) 75%, var(--glass-fill));
 }
 html .plate-card .plate-complete {
-  background: #ffffffb3;
-  border-color: var(--glass-line);
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--surface-accent);
+  background: var(--surface-raised);
+  border-color: var(--surface-line);
+  border-radius: 20px;
 }
-html .diet-panel .plate-card :is(h3, button, strong, b, span, small, p) {
-  color: #171717;
+html .plate-card .plate-complete.done {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 20%, transparent);
 }
 html
   :is(
@@ -740,6 +747,672 @@ html .history-dialog .history-table tbody tr:hover {
   background: var(--glass-tint);
 }
 
+/* Record and detail surfaces share neutral typography; color denotes emphasis. */
+html
+  :is(
+    .record-dialog,
+    .plate-card,
+    .strength-overview,
+    .strength-exercise-detail,
+    .training-week-card
+  ) {
+  --surface-text: #252529;
+  --surface-muted: #68686f;
+  --surface-line: #3c3c4317;
+  --surface-accent: color-mix(in srgb, var(--glass-accent) 82%, #242424);
+  --surface-frost: #f7f8fac7;
+  --surface-raised: #ffffffad;
+  --surface-shadow:
+    0 12px 30px #1d23300a, 0 2px 5px #1d233005, inset 0 1px 0 #fff;
+  color: var(--surface-text);
+}
+html .dialog-popup.record-dialog {
+  background: var(--surface-frost) !important;
+  border-radius: 30px !important;
+  box-shadow:
+    0 28px 90px #1d233030,
+    0 8px 24px #1d233012,
+    inset 0 1px 0 #fff !important;
+}
+html .record-dialog .record-dialog-header {
+  gap: 12px;
+  padding-block: 20px;
+  background: linear-gradient(180deg, #ffffffb3, #ffffff40);
+  border-color: var(--surface-line);
+}
+html .record-dialog [data-slot='dialog-title'],
+html :is(.plate-card, .strength-overview) > .section-heading h3 {
+  color: var(--surface-accent);
+}
+html .record-title-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  color: var(--surface-accent);
+  border: 1px solid #ffffffd9;
+  border-radius: 14px;
+  background: var(--glass-tint);
+  box-shadow:
+    0 2px 5px #00000005,
+    inset 0 1px 0 #fff;
+}
+html .record-dialog .record-save {
+  border-radius: 22px;
+}
+html .record-dialog .dialog-close {
+  color: var(--surface-muted);
+  background: #76768014;
+  border-color: transparent;
+  border-radius: 50%;
+}
+html
+  .record-dialog
+  :is(
+    .field > span,
+    .field-label,
+    .measurement-heading,
+    .check-field,
+    .choice-list > label,
+    .selected-food-name,
+    .selected-food-title > input,
+    .matrix-name strong,
+    .workout-toolbar > strong,
+    .meal-summary-caption strong,
+    .section-heading h3,
+    .food-option strong,
+    .cardio-matrix-row > strong
+  ) {
+  color: var(--surface-text);
+}
+html
+  .record-dialog
+  :is(
+    .helper,
+    .detail-text,
+    .measurement-heading small,
+    .library-sources,
+    .food-match-hint,
+    .food-option small,
+    .food-option .inline-macros,
+    .nutrition-reference-label,
+    .nutrition-reference-label span,
+    .food-portion small,
+    .food-portion label span,
+    .meal-summary-caption small,
+    .meal-summary-values small,
+    .meal-summary-values strong small,
+    .matrix-head,
+    .matrix-name > small,
+    .matrix-name p,
+    .matrix-row-footer,
+    .matrix-row-footer > span,
+    .catalog-source,
+    .cardio-matrix-head
+  ) {
+  color: var(--surface-muted);
+}
+html
+  .record-dialog
+  :is(
+    .field input,
+    .field textarea,
+    .matrix-input input,
+    .individual-set input,
+    .entry-input,
+    .exercise-search-line input,
+    .exercise-search-line select,
+    .food-portion select
+  ) {
+  color: var(--surface-text);
+  background: var(--surface-raised);
+  border: 1px solid var(--surface-line);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 2px #00000003,
+    0 1px 0 #fff;
+}
+html .record-dialog :is(input, textarea)::placeholder {
+  color: #85858c;
+  font-weight: 400;
+}
+html
+  .record-dialog
+  :is(
+    .secondary,
+    .date-picker-trigger,
+    .text-button,
+    .library-sources a,
+    .catalog-source a
+  ) {
+  color: var(--surface-accent);
+}
+html .record-dialog :is(.secondary, .date-picker-trigger) {
+  background: var(--surface-raised);
+  border-color: var(--surface-line);
+}
+html .record-dialog :is(.meal-tabs, .choice-list) {
+  padding: 4px;
+  gap: 4px;
+  background: #76768012;
+  border: 1px solid #ffffff80;
+  border-radius: 17px;
+  box-shadow: inset 0 1px 2px #00000003;
+}
+html .record-dialog :is(.meal-tabs button, .choice-list > label) {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  border-radius: 13px;
+  color: var(--surface-muted);
+  min-height: 40px;
+}
+html .record-dialog .meal-tabs button.selected,
+html .record-dialog .choice-list > label:has([aria-checked='true']),
+html .record-dialog .choice-list > label:has([data-checked]) {
+  background: var(--surface-raised);
+  border-color: #fff;
+  box-shadow:
+    0 2px 6px #0000000d,
+    inset 0 1px 0 #fff;
+  color: var(--surface-accent);
+}
+html .record-dialog :focus-visible,
+html .plate-card button:focus-visible,
+html .strength-overview :is(button, summary):focus-visible {
+  outline: 2px solid var(--surface-accent);
+  outline-offset: 3px;
+}
+html .record-dialog .body-record-form .measurements-grid > .field:not(.full) {
+  padding: 14px 12px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  box-shadow: var(--surface-shadow);
+}
+html
+  .record-dialog
+  .body-record-form
+  .measurements-grid
+  > .field:not(.full)
+  input {
+  min-height: 56px;
+  padding: 8px 0;
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--surface-accent);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+html .record-dialog .body-record-form .measurements-grid > .field.full {
+  margin-top: 8px;
+}
+html .record-dialog .body-record-form .check-field {
+  font-size: 13px;
+  line-height: 1.6;
+}
+html .record-dialog .meal-live-summary,
+html .record-dialog .workout-meta {
+  padding: 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: var(--surface-raised);
+  box-shadow: var(--surface-shadow);
+}
+html .record-dialog .meal-summary-values > span {
+  border-color: var(--surface-line);
+}
+html .record-dialog .meal-summary-values strong {
+  color: var(--surface-accent);
+  font-size: 26px;
+  letter-spacing: -0.6px;
+}
+html .record-dialog .meal-summary-values > span > small {
+  font-size: 11px;
+}
+html .record-dialog .meal-editor-grid {
+  gap: 12px;
+}
+html .record-dialog .food-library {
+  background: #ffffff4d;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+}
+html .record-dialog .food-library .food-search {
+  background: #f7f8fa;
+  border-color: var(--surface-line);
+  color: var(--surface-muted);
+  box-shadow: 0 -12px 0 12px #f7f8fa;
+  border-radius: 12px;
+}
+html .record-dialog .food-search input {
+  color: var(--surface-text);
+}
+html
+  .record-dialog
+  :is(.library-tabs, .library-basis, .exercise-group-tabs)
+  button {
+  border: 1px solid var(--surface-line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--surface-muted);
+  min-height: 32px;
+}
+html
+  .record-dialog
+  :is(.library-tabs, .library-basis, .exercise-group-tabs)
+  button.selected {
+  color: var(--surface-accent);
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 25%, transparent);
+}
+html .record-dialog .food-option {
+  border-color: var(--surface-line);
+  padding-block: 12px;
+}
+html .record-dialog .food-option strong {
+  font-size: 13px;
+}
+html .record-dialog .food-option:hover {
+  background: var(--surface-raised);
+  border-radius: 10px;
+}
+html .record-dialog .food-option > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  color: var(--surface-accent);
+  background: var(--glass-tint);
+  border-radius: 50%;
+}
+html .record-dialog .meal-editing > .section-heading {
+  background: #f7f8fa;
+  border-color: var(--surface-line);
+  padding-inline: 4px;
+}
+html .record-dialog .selected-foods {
+  gap: 10px;
+  padding-top: 10px;
+}
+html .record-dialog .selected-food {
+  padding: 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  box-shadow: 0 2px 6px #00000003;
+}
+html .record-dialog .food-portion > label {
+  background: var(--surface-raised);
+  border-color: var(--surface-line);
+  border-radius: 10px;
+}
+html .record-dialog .food-portion :is(input, strong) {
+  color: var(--surface-accent);
+}
+html .record-dialog .food-portion :is(input, select) {
+  height: 36px;
+  font-size: 12px;
+}
+html .record-dialog .exercise-picker,
+html .record-dialog .individual-sets {
+  background: var(--surface-raised);
+  border-color: var(--glass-edge);
+  border-radius: 18px;
+  box-shadow: var(--surface-shadow);
+}
+html .record-dialog .exercise-picker-list button {
+  color: var(--surface-text);
+  border-color: var(--surface-line);
+  background: var(--surface-raised);
+  border-radius: 12px;
+  min-height: 48px;
+}
+html .record-dialog .exercise-picker-list button small {
+  color: var(--surface-muted);
+}
+html .record-dialog :is(.matrix-head, .cardio-matrix-head) {
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: #7676800d;
+}
+html .record-dialog :is(.matrix-exercise, .cardio-matrix-row) {
+  padding: 14px 10px 10px;
+  margin-top: 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  box-shadow: 0 2px 5px #00000003;
+}
+html
+  .record-dialog
+  :is(
+    .cardio-picker h4,
+    .cardio-picker button,
+    .bodyweight-label,
+    .calendar-day b
+  ) {
+  color: var(--surface-text);
+}
+html
+  .record-dialog
+  :is(
+    .food-option .inline-macros > span,
+    .food-option .inline-macros small,
+    .empty-note,
+    .food-empty,
+    .legacy-note,
+    .cardio-total,
+    .cardio-total strong small
+  ) {
+  color: var(--surface-muted);
+}
+html .record-dialog .food-option .inline-macros b {
+  color: var(--surface-text);
+}
+/* Earlier global readability rules use !important; keep their overrides local. */
+html
+  .record-dialog
+  :is(
+    .helper,
+    .detail-text,
+    .food-option small,
+    .food-empty p,
+    .food-empty strong
+  ),
+html .plate-card .empty-inline,
+html .strength-overview .subtle,
+html .strength-exercise-detail :is(.subtle, .empty-inline) {
+  color: var(--surface-muted) !important;
+}
+html .record-dialog :is(.individual-set > label, .cardio-matrix-row small) {
+  color: var(--surface-muted);
+}
+html .record-dialog .cardio-picker button {
+  background: var(--surface-raised);
+  border-color: var(--surface-line);
+  min-height: 36px;
+  border-radius: 10px;
+}
+html
+  .record-dialog
+  :is(
+    .cardio-picker button.selected,
+    .calendar-day.selected b,
+    .cardio-total strong
+  ) {
+  color: var(--surface-accent);
+}
+html .record-dialog .cardio-picker button.selected {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 25%, transparent);
+}
+html .record-dialog .workout-win-preview {
+  color: var(--surface-accent);
+  background: var(--glass-tint);
+  border-color: var(--surface-line);
+  border-radius: 14px;
+}
+html .record-dialog .workout-win-preview small {
+  color: var(--surface-muted);
+}
+/* Training without a daily entry still shows concrete progress and recent context. */
+html .training-week-card {
+  padding: 15px;
+  background: var(--surface-frost);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--surface-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html .training-week-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+html .training-week-heading > strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.6;
+  color: var(--surface-text);
+}
+html .training-week-heading > small {
+  font-size: 10px;
+  color: var(--surface-accent);
+  background: var(--glass-tint);
+  border-radius: 8px;
+  padding: 3px 6px;
+}
+html .training-week-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+html .training-week-metrics > div > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+html .training-week-metrics span {
+  font-size: 12px;
+  color: var(--surface-muted);
+}
+html .training-week-metrics strong {
+  color: var(--surface-accent);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+html .training-week-metrics small {
+  color: var(--surface-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+html .training-week-metrics progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: #76768018;
+  accent-color: var(--glass-fill);
+}
+html .training-week-metrics progress::-webkit-progress-bar {
+  background: #76768018;
+}
+html .training-week-metrics progress::-webkit-progress-value {
+  background: var(--glass-fill);
+  border-radius: 8px;
+}
+html .training-week-metrics progress::-moz-progress-bar {
+  background: var(--glass-fill);
+  border-radius: 8px;
+}
+html .training-week-card .training-last-session {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--surface-line);
+  color: var(--surface-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+html .strength-overview > .section-heading {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+html
+  .strength-overview
+  :is(
+    .subtle,
+    .strength-growth-copy > span,
+    .strength-growth-copy p,
+    .strength-growth-copy small,
+    .strength-body-grid > button > small,
+    .strength-method p,
+    .strength-avatar-gallery figcaption > span,
+    .strength-avatar-gallery figcaption > small
+  ) {
+  color: var(--surface-muted);
+}
+html .strength-overview .strength-growth {
+  isolation: isolate;
+  padding: 12px;
+  gap: 8px;
+  margin: 6px 0 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 24px;
+  background: var(--surface-frost);
+  box-shadow: var(--surface-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+html .strength-overview .strength-growth > img {
+  height: 166px;
+  mix-blend-mode: multiply;
+}
+html .strength-overview .strength-growth-copy > strong {
+  font-size: 38px;
+  letter-spacing: -1.5px;
+  color: var(--surface-accent);
+}
+html .strength-overview .strength-growth-copy p {
+  color: var(--surface-muted);
+  line-height: 1.6;
+  font-size: 12px;
+}
+html .strength-overview progress,
+html .strength-overview progress::-webkit-progress-bar {
+  background: #76768018;
+}
+html .strength-overview progress {
+  height: 6px;
+  margin-block: 12px 8px;
+  accent-color: var(--glass-fill);
+}
+html .strength-overview progress::-webkit-progress-value {
+  background: var(--glass-fill);
+}
+html .strength-overview progress::-moz-progress-bar {
+  background: var(--glass-fill);
+}
+html .strength-overview .strength-body-grid {
+  gap: 8px;
+}
+html .strength-overview .strength-body-grid > button {
+  gap: 8px;
+  padding: 12px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  box-shadow: var(--surface-shadow);
+}
+html .strength-overview .strength-body-grid > button.selected {
+  background: var(--glass-tint);
+  border-color: color-mix(in srgb, var(--glass-accent) 30%, transparent);
+}
+html .strength-overview .strength-body-grid > button > span {
+  color: var(--surface-text);
+  font-size: 12px;
+}
+html .strength-overview .strength-body-grid > button > strong {
+  color: var(--surface-accent);
+  font-size: 30px;
+}
+html .strength-overview :is(.strength-method, .strength-journey) > summary {
+  padding: 12px;
+  background: var(--surface-raised);
+  color: var(--surface-text);
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px #00000003;
+}
+html .strength-overview .strength-method p {
+  padding-inline: 4px;
+  font-size: 12px;
+}
+html
+  .strength-overview
+  :is(.strength-method a, .strength-avatar-gallery figcaption strong) {
+  color: var(--surface-accent);
+}
+html .strength-overview .strength-avatar-gallery img {
+  mix-blend-mode: multiply;
+}
+html .strength-overview .strength-avatar-gallery figure {
+  isolation: isolate;
+  background: var(--surface-raised);
+  border-color: var(--surface-line);
+}
+html .strength-overview .strength-avatar-gallery figure.unlocked {
+  border-color: color-mix(in srgb, var(--glass-accent) 28%, transparent);
+}
+html .strength-exercise-detail :is(.subtle, .strength-reference, .chart-note) {
+  color: var(--surface-muted);
+}
+@media (max-width: 520px) {
+  html .record-dialog .record-dialog-header {
+    gap: 8px;
+    padding-block: 14px;
+  }
+  html .record-title-icon {
+    display: none;
+  }
+  html .record-dialog .body-record-form .measurements-grid > .field:not(.full) {
+    padding: 12px 8px 6px;
+    border-radius: 16px;
+  }
+  html
+    .record-dialog
+    .body-record-form
+    .measurements-grid
+    > .field:not(.full)
+    input {
+    font-size: 24px;
+  }
+  html .record-dialog :is(.meal-live-summary, .workout-meta) {
+    padding: 12px;
+  }
+  html .record-dialog .meal-summary-values strong {
+    font-size: 22px;
+  }
+  html .record-dialog .meal-summary-values > span {
+    padding-left: 8px;
+  }
+  html .record-dialog .meal-summary-values > span:first-child {
+    padding-left: 0;
+  }
+}
+@supports not
+((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html
+    :is(.record-dialog, .plate-card, .strength-overview, .training-week-card) {
+    --surface-frost: #f7f8fa;
+    --surface-raised: #fff;
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html
+    :is(.record-dialog, .plate-card, .strength-overview, .training-week-card) {
+    --surface-frost: #f7f8fa;
+    --surface-raised: #fff;
+    --surface-line: #929299;
+    --surface-muted: #515158;
+  }
+}
+
 /* System preferences and unsupported blur never leave text on a transparent base. */
 @supports not
 ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -790,5 +1463,306 @@ html .history-dialog .history-table tbody tr:hover {
     ),
   html .strength-body-grid > button:hover {
     transform: none;
+  }
+}
+
+/* Recipe cards own their layout in both the meal editor and nested chat lists. */
+html .dish-details {
+  container: dish-card / inline-size;
+  min-width: 0;
+  margin: 10px 0 2px;
+  border: 1px solid #e3e3e5;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 2px 6px #00000004;
+  color: #242424;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+html .dish-details .dish-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  list-style: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+html .dish-details .dish-disclosure::-webkit-details-marker {
+  display: none;
+}
+html .dish-details .dish-disclosure::after {
+  content: none;
+}
+html .dish-details .dish-disclosure:hover {
+  background: #f5f5f6;
+}
+html .dish-details .dish-disclosure:active {
+  background: #eeeeef;
+}
+html .dish-details .dish-disclosure:focus-visible {
+  outline: 2px solid #444;
+  outline-offset: -3px;
+}
+html .dish-details .dish-details-summary {
+  min-height: 72px;
+  padding: 14px 16px;
+  background: #fafafa;
+  border-radius: 17px;
+}
+html .dish-details[open] > .dish-details-summary {
+  border-radius: 17px 17px 0 0;
+  background: #fff;
+}
+html .dish-details .dish-heading-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: #eeeeef;
+  color: #535355;
+}
+html .dish-details .dish-heading {
+  flex: 1;
+  min-width: 0;
+}
+html .dish-details .dish-heading-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  font-weight: 650;
+}
+html .dish-details .dish-estimate-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #ededee;
+  color: #656568;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+html .dish-details .dish-heading-meta {
+  display: block;
+  margin-top: 3px;
+  color: #6b6b70;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+html .dish-details .dish-chevron {
+  flex-shrink: 0;
+  color: #77777b;
+  transition: transform 0.18s ease;
+}
+html .dish-details[open] > summary > .dish-chevron,
+html .dish-reference[open] > summary > .dish-chevron {
+  transform: rotate(180deg);
+}
+html .dish-details .dish-details-body {
+  display: grid;
+  gap: 20px;
+  padding: 0 16px 16px;
+}
+html .dish-details :is(p, h4, dl, dd, ul) {
+  margin: 0;
+}
+html .dish-details h4 {
+  color: #3b3b3e;
+  font-size: 14px;
+  font-weight: 650;
+}
+html .dish-details .dish-nutrition {
+  padding: 16px;
+  border-radius: 14px;
+  background: #f5f5f6;
+}
+html .dish-details .dish-energy > span {
+  color: #68686d;
+  font-size: 12px;
+}
+html .dish-details .dish-energy > p {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 16px;
+}
+html .dish-details .dish-energy strong {
+  color: #222;
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -1px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+html .dish-details .dish-energy p > span {
+  color: #68686d;
+  font-size: 13px;
+}
+html .dish-details .dish-macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+html .dish-details .dish-macros dt {
+  color: #68686d;
+  font-size: 12px;
+}
+html .dish-details .dish-macros dd {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+  color: #2d2d30;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+html .dish-details .dish-macros dd > span {
+  color: #79797e;
+  font-size: 12px;
+  font-weight: 400;
+}
+html .dish-details .dish-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+}
+html .dish-details .dish-section-heading > span {
+  color: #747478;
+  font-size: 12px;
+}
+html .dish-details .dish-ingredients {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+html .dish-details .dish-ingredients > li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: #f7f7f8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html .dish-details .dish-ingredients > li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+html .dish-details .dish-ingredient-amount {
+  flex-shrink: 0;
+  color: #77777c;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+html .dish-details .dish-method {
+  margin-top: 16px;
+}
+html .dish-details .dish-method > p {
+  margin-top: 6px;
+  color: #54545a;
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+html .dish-details .dish-reference {
+  margin: 0;
+  border: 1px solid #e7e7e9;
+  border-radius: 12px;
+  overflow: hidden;
+}
+html .dish-details .dish-reference-toggle {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fafafa;
+  color: #5e5e64;
+  font-size: 14px;
+}
+html .dish-details .dish-reference-body {
+  display: grid;
+  gap: 10px;
+  padding: 2px 12px 12px;
+  color: #6b6b70;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+html .dish-details .dish-per-hundred {
+  font-variant-numeric: tabular-nums;
+}
+html .dish-details .dish-save-note {
+  margin-top: -8px;
+  color: #6b6b70;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.food-library-item {
+  min-width: 0;
+}
+.food-library-item > .food-option {
+  width: 100%;
+}
+.coach-record-group > ul > li:has(.dish-details) {
+  flex-wrap: wrap;
+}
+.coach-record-group > ul > li > .dish-details {
+  flex-basis: 100%;
+  width: 100%;
+}
+.meal-form .library-tabs {
+  flex-wrap: wrap;
+}
+@container dish-card (max-width: 19rem) {
+  html .dish-details .dish-details-summary {
+    padding: 12px;
+    gap: 8px;
+  }
+  html .dish-details .dish-heading-icon {
+    display: none;
+  }
+  html .dish-details .dish-details-body {
+    padding: 0 12px 12px;
+    gap: 16px;
+  }
+  html .dish-details .dish-nutrition {
+    padding: 12px;
+  }
+  html .dish-details .dish-macros {
+    gap: 8px;
+  }
+  html .dish-details .dish-macros dd {
+    font-size: 18px;
+  }
+  html .dish-details .dish-ingredients {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .dish-details :is(.dish-disclosure, .dish-chevron) {
+    transition: none;
   }
 }

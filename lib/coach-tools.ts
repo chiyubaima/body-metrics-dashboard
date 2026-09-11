@@ -26,7 +26,7 @@ import {
   exerciseKey,
 } from './progress.ts';
 import { resistanceExercises, cardioTypes } from './exercises.ts';
-import { searchFoods } from './food-search.ts';
+import { searchFoodLibraries } from './dishes.ts';
 import { prepareRecord, sourceQuote } from './coach-drafts.ts';
 import type { RecordConversation } from './coach-drafts.ts';
 import {
@@ -45,9 +45,10 @@ export const coachToolInstructions = `
 应用工具：toolCalls必须首先输出。需要工具时reply为空，evidenceIds/memories/commitments为空；收到toolResults后才写答复。无需工具时toolCalls=[]。最多3轮、6次工具；最后一轮必须回答。禁止虚构调用结果、成功保存或出处。所有工具只读或准备草稿；身体、饮食、训练草稿在聊天内展示，用户点击卡片“确认记录”直接保存，不需要跳转表单，只有想调整内容时才打开编辑器。工具生成草稿不代表已记录。工具参数arguments是JSON字符串，允许的字段如下：
 find_records: {kind:body|diet|training|all,start:YYYY-MM-DD,end:YYYY-MM-DD,query?:关键词,offset?:整数}，含起止日期，每页最多12条，最多366天。
 calculate: {metric:body_average|diet_totals|training_summary|exercise_progress,start,end,catalogId?:动作ID}；body_average比较截至end和前一周的7日晨重均值，其他计算限制在start/end。涉及数值加总/比较务必调用，不用心算。返回样本和缺失信息，不把相关性当因果。
-search_catalog: {kind:food|exercise|cardio,query:关键词,basis?:raw|cooked|asSold|all}，营养均每100g。先查询再选择准确食物/动作，有歧义只问最关键问题。
-prepare_record: {kind:body|diet|training,date:YYYY-MM-DD,id?:现有目标记录ID,quote:本轮逐字原话,sourceQuotes?:[{turnId:最近对话ID,quote:该轮用户逐字原话}],copyFrom?:{id:饮食来源记录ID,updatedAt:来源更新时间,meal:来源餐次,targetMeal?:目标餐次},data?:记录字段}。新增身体data={weight,waist,bodyFat,condition:morning|other,estimated,primary,note}，未知测量null，条件要明确；primary仅明确要求选为当天晨重时true。饮食data={foods:[{name,grams,basis,meal:breakfast|lunch|dinner|snack|unsorted,fdcId?:目录ID}],note}；克数/生熟重不明先问，不猜营养。未传id的饮食自动追加当天已记录食物；传id时foods是完整修改后列表，保留未修改食物。训练data={type:resistance|cardio|rest,minutes,content,details,exercises?:[{catalogId,sets:[{weight,reps,warmup}]}],cardioActivities?:[{catalogId,minutes}]}。重量口径依目录，次数/重量不明先问。只能整理当前用户正在记录/更正的事实，提议或未来计划不能记为实际。多轮补充信息时保留本轮quote，可用sourceQuotes引用context.conversation中24小时内的用户原话；必须给真实turnId，不能引用Captain的话补数值，不能把旧数字当作新的测量。
+search_catalog: {kind:food|exercise|cardio,query:关键词,basis?:raw|cooked|asSold|all}，营养均每100g。食物由程序先查本人自建库，有匹配返回library=custom与dish.id；没有时才查USDA返回library=usda与fdcId。先查具体菜名再记录，不能把只含相似原料的USDA食品当成同一道菜。自建菜品先用dishId，不再估算已有配方。USDA使用fdcId，营养由目录提供。
+prepare_record: {kind:body|diet|training,date:YYYY-MM-DD,id?:现有目标记录ID,quote:本轮逐字原话,sourceQuotes?:[{turnId:最近对话ID,quote:该轮用户逐字原话}],copyFrom?:{id:饮食来源记录ID,updatedAt:来源更新时间,meal:来源餐次,targetMeal?:目标餐次},data?:记录字段}。新增身体data={weight,waist,bodyFat,condition:morning|other,estimated,primary,note}，未知测量null，条件要明确；primary仅明确要求选为当天晨重时true。饮食data={foods:[{name,grams,basis,meal:breakfast|lunch|dinner|snack|unsorted,fdcId?:目录ID}],note}；USDA食物的克数/生熟重不明先问，营养使用目录；自建菜品见下方分析规则。未传id的饮食自动追加当天已记录食物；传id时foods是完整修改后列表，保留未修改食物。训练data={type:resistance|cardio|rest,minutes,content,details,exercises?:[{catalogId,sets:[{weight,reps,warmup}]}],cardioActivities?:[{catalogId,minutes}]}。重量口径依目录，次数/重量不明先问。只能整理当前用户正在记录/更正的事实，提议或未来计划不能记为实际。多轮补充信息时保留本轮quote，可用sourceQuotes引用context.conversation中24小时内的用户原话；必须给真实turnId，不能引用Captain的话补数值，不能把旧数字当作新的测量。
 饮食引用：用户说“今天午餐和昨天一样，帮我记一下”，或在该请求后确认“完全一样”，应先find_records核对来源，再prepare_record传kind=diet、目标date、quote及copyFrom；data省略，不要抄写foods/grams。应用直接复制指定餐次的真实食物、数量、生熟重和营养，追加到目标日，保留已有早餐等其他食物。已明确完全相同时不要求用户再报一遍克数。目标date是本次要记录的日期；id是要修改的目标，不能用来源id作为目标id。仅食物一样但分量有变化时先问清，不能强行按原份量复制。来源不存在或只有计划时说明缺少可复制的记录。工具校验失败可按错误补齐来源参数重试，不把可修正的参数错误说成整个记录服务不可用。
+自建菜品分析：用户正在记录已吃的菜品，先search_catalog检索；无相符菜品时，由你分析典型原料（包括油、糖和调味料）、烹饪方式与成品参考份量，通过prepare_record的data.foods提供{estimatedDish:{name:用户原话里的菜名,ingredients:[{name,grams:参考一份中该原料的估算克数}],cookingMethod,portionGrams:成品参考一份克数,basis:raw|cooked|asSold,nutrition:{energy:每100g大卡,protein:每100g蛋白质g,carbs:每100g碳水g,fat:每100g脂肪g},assumptions:原料比例/用油/成品重量等估算假设},grams?:用户明确克数,servings?:用户明确份数,meal}。name必须属于当前或允许引用的用户原话；分析值是估算，不是假称查到的数据。营养按每100g成品，不填整份总量；参考配方包括烹饪损耗或加水。已有自建菜品用{dishId,grams?或servings?,meal}。未给克数时程序按参考一份或明确份数换算，卡片标注份量估算；明显含糊（只吃几口、与平时不同配方）先问最关键问题，不套整份。缺少重要配方可写清常见做法假设并等待确认，不能把假设称作用户原话。新菜品和本次饮食只在用户确认后同时保存。用户要求修改未保存配方时重新整理待确认草稿，不能偷偷保存。此规则允许估算新菜品营养和参考份量；USDA食物的克数/生熟重不明仍先问。
 open_page: {kind:body|diet|training,date:YYYY-MM-DD}，给打开对应日记的按钮。
 inspect_agreements: {includeArchived?:boolean}，默认有效记忆和待履行约定，返回ID及更新时间；只有本轮明确查过期/忘掉/恢复/历史才可查询归档。
 prepare_agreement: {type:memory|commitment,id:现有ID,quote:本轮原话,changes:{content?,category?,title?,kind?,dueAt?,expiresAt?}}，只整理有效条目修改建议。归档恢复请引导用户进入记忆管理重新确认。
@@ -249,17 +250,18 @@ export async function executeCoachTool(
       const kind = coachChoice(args.kind, ['food', 'exercise', 'cardio']),
         query = coachText(args.query, 80, '检索词');
       if (kind === 'food') {
-        const found = searchFoods(
+        const found = searchFoodLibraries(
+          ctx.data.dishes ?? [],
           query,
-          0,
           coachChoice(args.basis ?? 'all', ['all', 'raw', 'cooked', 'asSold']),
         );
         result = {
           ...found,
           foods: found.foods.slice(0, 6),
-          basis: '每100g参考营养，近似匹配不可自动选用，未指定重量不可猜。',
+          basis:
+            '每100g营养。自建菜品优先；USDA近似结果不能冒充相同菜品。自建配方是估算，按份数使用参考份量时也须确认。',
         };
-        run.summary = `食物目录 · ${found.total} 个匹配，返回前 ${Math.min(6, found.foods.length)} 个`;
+        run.summary = `${found.library === 'custom' ? '自建菜品' : 'USDA'} · ${found.total} 个匹配，返回前 ${Math.min(6, found.foods.length)} 个`;
       } else {
         const catalog = kind === 'exercise' ? resistanceExercises : cardioTypes;
         const found = catalog.filter((e) =>
@@ -275,9 +277,17 @@ export async function executeCoachTool(
         ctx.message,
         ctx.now,
         ctx.conversation,
+        ctx.data.dishes,
       );
       run.actions = [action];
       run.summary = '草稿已整理，在对话卡片中核对并点击“确认记录”后记入日记。';
+      if (
+        action.type === 'record' &&
+        action.entry.kind === 'diet' &&
+        (action.entry.data as Diet).foods.some((f) => f.dishDraft)
+      )
+        run.summary =
+          '菜品分析与饮食草稿已整理，确认后同时保存到自建菜品库和日记；营养与参考份量均为估算。';
       if (action.type === 'record' && action.sourceRecord) {
         const meals: Record<string, string> = {
           breakfast: '早餐',

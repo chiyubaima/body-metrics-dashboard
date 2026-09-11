@@ -13,6 +13,11 @@ export function DeleteConfirm({
   error,
   cancel,
   confirm,
+  title,
+  description,
+  confirmLabel = '移入回收站',
+  cancelLabel = '保留记录',
+  className = '',
 }: {
   count: number;
   label: string;
@@ -20,6 +25,11 @@ export function DeleteConfirm({
   error?: string;
   cancel: () => void;
   confirm: () => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  className?: string;
 }) {
   return (
     <Dialog
@@ -29,17 +39,18 @@ export function DeleteConfirm({
       }}
     >
       <DialogContent
-        className="dialog-popup delete-dialog"
+        className={`dialog-popup delete-dialog ${className}`}
         showCloseButton={false}
       >
         <div className="delete-symbol">
           <Trash2 size={26} />
         </div>
         <DialogTitle>
-          将 {count} 条{label}记录移入回收站？
+          {title ?? `将 ${count} 条${label}记录移入回收站？`}
         </DialogTitle>
         <DialogDescription>
-          记录会从看板和统计中移除。之后可以从页面顶部的回收站恢复。
+          {description ??
+            '记录会从看板和统计中移除。之后可以从页面顶部的回收站恢复。'}
         </DialogDescription>
         {error && (
           <p className="form-error" role="alert">
@@ -53,7 +64,7 @@ export function DeleteConfirm({
             disabled={busy}
             onClick={cancel}
           >
-            保留记录
+            {cancelLabel}
           </button>
           <button
             type="button"
@@ -61,7 +72,7 @@ export function DeleteConfirm({
             disabled={busy}
             onClick={confirm}
           >
-            {busy ? '正在移动…' : '移入回收站'}
+            {busy ? '正在处理…' : confirmLabel}
           </button>
         </div>
       </DialogContent>

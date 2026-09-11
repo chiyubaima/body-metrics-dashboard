@@ -7,7 +7,16 @@ import {
   validId,
 } from '../lib/model.ts';
 import { coachObject } from '../lib/coach.ts';
-import type { Body, Entry, Plan, Snapshot } from '../lib/model.ts';
+import type {
+  Body,
+  Entry,
+  Plan,
+  Snapshot,
+  Diet,
+  CustomDish,
+} from '../lib/model.ts';
+import { listDishes } from './dishes.ts';
+import { dishFood, dishNameKey } from '../lib/dishes.ts';
 type Row = {
   id: string;
   owner: string;
@@ -69,6 +78,7 @@ export async function snapshot(
   ]);
   return {
     records: (records.results as Row[]).map(entry),
+    dishes: await listDishes(db, owner),
     plans: (plans.results as PlanRow[]).map(plan),
     profile: profile.results[0]
       ? JSON.parse((profile.results[0] as { payload: string }).payload)
@@ -134,6 +144,39 @@ export async function saveEntry(
     throw new InputError('记录已在回收站，请先恢复再编辑。');
   if (existing && existing.kind !== v.kind)
     throw new InputError('不能更改记录类型。');
+  const newDishes = new Map<string, CustomDish>();
+  if (v.kind === 'diet') {
+    for (const food of (v.data as Diet).foods) {
+      if (!food.dish) continue;
+      if (food.fdcId)
+        throw new InputError('菜品不能同时标记为自建和USDA来源。');
+      const dish = food.dish;
+      const stored = await db
+        .prepare(
+          'SELECT owner,payload,created_at FROM custom_dishes WHERE id=?',
+        )
+        .bind(dish.id)
+        .first<{ owner: string; payload: string; created_at: string }>();
+      if (stored) {
+        if (
+          stored.owner !== owner ||
+          stored.payload !== JSON.stringify(dish.recipe) ||
+          stored.created_at !== dish.createdAt
+        )
+          throw new InputError('自建菜品来源不一致，请从菜品库重新选择。');
+      } else {
+        if (!food.dishDraft)
+          throw new InputError('菜品已不可用，请重新核对配方。');
+        const duplicate = newDishes.get(dish.id);
+        if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(dish))
+          throw new InputError('同一菜品出现不同配方，请重新整理。');
+        newDishes.set(dish.id, dish);
+      }
+      // Save the reviewed recipe snapshot and derive all food nutrition from it.
+      Object.assign(food, dishFood(dish, food.grams));
+      delete food.dishDraft;
+    }
+  }
   const now = new Date(
     Math.max(Date.now(), existing ? Date.parse(existing.updated_at) + 1 : 0),
   ).toISOString();
@@ -172,6 +215,7 @@ export async function saveEntry(
         )
         .bind(owner, v.date, v.id, v.id, ...versionArgs),
     );
+  const recordIndex = statements.length;
   statements.push(
     db
       .prepare(
@@ -205,13 +249,37 @@ export async function saveEntry(
           confirmation.turnId,
         ),
     );
+  for (const dish of newDishes.values())
+    statements.push(
+      db
+        .prepare(
+          'INSERT INTO custom_dishes (id,owner,name_key,payload,created_at) SELECT ?,?,?,?,? WHERE changes()=1 AND EXISTS(SELECT 1 FROM records WHERE owner=? AND id=? AND updated_at=?)',
+        )
+        .bind(
+          dish.id,
+          owner,
+          dishNameKey(dish.recipe.name),
+          JSON.stringify(dish.recipe),
+          dish.createdAt,
+          owner,
+          v.id,
+          now,
+        ),
+    );
   try {
     const saved = await db.batch(statements);
-    if (!saved.at(-1)?.meta.changes)
+    if (!saved[recordIndex]?.meta.changes)
       throw new InputError(
         '记录已修改或进入回收站，请重新读取后再整理，当前输入已保留。',
       );
   } catch (error) {
+    if (
+      String(error).includes('custom_dishes') &&
+      String(error).includes('UNIQUE')
+    )
+      throw new InputError(
+        '同名菜品已在自建库中，请重新选择；本次饮食尚未保存。',
+      );
     if (String(error).includes('UNIQUE'))
       throw new InputError('当天已有饮食记录，请打开已有记录修改。');
     throw error;

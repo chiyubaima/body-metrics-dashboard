@@ -6,6 +6,8 @@ Keep level-01.png through level-20.png stable: the dashboard selects the current
 
 Visual brief: friendly stylized adult workout character, short dark hair, green sport top, navy shorts and white shoes. Rounded, polished illustration; blue and orange accents. No words, numbers or interface chrome. Vary pose, equipment and subtle outfit details without equating body size with achievement.
 
+Since 2026-09-11, the current portrait and stage gallery use isolated CSS multiply blending to merge their white backgrounds into the light glass surfaces. The original PNGs remain unchanged; do not add a rectangular image drop shadow.
+
 ## Stage prompts
 
 {

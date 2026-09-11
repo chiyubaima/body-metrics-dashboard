@@ -11,6 +11,7 @@ import type {
 } from '../lib/model.ts';
 import {
   bodyPoints,
+  defaultMealSlot,
   exerciseKey,
   exerciseTimeline,
   nutritionSummary,
@@ -52,6 +53,33 @@ const food: Food = {
   meal: 'lunch',
   nutrition: { energy: 120, protein: 22.5, carbs: 0, fat: 2.62 },
 };
+await test('meal defaults use Shanghai boundaries and advance exactly one recorded meal', () => {
+  for (const [time, slot, next] of [
+    ['00:00:00', 'breakfast', 'lunch'],
+    ['10:59:59', 'breakfast', 'lunch'],
+    ['11:00:00', 'lunch', 'dinner'],
+    ['15:59:59', 'lunch', 'dinner'],
+    ['16:00:00', 'dinner', 'snack'],
+    ['23:59:59', 'dinner', 'snack'],
+  ] as const) {
+    const now = new Date(`2026-09-11T${time}+08:00`);
+    assert.equal(defaultMealSlot([], now), slot);
+    assert.equal(defaultMealSlot([{ ...food, meal: slot }], now), next);
+    assert.equal(defaultMealSlot([{ ...food, meal: 'unsorted' }], now), slot);
+    assert.equal(defaultMealSlot([{ ...food, meal: next }], now), slot);
+    assert.equal(
+      defaultMealSlot(
+        [
+          { ...food, meal: slot },
+          { ...food, meal: next },
+        ],
+        now,
+      ),
+      next,
+    );
+  }
+  assert.equal(defaultMealSlot([], new Date('2026-09-11T03:00:00Z')), 'lunch');
+});
 await test('nutrition uses edible grams and per-nutrient coverage; unknown and known zero are distinct', () => {
   const summary = nutritionSummary([
     food,
