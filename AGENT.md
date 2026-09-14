@@ -1,5 +1,12 @@
 # Application working rules
 
+## Annotation scrolling and record details (2026-09-14)
+
+- Give review panels an explicit viewport-bounded height on the dashboard, in dialogs and on narrow screens. Keep header/tabs/footer fixed and only the list scrollable. Focus the named list for keyboard scrolling and reset it when switching status; preserve red styling and existing annotation actions.
+- Apply the six initial notes: inset the nutrition-source disclosure marker with compact vertical spacing, separate library tabs from their divider, round/pad the pinned meal heading, and space a matching glass empty card below it with only 这顿吃了什么？ and its existing icon.
+- Replace the shared inline unsaved-form replacement with a compact existing AlertDialog. Keep the underlying record/plan/profile form mounted and visible, block background interaction, initially focus continue, preserve drafts and scroll on cancel/Escape, and close only after explicit discard. Preserve save behavior.
+- Keep changes in existing developer-mode, meal-form, dashboard and glass files. Synthetic UI regressions live in `tests/annotation-ui.test.ts` and `tests/record-dialog.test.ts`; reuse meal tests. Temporary `work/annotation-check/` contains only documented browser QA tooling with in-memory synthetic API responses, no personal state or model access; stop and remove it after validation. Run test/typecheck/lint/build and local checks. Resolve only the six initial unchanged notes; no commit, push or deployment.
+
 ## Captain multi-food tool batches (2026-09-14)
 
 - Share the limits of six total tool calls and three tool rounds in `lib/coach-tool-types.ts`, reusing them in instructions, output schema, parsing and orchestration. Remove the hidden three-call batch ceiling; report remaining calls/rounds to each model generation and keep sequential execution/validation.

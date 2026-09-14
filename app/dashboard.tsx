@@ -19,6 +19,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/ui/alert-dialog';
 import { RecordForm, PlanForm } from './forms';
 import { PersonalSettings } from './personal-settings';
 import { BodyPanel, DietPanel, TrainingPanel, compactDate } from './panels';
@@ -97,6 +103,7 @@ export default function Dashboard({
   localPreview: boolean;
 }) {
   const recordFormId = useId();
+  const continueEditing = useRef<HTMLButtonElement | null>(null);
   const [onboardingRequest, setOnboardingRequest] = useState(0);
   const [coachSettingsRequest, setCoachSettingsRequest] = useState(0);
   const [celebration, setCelebration] = useState('');
@@ -662,33 +669,7 @@ export default function Dashboard({
                     : '管理你的资料、常用配方与账本备份。'}
             </DialogDescription>
           )}
-          {confirmClose && (
-            <div className="dialog-body">
-              <p>还有未保存的内容，要放弃这次填写吗？</p>
-              <div className="form-actions">
-                <button
-                  className="secondary"
-                  onClick={() => setConfirmClose(false)}
-                >
-                  继续填写
-                </button>
-                <button
-                  className="primary"
-                  onClick={() => {
-                    setDirty(false);
-                    setConfirmClose(false);
-                    setModal(null);
-                  }}
-                >
-                  放弃并关闭
-                </button>
-              </div>
-            </div>
-          )}
-          <div
-            className="dialog-form-region"
-            style={confirmClose ? { display: 'none' } : undefined}
-          >
+          <div className="dialog-form-region">
             {modal?.type === 'record' && (
               <RecordForm
                 key={(modal.draft?.id ?? modal.entry?.id ?? 'new') + modal.kind}
@@ -751,6 +732,38 @@ export default function Dashboard({
               </>
             )}
           </div>
+          <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+            <AlertDialogContent
+              className="dialog-popup discard-dialog"
+              initialFocus={continueEditing}
+            >
+              <AlertDialogTitle>放弃未保存的内容？</AlertDialogTitle>
+              <AlertDialogDescription>
+                这次填写还没有保存，关闭后将丢失。
+              </AlertDialogDescription>
+              <div className="discard-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  ref={continueEditing}
+                  onClick={() => setConfirmClose(false)}
+                >
+                  继续填写
+                </button>
+                <button
+                  type="button"
+                  className="danger-button"
+                  onClick={() => {
+                    setDirty(false);
+                    setConfirmClose(false);
+                    setModal(null);
+                  }}
+                >
+                  放弃并关闭
+                </button>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
         </DialogContent>
       </Dialog>
     </main>

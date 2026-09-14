@@ -149,6 +149,8 @@ html[data-developer-picking] [data-developer-ui] button {
   bottom: 110px;
   z-index: 10002;
   width: min(375px, calc(100vw - 32px));
+  height: calc(100dvh - 194px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -306,8 +308,15 @@ html[data-developer-picking] [data-developer-ui] button {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #d18a94 transparent;
   overscroll-behavior: contain;
   padding: 0 17px;
+}
+.developer-note-list:focus-visible {
+  outline: 2px solid #b42335;
+  outline-offset: -2px;
 }
 .developer-note {
   padding: 15px 0;
@@ -525,6 +534,7 @@ html[data-developer-picking] [data-developer-ui] button {
   bottom: 14px;
   right: 14px;
   max-height: calc(100% - 114px);
+  height: calc(100% - 114px);
   width: min(375px, calc(100% - 28px));
   border-radius: 16px;
   z-index: 10002;
@@ -575,6 +585,7 @@ html[data-developer-picking] [data-developer-ui] button {
     top: 65px;
     right: 12px;
     bottom: 100px;
+    height: calc(100dvh - 165px);
     width: calc(100vw - 24px);
     border-radius: 17px;
   }
@@ -601,6 +612,7 @@ html[data-developer-picking] [data-developer-ui] button {
   }
   .developer-tools.in-dialog .developer-panel {
     top: 87px;
+    height: calc(100% - 101px);
     max-height: calc(100% - 101px);
   }
 }

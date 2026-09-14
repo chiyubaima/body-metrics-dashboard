@@ -84,6 +84,7 @@ export function DeveloperMode({
   const selectedElement = useRef<Element | null>(null),
     textarea = useRef<HTMLTextAreaElement | null>(null),
     panelRef = useRef<HTMLDialogElement | null>(null),
+    listRef = useRef<HTMLElement | null>(null),
     draftDirty = panel === 'editor' && message !== original;
   const perform = useCallback((action: Action) => {
     setDiscard(null);
@@ -251,9 +252,12 @@ export function DeveloperMode({
       return () => cancelAnimationFrame(frame);
     }
     if (panel === 'list' && host) {
-      panelRef.current?.focus();
+      listRef.current?.focus();
     }
   }, [panel, id, host]);
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [filter]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 5500);
@@ -554,7 +558,14 @@ export function DeveloperMode({
                   <RotateCcw size={14} />
                 </button>
               </div>
-              <div className="developer-note-list">
+              <section
+                className="developer-note-list"
+                ref={listRef}
+                aria-label={
+                  filter === 'open' ? '待处理批注列表' : '已处理批注列表'
+                }
+                tabIndex={-1}
+              >
                 {!shown.length && (
                   <div className="developer-empty">
                     <MessageSquare size={30} />
@@ -641,7 +652,7 @@ export function DeveloperMode({
                     )}
                   </article>
                 ))}
-              </div>
+              </section>
               <footer className="developer-list-footer">
                 批注完后，在聊天里告诉我“批注完了”，我会读取这些意见集中修改。
               </footer>

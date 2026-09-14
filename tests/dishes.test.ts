@@ -156,6 +156,10 @@ await test('meal editor selects from both libraries without recipe management, a
   };
   await settle();
   assert.equal(requests[0], 'GET /api/dishes');
+  assert.equal(
+    container.querySelector('.food-empty')?.textContent.trim(),
+    '这顿吃了什么？',
+  );
   assert.equal(button('自建菜品').getAttribute('aria-pressed'), 'true');
   assert(container.textContent.includes(dish.recipe.name));
   assert.equal(container.querySelector('.food-library .dish-details'), null);

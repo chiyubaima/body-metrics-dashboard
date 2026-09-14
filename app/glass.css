@@ -1030,7 +1030,32 @@ html .record-dialog .food-option > svg {
 html .record-dialog .meal-editing > .section-heading {
   background: #f7f8fa;
   border-color: var(--surface-line);
-  padding-inline: 4px;
+  padding-inline: 12px;
+  border-radius: 14px;
+}
+html .record-dialog .library-tabs {
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+}
+html .record-dialog .library-sources {
+  margin: 0 0 10px;
+  padding-inline: 10px;
+}
+html .record-dialog .library-sources > summary {
+  list-style-position: inside;
+  padding: 5px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--surface-muted);
+}
+html .record-dialog .meal-editing > .food-empty {
+  margin-top: 14px;
+  padding: 24px 16px;
+  gap: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  box-shadow: var(--surface-shadow);
 }
 html .record-dialog .selected-foods {
   gap: 10px;
@@ -1411,6 +1436,39 @@ html .strength-exercise-detail :is(.subtle, .strength-reference, .chart-note) {
     --surface-line: #929299;
     --surface-muted: #515158;
   }
+}
+
+/* Discard confirmation floats above the still-mounted editor. */
+html .dialog-popup.discard-dialog {
+  --glass-accent: #525252;
+  --glass-ink: #333;
+  --glass-tint: #f5f5f5;
+  width: min(24rem, calc(100vw - 2rem)) !important;
+  max-width: 24rem !important;
+  height: auto !important;
+  max-height: calc(100dvh - 2rem) !important;
+  padding: 24px !important;
+  gap: 12px;
+  color: #262626;
+  border-radius: 20px !important;
+  overflow-y: auto;
+}
+html .discard-dialog [data-slot='alert-dialog-title'] {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+html .discard-dialog [data-slot='alert-dialog-description'] {
+  color: #68686f;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.discard-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 /* System preferences and unsupported blur never leave text on a transparent base. */

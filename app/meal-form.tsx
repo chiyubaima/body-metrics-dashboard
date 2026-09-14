@@ -586,11 +586,6 @@ export function MealForm({
               <div className="food-empty">
                 <Utensils size={26} />
                 <strong>这顿吃了什么？</strong>
-                <p>
-                  从左侧选择食物，或手动记下菜名。
-                  <br />
-                  营养信息可以稍后补全。
-                </p>
               </div>
             )}
             <div className="selected-foods">
