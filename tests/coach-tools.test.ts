@@ -13,6 +13,7 @@ import {
   resolveRecordAction,
   changedDietMeals,
   previewDietMeals,
+  coachToolLimits,
 } from '../lib/coach-tool-types.ts';
 import type {
   CoachToolCall,
@@ -23,6 +24,7 @@ import { today, shiftDate } from '../lib/model.ts';
 import { searchKnowledge } from '../lib/coach-knowledge.ts';
 import { coachChat, updateCoachSettings } from '../lib/coach-service.ts';
 import { coachConnection, generateCoachReply } from '../lib/coach-model.ts';
+import { coachOutputSchema } from '../lib/coach-prompt.ts';
 import {
   getCoachTurn,
   saveCoachMemory,
@@ -1400,6 +1402,305 @@ await test('owned tool loop persists cards, references and retry identity withou
     });
   } finally {
     close();
+  }
+});
+
+await test('tool schema and parser accept multi-food batches up to the shared total limit', () => {
+  assert.equal(
+    coachOutputSchema.properties.toolCalls.maxItems,
+    coachToolLimits.calls,
+  );
+  for (const size of [0, 3, 4, 6]) {
+    const calls = Array.from({ length: size }, (_, i) =>
+      call('search_catalog', { kind: 'food', query: `合成菜品${i}` }),
+    );
+    assert.deepEqual(parseToolCalls(toolOutput(...calls)), calls);
+  }
+  assert.throws(
+    () =>
+      parseToolCalls(
+        toolOutput(
+          ...Array(7).fill(
+            call('search_catalog', { kind: 'food', query: '合成菜品' }),
+          ),
+        ),
+      ),
+    /超过调用上限/,
+  );
+  assert.throws(() => parseToolCalls({ toolCalls: '{}' }), /格式有误/);
+  assert.throws(() =>
+    parseToolCalls({ toolCalls: [{ name: 'shell', arguments: '{}' }] }),
+  );
+});
+
+for (const recover of [false, true]) {
+  await test(`four-food meal completes lookup, review and idempotent confirmation${recover ? ' after an oversized batch is corrected' : ''}`, async () => {
+    const { db, close } = connect();
+    try {
+      await enable(db);
+      await saveEntry(
+        db,
+        'a',
+        entry('diet', {
+          status: 'logged',
+          note: '',
+          foods: [
+            { name: '合成早餐', grams: 60, meal: 'breakfast', basis: 'asSold' },
+          ],
+        }),
+      );
+      const before = await snapshot(db, 'a');
+      const recipes = [
+        '合成甲豆腐煲',
+        '合成乙豆腐煲',
+        '合成丙豆腐煲',
+        '合成丁豆腐煲',
+      ].map((name) => ({ ...recipe(), name }));
+      const input = message(
+        `晚餐吃了${recipes.map((r) => `一份${r.name}`).join('、')}，帮我记录`,
+      );
+      const queries = recipes.map((r) =>
+        call('search_catalog', { kind: 'food', query: r.name }),
+      );
+      let generations = 0;
+      const progress: string[] = [];
+      const response = await coachChat(
+        db,
+        'a',
+        env,
+        input,
+        async (_env, _prompt, raw) => {
+          const supplied = JSON.parse(raw);
+          const step = generations++ - Number(recover);
+          assert.equal(supplied.remainingToolRounds, 4 - generations);
+          if (step === -1)
+            return toolOutput(...queries, ...queries.slice(0, 3));
+          if (step === 0) {
+            assert.equal(supplied.remainingToolCalls, 6);
+            assert.equal(supplied.toolResults.length, 0);
+            assert.equal(
+              progress.length,
+              0,
+              'the rejected batch executes nothing',
+            );
+            if (recover)
+              assert.match(supplied.toolRequestFeedback, /整批未执行/);
+            return toolOutput(...queries);
+          }
+          if (step === 1) {
+            assert.equal(supplied.remainingToolCalls, 2);
+            assert.equal(supplied.toolResults.length, 4);
+            assert.equal(supplied.toolRequestFeedback, null);
+            return toolOutput(
+              call('prepare_record', {
+                kind: 'diet',
+                date,
+                quote: input.message,
+                data: {
+                  foods: recipes.map((estimatedDish) => ({
+                    estimatedDish,
+                    servings: 1,
+                    meal: 'dinner',
+                  })),
+                },
+              }),
+            );
+          }
+          assert.equal(supplied.toolResults.length, 5);
+          assert.equal(supplied.remainingToolCalls, recover ? 0 : 1);
+          return { ...output, reply: '四道菜的配方是估算，请核对后确认。' };
+        },
+        now,
+        { onProgress: (p) => progress.push(p.status) },
+      );
+      assert.equal(generations, recover ? 4 : 3);
+      assert.deepEqual(
+        progress,
+        Array.from({ length: 5 }, () => ['running', 'complete']).flat(),
+      );
+      assert.deepEqual(
+        response.turn!.toolRuns!.map((r) => r.name),
+        [...Array(4).fill('search_catalog'), 'prepare_record'],
+      );
+      const run = response.turn!.toolRuns![4];
+      const action = draftAction(run.actions![0]);
+      assert.deepEqual(action.dietMeals, ['dinner']);
+      assert.deepEqual(
+        (action.entry.data as Diet).foods.slice(1).map((f) => f.name),
+        recipes.map((r) => r.name),
+      );
+      assert.deepEqual(
+        await snapshot(db, 'a'),
+        before,
+        'queries and the complete draft never save a meal or recipe',
+      );
+      const confirmation = { turnId: input.id, runId: run.id, actionIndex: 0 };
+      await confirmCoachRecord(db, 'a', confirmation);
+      const saved = await snapshot(db, 'a');
+      assert.equal(saved.records.length, 1);
+      assert.equal(saved.dishes!.length, 4);
+      const foods = (saved.records[0].data as Diet).foods;
+      assert.equal(foods.length, 5);
+      assert.deepEqual(foods[0], (before.records[0].data as Diet).foods[0]);
+      assert.deepEqual(
+        foods.slice(1).map((f) => f.name),
+        recipes.map((r) => r.name),
+      );
+      assert(foods.slice(1).every((f) => f.dish && !f.dishDraft));
+      await confirmCoachRecord(db, 'a', confirmation);
+      await coachChat(db, 'a', env, input, async () =>
+        assert.fail('completed retry must not regenerate'),
+      );
+      assert.deepEqual(await snapshot(db, 'a'), saved);
+    } finally {
+      close();
+    }
+  });
+}
+
+for (const recover of [false, true]) {
+  await test(`six total tools stay bounded${recover ? ' when a later batch exceeds the remaining budget' : ' in one batch'}`, async () => {
+    const { db, close } = connect();
+    try {
+      await enable(db);
+      const queries = Array.from({ length: 6 }, (_, i) =>
+        call('search_catalog', { kind: 'food', query: `合成菜品${i}` }),
+      );
+      let generations = 0;
+      const progress: string[] = [];
+      const response = await coachChat(
+        db,
+        'a',
+        env,
+        message(),
+        async (_env, _prompt, raw) => {
+          const supplied = JSON.parse(raw);
+          const step = generations++;
+          if (step === 0)
+            return toolOutput(...(recover ? queries.slice(0, 4) : queries));
+          if (recover && step === 1) {
+            assert.equal(supplied.remainingToolCalls, 2);
+            return toolOutput(...queries.slice(3));
+          }
+          if (recover && step === 2) {
+            assert.equal(supplied.remainingToolCalls, 2);
+            assert.equal(supplied.remainingToolRounds, 1);
+            assert.equal(supplied.toolResults.length, 4);
+            assert.equal(
+              progress.length,
+              8,
+              'no part of an oversized batch is executed',
+            );
+            assert.match(supplied.toolRequestFeedback, /整批未执行/);
+            return toolOutput(...queries.slice(4));
+          }
+          assert.equal(supplied.toolResults.length, 6);
+          assert.equal(supplied.toolsAvailable, false);
+          assert.equal(supplied.remainingToolCalls, 0);
+          return output;
+        },
+        now,
+        { onProgress: (p) => progress.push(p.status) },
+      );
+      assert.equal(generations, recover ? 4 : 2);
+      assert.equal(response.turn!.toolRuns!.length, 6);
+      assert.deepEqual(
+        progress,
+        Array.from({ length: 6 }, () => ['running', 'complete']).flat(),
+      );
+      assert.equal((await snapshot(db, 'a')).records.length, 0);
+    } finally {
+      close();
+    }
+  });
+}
+
+await test('persistent oversized requests stop after four generations and preserve the original message for retry', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const input = message();
+    let generations = 0;
+    await assert.rejects(
+      coachChat(
+        db,
+        'a',
+        env,
+        input,
+        async () => {
+          generations++;
+          return toolOutput(
+            ...Array(7).fill(
+              call('search_catalog', { kind: 'food', query: '合成菜品' }),
+            ),
+          );
+        },
+        now,
+        {
+          onProgress: () =>
+            assert.fail('oversized requests must never execute'),
+        },
+      ),
+      /原消息已保留/,
+    );
+    assert.equal(generations, 4);
+    const failed = await getCoachTurn(db, 'a', input.id);
+    assert.equal(failed!.status, 'failed');
+    assert.equal(failed!.userText, input.message);
+    assert.equal((await snapshot(db, 'a')).records.length, 0);
+    const retried = await coachChat(db, 'a', env, input, async () => output);
+    assert.equal(retried.turn!.id, input.id);
+    assert.equal(retried.turn!.status, 'complete');
+  } finally {
+    close();
+  }
+});
+
+await test('opening and final-answer generations cannot execute tools', async () => {
+  for (const opening of [false, true]) {
+    const { db, close } = connect();
+    try {
+      await enable(db);
+      const at = new Date(`${date}T02:00:00.000Z`);
+      let generations = 0;
+      const progress: string[] = [];
+      await assert.rejects(
+        coachChat(
+          db,
+          'a',
+          env,
+          { ...message(), kind: opening ? 'opening' : 'chat' },
+          async (_env, _prompt, raw) => {
+            const supplied = JSON.parse(raw);
+            generations++;
+            if (opening || generations === 4) {
+              assert.equal(supplied.remainingToolRounds, 0);
+              assert.equal(supplied.remainingToolCalls, 0);
+              assert.equal(supplied.toolsAvailable, false);
+            }
+            return toolOutput(
+              call('search_catalog', {
+                kind: 'food',
+                query: `合成菜品${generations}`,
+              }),
+            );
+          },
+          at,
+          { onProgress: (p) => progress.push(p.status) },
+        ),
+        /原消息已保留/,
+      );
+      assert.equal(generations, opening ? 1 : 4);
+      assert.deepEqual(
+        progress,
+        Array.from({ length: opening ? 0 : 3 }, () => [
+          'running',
+          'complete',
+        ]).flat(),
+      );
+    } finally {
+      close();
+    }
   }
 });
 

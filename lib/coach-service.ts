@@ -3,7 +3,7 @@ import {
   parseToolCalls,
   executeCoachTool,
 } from './coach-tools.ts';
-import { coachToolLabels } from './coach-tool-types.ts';
+import { coachToolLabels, coachToolLimits } from './coach-tool-types.ts';
 import type { CoachToolRun, CoachToolProgress } from './coach-tool-types.ts';
 import { snapshot } from '../db/repository.ts';
 import {
@@ -175,8 +175,9 @@ export async function coachChat(
     const toolRuns: CoachToolRun[] = [],
       toolResults: unknown[] = [],
       seen = new Set<string>();
-    let output: unknown;
-    for (let round = 0; round <= 3; round++) {
+    let output: unknown,
+      toolRequestFeedback: string | null = null;
+    for (let round = 0; round <= coachToolLimits.rounds; round++) {
       signal.throwIfAborted();
       const latest = await getCoachSettings(db, owner);
       if (
@@ -218,6 +219,10 @@ export async function coachChat(
             toolRuns[index].summary = '该条目已永久忘掉。';
           }
       }
+      const remainingToolRounds =
+          request.kind === 'chat' ? coachToolLimits.rounds - round : 0,
+        remainingToolCalls =
+          remainingToolRounds > 0 ? coachToolLimits.calls - toolRuns.length : 0;
       output = await generate(
         env,
         coachSystemPrompt +
@@ -228,23 +233,30 @@ export async function coachChat(
         JSON.stringify({
           ...input,
           toolResults,
-          toolsAvailable:
-            request.kind === 'chat' && round < 3 && toolRuns.length < 6,
+          toolsAvailable: remainingToolCalls > 0,
+          remainingToolCalls,
+          remainingToolRounds,
+          toolRequestFeedback,
         }),
         fetch,
         { signal },
       );
       signal.throwIfAborted();
+      const requestedCalls = coachObject(output).toolCalls;
+      if (
+        Array.isArray(requestedCalls) &&
+        requestedCalls.length > remainingToolCalls
+      ) {
+        if (request.kind === 'opening' || round === coachToolLimits.rounds)
+          throw new InputError(
+            'Captain 未能在本次查询范围内整理完回复，原消息已保留，请重试。',
+          );
+        toolRequestFeedback = `上一批请求了${requestedCalls.length}次工具，超过本条消息剩余的${remainingToolCalls}次额度；整批未执行，没有新增工具结果或记录草稿。请按接下来提供的剩余额度调整查询，不重复已完成的查询，不遗漏用户要记录的食物。额度为0时toolCalls必须为空，只根据已核对结果答复或询问缺少的信息，不能声称已生成不存在的草稿。`;
+        continue;
+      }
       const calls = parseToolCalls(output);
       if (!calls.length) break;
-      if (
-        request.kind === 'opening' ||
-        round === 3 ||
-        toolRuns.length + calls.length > 6
-      )
-        throw new InputError(
-          '这次查询步骤较多，请把问题缩小到一个日期区间或一个事项后重试。',
-        );
+      toolRequestFeedback = null;
       if (coachObject(output).reply)
         throw new InputError('工具结果还没核对完整，请重试这条消息。');
       for (const call of calls) {

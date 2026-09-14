@@ -1,5 +1,11 @@
 # Application working rules
 
+## Captain multi-food tool batches (2026-09-14)
+
+- Share the limits of six total tool calls and three tool rounds in `lib/coach-tool-types.ts`, reusing them in instructions, output schema, parsing and orchestration. Remove the hidden three-call batch ceiling; report remaining calls/rounds to each model generation and keep sequential execution/validation.
+- Reject an over-budget batch before executing any of it, then return concise correction feedback to the model within the existing four-generation/120-second envelope. Do not truncate requests or silently drop food. Persistent over-budget requests, opening-time tools and tools in the final answer round remain bounded; retain whitelist, argument checks, ownership, cancellation, deduplication and confirmation-only writes.
+- Extend existing synthetic coach tests for four-food lookup/draft/confirmation and idempotent retry, exact-six boundaries, recovery and persistent violations. Update README and parent architecture limits, run test/typecheck/lint/build and local read-only checks. No personal-message replay, real model/record mutation, automatic commit, push or deployment.
+
 ## Plate and training overview annotations (2026-09-11)
 
 - Apply only the nine initially read notes. Remove the redundant plate meal heading and unlogged label; empty content says 暂无记录. Move recorded meal energy into selector subtitles, distinguishing unknown and partial nutrition. Rename the main diet action 记录饮食 and remove the footer's time/scroll instruction.

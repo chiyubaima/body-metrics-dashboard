@@ -1,6 +1,8 @@
 import { InputError } from './model.ts';
 import type { Entry, Kind, Diet, MealSlot } from './model.ts';
 
+export const coachToolLimits = { calls: 6, rounds: 3 } as const;
+
 export const coachToolNames = [
   'find_records',
   'calculate',

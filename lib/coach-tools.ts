@@ -34,7 +34,11 @@ import {
   knowledgeTopics,
   knowledgePopulationLabels,
 } from './coach-knowledge.ts';
-import { coachToolNames, coachToolLabels } from './coach-tool-types.ts';
+import {
+  coachToolNames,
+  coachToolLabels,
+  coachToolLimits,
+} from './coach-tool-types.ts';
 import type {
   CoachToolCall,
   CoachToolRun,
@@ -42,7 +46,7 @@ import type {
 } from './coach-tool-types.ts';
 
 export const coachToolInstructions = `
-应用工具：toolCalls必须首先输出。需要工具时reply为空，evidenceIds/memories/commitments为空；收到toolResults后才写答复。无需工具时toolCalls=[]。最多3轮、6次工具；最后一轮必须回答。禁止虚构调用结果、成功保存或出处。所有工具只读或准备草稿；身体、饮食、训练草稿在聊天内展示，用户点击卡片“确认记录”直接保存，不需要跳转表单，只有想调整内容时才打开编辑器。工具生成草稿不代表已记录。工具参数arguments是JSON字符串，允许的字段如下：
+应用工具：toolCalls必须首先输出。需要工具时reply为空，evidenceIds/memories/commitments为空；收到toolResults后才写答复。无需工具时toolCalls=[]。每条消息最多${coachToolLimits.rounds}轮工具、累计${coachToolLimits.calls}次调用；同一批可包含多个请求，上限由remainingToolCalls给出，程序逐项执行，没有额外的每批3次限制。remainingToolRounds是剩余工具轮数；最后一轮或toolsAvailable=false时必须回答，toolCalls=[]。收到toolRequestFeedback时，上一批请求整批未执行，按剩余额度重新安排，不重复已完成的查询、不遗漏食物，也不把额度问题要求用户反复重试。一次记录多种食物时可在同一批分别查库，收到结果后统一整理成一份完整记录草稿，并为prepare_record保留一次调用额度。禁止虚构调用结果、成功保存或出处。所有工具只读或准备草稿；身体、饮食、训练草稿在聊天内展示，用户点击卡片“确认记录”直接保存，不需要跳转表单，只有想调整内容时才打开编辑器。工具生成草稿不代表已记录。工具参数arguments是JSON字符串，允许的字段如下：
 find_records: {kind:body|diet|training|all,start:YYYY-MM-DD,end:YYYY-MM-DD,query?:关键词,offset?:整数}，含起止日期，每页最多12条，最多366天。
 calculate: {metric:body_average|diet_totals|training_summary|exercise_progress,start,end,catalogId?:动作ID}；body_average比较截至end和前一周的7日晨重均值，其他计算限制在start/end。涉及数值加总/比较务必调用，不用心算。返回样本和缺失信息，不把相关性当因果。
 search_catalog: {kind:food|exercise|cardio,query:关键词,basis?:raw|cooked|asSold|all}，营养均每100g。食物由程序先查本人自建库，有匹配返回library=custom与dish.id；没有时才查USDA返回library=usda与fdcId。先查具体菜名再记录，不能把只含相似原料的USDA食品当成同一道菜。自建菜品先用dishId，不再估算已有配方。USDA使用fdcId，营养由目录提供。
@@ -57,8 +61,9 @@ search_knowledge: {topics:[${Object.keys(knowledgeTopics).join('|')}],population
 `;
 export function parseToolCalls(value: unknown): CoachToolCall[] {
   const calls = coachObject(value).toolCalls ?? [];
-  if (!Array.isArray(calls) || calls.length > 3)
-    throw new InputError('工具请求格式有误，请重试。');
+  if (!Array.isArray(calls)) throw new InputError('工具请求格式有误，请重试。');
+  if (calls.length > coachToolLimits.calls)
+    throw new InputError('本次工具请求超过调用上限，需要减少查询步骤。');
   return calls.map((call) => {
     const item = coachObject(call);
     return {

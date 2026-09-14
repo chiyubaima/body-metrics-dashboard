@@ -1,4 +1,4 @@
-import { coachToolNames } from './coach-tool-types.ts';
+import { coachToolNames, coachToolLimits } from './coach-tool-types.ts';
 import {
   coachObject,
   coachText,
@@ -28,6 +28,7 @@ export const coachOutputSchema = {
   properties: {
     toolCalls: {
       type: 'array',
+      maxItems: coachToolLimits.calls,
       items: {
         type: 'object',
         additionalProperties: false,
