@@ -327,6 +327,19 @@ await test('control routes reject cross-origin, DNS rebinding and unexpected act
   );
   assert.equal(res.statusCode, 405);
   assert.equal(actions.length, 1);
+  await middleware(
+    { ...base, method: 'GET', url: '/__body-journal/update/shutdown' },
+    res,
+    () => assert.fail(),
+  );
+  assert.equal(res.statusCode, 405);
+  await middleware(
+    { ...base, url: '/__body-journal/update/shutdown' },
+    res,
+    () => assert.fail(),
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(actions, ['apply', 'shutdown']);
   await middleware({ ...base, url: '/__body-journal/update/shell' }, res, () =>
     assert.fail(),
   );

@@ -249,17 +249,40 @@ export function JournalCalendar({
           <span>{name ? `${name}，` : ''}练就有效</span>
         </div>
         <div className="calendar-controls">
-          <button
-            className="text-button"
-            onClick={() => {
-              setView(date);
-              setExpanded(!expanded);
-            }}
-            aria-expanded={expanded}
-          >
-            {date.slice(0, 4)} 年 {Number(date.slice(5, 7))} 月
-            <ChevronDown size={16} />
-          </button>
+          <div className="calendar-month-anchor">
+            <button
+              className="text-button"
+              onClick={() => {
+                setView(date);
+                setExpanded(!expanded);
+              }}
+              aria-expanded={expanded}
+            >
+              {date.slice(0, 4)} 年 {Number(date.slice(5, 7))} 月
+              <ChevronDown size={16} />
+            </button>
+            {expanded && (
+              <div className="calendar-month-sheet">
+                <MonthNav view={view} setView={setView} />
+                <CalendarGrid
+                  view={view}
+                  value={date}
+                  records={records}
+                  onChange={(d) => {
+                    onChange(d);
+                    setView(d);
+                    setExpanded(false);
+                  }}
+                />
+                <button
+                  className="text-button"
+                  onClick={() => setExpanded(false)}
+                >
+                  收起月份
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="secondary small"
             onClick={() => {
@@ -316,24 +339,6 @@ export function JournalCalendar({
         </div>
         <small>本周 · 浅绿圆点为部分饮食记录，空心橙圈为休息</small>
       </div>
-      {expanded && (
-        <div className="calendar-month-sheet">
-          <MonthNav view={view} setView={setView} />
-          <CalendarGrid
-            view={view}
-            value={date}
-            records={records}
-            onChange={(d) => {
-              onChange(d);
-              setView(d);
-              setExpanded(false);
-            }}
-          />
-          <button className="text-button" onClick={() => setExpanded(false)}>
-            收起月份
-          </button>
-        </div>
-      )}
     </section>
   );
 }

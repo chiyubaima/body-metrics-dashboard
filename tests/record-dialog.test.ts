@@ -48,9 +48,10 @@ await test('record close confirmation uses a nested alert, preserves all three d
     'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
   const react = `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))};`;
   const stubs: Record<string, string> = {
+    './app-settings': `${react} export const AppSettings=({onSelect})=>h('button',{onClick:()=>onSelect('models')},'Synthetic settings');`,
     './forms': `${react} export const RecordForm=({kind,formId,onDirty})=>h('form',{id:formId,onInput:onDirty},h('input',{'aria-label':'Synthetic '+kind})); export const PlanForm=()=>null;`,
     './panels': `${react} const panel=kind=>({edit})=>h('button',{onClick:()=>edit(kind)},kind); export const BodyPanel=panel('body'),DietPanel=panel('diet'),TrainingPanel=panel('training'); export const compactDate=d=>d;`,
-    './personal-settings': 'export const PersonalSettings=()=>null;',
+    './personal-settings': `${react} export const PersonalSettings=({onModelDirty,save})=>h('div',null,h('button',{onClick:()=>onModelDirty(true)},'Synthetic model draft'),h('button',{onClick:()=>save('/api/profile',{})},'Save synthetic profile'));`,
     './history': 'export const HistoryView=()=>null;',
     './trash': 'export const TrashView=()=>null;',
     './calendar': 'export const JournalCalendar=()=>null;',
@@ -58,6 +59,7 @@ await test('record close confirmation uses a nested alert, preserves all three d
     './app-update': 'export const AppUpdate=()=>null;',
     './coach': 'export const Coach=()=>null;',
     './onboarding': 'export const Onboarding=()=>null;',
+    './medals': 'export const Medals=()=>null;',
   };
   const modules: Record<string, string> = {};
   const compile = (file: string): string =>
@@ -86,10 +88,21 @@ await test('record close confirmation uses a nested alert, preserves all three d
   const { default: Dashboard } = await import(compile('app/dashboard.tsx'));
   const { createRoot } = await import('react-dom/client');
   const originalFetch = globalThis.fetch;
+  let profileSaves = 0;
   globalThis.fetch = (async (url, init) => {
+    if (url === '/api/profile') {
+      assert.equal(init?.method, 'POST');
+      profileSaves++;
+      return Response.json({});
+    }
     assert.equal(url, '/api/data');
     assert.equal(init?.method, 'GET');
-    return Response.json({ records: [], plans: [], dishes: [], profile: null });
+    return Response.json({
+      records: [],
+      plans: [],
+      dishes: [],
+      profile: null,
+    });
   }) as typeof fetch;
   const container = win.document.createElement('div');
   win.document.body.append(container);
@@ -113,7 +126,10 @@ await test('record close confirmation uses a nested alert, preserves all three d
     });
   await act(async () =>
     root.render(
-      createElement(Dashboard, { signInPath: '/signin', localPreview: true }),
+      createElement(Dashboard, {
+        signInPath: '/signin',
+        localPreview: true,
+      }),
     ),
   );
   for (const kind of ['body', 'diet', 'training']) {
@@ -175,4 +191,22 @@ await test('record close confirmation uses a nested alert, preserves all three d
       'clean form closes without confirmation',
     );
   }
+  await t.test(
+    'saving a profile preserves a separate unsaved model draft and its close guard',
+    async () => {
+      await click(button('Synthetic settings'));
+      await click(button('Synthetic model draft'));
+      await click(button('Save synthetic profile'));
+      assert.equal(profileSaves, 1);
+      assert(win.document.querySelector('[role="dialog"]'));
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '[role="dialog"] [aria-label="关闭"]',
+        )!,
+      );
+      assert(win.document.querySelector('[role="alertdialog"]'));
+      await click(button('继续填写'));
+      assert(button('Synthetic model draft'));
+    },
+  );
 });

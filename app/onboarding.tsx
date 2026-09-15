@@ -26,12 +26,14 @@ export function Onboarding({
   blocked,
   openRequest,
   configure,
+  onFactsChanged,
 }: {
   ready: boolean;
   snapshot: Snapshot;
   blocked: boolean;
   openRequest: number;
   configure: (target: OnboardingTarget) => void;
+  onFactsChanged?: () => Promise<unknown>;
 }) {
   const [visible, setVisible] = useState(false);
   const checked = useRef(false),
@@ -171,8 +173,22 @@ export function Onboarding({
           </li>
         </ol>
         <div className="onboarding-footer">
-          <span>以后可以在“个人资料与备份”里重新打开引导。</span>
-          <button className="primary" onClick={dismiss}>
+          <span>以后可以在“个人设置”里重新打开引导。</span>
+          <button
+            className="primary"
+            onClick={() => {
+              dismiss();
+              void fetch('/api/medals/facts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ metric: 'guide_completed' }),
+              })
+                .then((response) => {
+                  if (response.ok) return onFactsChanged?.();
+                })
+                .catch(() => {});
+            }}
+          >
             开始记录
             <ArrowRight size={17} />
           </button>

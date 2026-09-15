@@ -1,3 +1,4 @@
+import { medalCardModule } from './medal-card-module.ts';
 import { dishDetailsModule } from './dish-details-module.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -159,7 +160,11 @@ function connect() {
     execute() {
       const s = sqlite.prepare(this.sql);
       return s.columns().length
-        ? { results: s.all(...this.args), meta: { changes: 0 }, success: true }
+        ? {
+            results: s.all(...this.args),
+            meta: { changes: 0 },
+            success: true,
+          }
         : {
             results: [],
             meta: { changes: Number(s.run(...this.args).changes) },
@@ -337,7 +342,12 @@ await test('in-chat confirmation rejects changed source/target and rolls back re
       status: 'logged',
       note: '',
       foods: [
-        { name: '合成早餐', grams: 65, basis: 'asSold', meal: 'breakfast' },
+        {
+          name: '合成早餐',
+          grams: 65,
+          basis: 'asSold',
+          meal: 'breakfast',
+        },
       ],
     });
     await saveEntry(db, 'a', source);
@@ -466,7 +476,10 @@ await test('in-chat confirmation rejects changed source/target and rolls back re
       /卡片有误/,
     );
     await assert.rejects(
-      confirmCoachRecord(db, 'a', { ...confirm, runId: crypto.randomUUID() }),
+      confirmCoachRecord(db, 'a', {
+        ...confirm,
+        runId: crypto.randomUUID(),
+      }),
       /不可用/,
     );
   } finally {
@@ -605,7 +618,11 @@ await test('record tools paginate inclusive ranges and keep sparse/unknown/compl
     }),
   );
   const stats = await executeCoachTool(
-    call('calculate', { metric: 'training_summary', start: date, end: date }),
+    call('calculate', {
+      metric: 'training_summary',
+      start: date,
+      end: date,
+    }),
     context(data),
   );
   assert.equal((stats.result as { workingSets: number }).workingSets, 1);
@@ -630,7 +647,12 @@ await test('copied meals use owned versioned records, preserve other meals, and 
       note: '',
       complete: true,
       foods: [
-        { name: '合成早饭', grams: 75, basis: 'asSold', meal: 'breakfast' },
+        {
+          name: '合成早饭',
+          grams: 75,
+          basis: 'asSold',
+          meal: 'breakfast',
+        },
         {
           name: '合成午饭',
           grams: 135,
@@ -650,7 +672,12 @@ await test('copied meals use owned versioned records, preserve other meals, and 
     note: '保留备注',
     complete: true,
     foods: [
-      { name: '目标日早餐', grams: 65, basis: 'asSold', meal: 'breakfast' },
+      {
+        name: '目标日早餐',
+        grams: 65,
+        basis: 'asSold',
+        meal: 'breakfast',
+      },
     ],
   });
   const original = structuredClone([source, target]);
@@ -658,7 +685,11 @@ await test('copied meals use owned versioned records, preserve other meals, and 
     kind: 'diet',
     date,
     quote: '完全一样',
-    copyFrom: { id: source.id, updatedAt: source.updatedAt, meal: 'lunch' },
+    copyFrom: {
+      id: source.id,
+      updatedAt: source.updatedAt,
+      meal: 'lunch',
+    },
   };
   const action = draftAction(prepareRecord(args, [source, target], '完全一样'));
   assert.deepEqual(action.dietMeals, ['lunch']);
@@ -735,7 +766,12 @@ await test('copied meals use owned versioned records, preserve other meals, and 
     () =>
       prepareRecord(
         args,
-        [{ ...source, data: { ...source.data, status: 'planned' } as Diet }],
+        [
+          {
+            ...source,
+            data: { ...source.data, status: 'planned' } as Diet,
+          },
+        ],
         '完全一样',
       ),
     /计划/,
@@ -775,7 +811,10 @@ await test('record clarifications use exact eligible user quotes and never assis
   assert.throws(
     () =>
       prepareRecord(
-        { ...args, sourceQuotes: [{ turnId: id, quote: 'Captain猜测78公斤' }] },
+        {
+          ...args,
+          sourceQuotes: [{ turnId: id, quote: 'Captain猜测78公斤' }],
+        },
         [],
         '晨起空腹',
         now,
@@ -856,7 +895,12 @@ await test('same-meal request followed by a short confirmation yields a reviewab
       status: 'logged',
       note: '',
       foods: [
-        { name: '合成早餐', grams: 65, basis: 'asSold', meal: 'breakfast' },
+        {
+          name: '合成早餐',
+          grams: 65,
+          basis: 'asSold',
+          meal: 'breakfast',
+        },
       ],
     });
     await saveEntry(db, 'a', source);
@@ -1172,7 +1216,11 @@ await test('opening a draft preserves stable IDs, rejects stale edits and never 
 await test('time tools respect Beijing week/year boundaries; archive lookup requires explicit intent', async () => {
   const ctx = { ...context(), now: new Date('2026-12-31T17:00:00Z') };
   const resolved = await executeCoachTool(
-    call('resolve_time', { reference: 'next_week', weekday: 1, time: '20:00' }),
+    call('resolve_time', {
+      reference: 'next_week',
+      weekday: 1,
+      time: '20:00',
+    }),
     ctx,
   );
   assert.deepEqual(resolved.result, {
@@ -1445,7 +1493,12 @@ for (const recover of [false, true]) {
           status: 'logged',
           note: '',
           foods: [
-            { name: '合成早餐', grams: 60, meal: 'breakfast', basis: 'asSold' },
+            {
+              name: '合成早餐',
+              grams: 60,
+              meal: 'breakfast',
+              basis: 'asSold',
+            },
           ],
         }),
       );
@@ -1508,7 +1561,10 @@ for (const recover of [false, true]) {
           }
           assert.equal(supplied.toolResults.length, 5);
           assert.equal(supplied.remainingToolCalls, recover ? 0 : 1);
-          return { ...output, reply: '四道菜的配方是估算，请核对后确认。' };
+          return {
+            ...output,
+            reply: '四道菜的配方是估算，请核对后确认。',
+          };
         },
         now,
         { onProgress: (p) => progress.push(p.status) },
@@ -1534,8 +1590,26 @@ for (const recover of [false, true]) {
         before,
         'queries and the complete draft never save a meal or recipe',
       );
-      const confirmation = { turnId: input.id, runId: run.id, actionIndex: 0 };
+      const confirmation = {
+        turnId: input.id,
+        runId: run.id,
+        actionIndex: 0,
+      };
+      const mealEvents = () =>
+        db
+          .prepare(
+            "SELECT source_id,occurred_at FROM medal_facts WHERE owner=? AND metric='coach_recorded_meals'",
+          )
+          .bind('a')
+          .all();
+      assert.equal((await mealEvents()).results.length, 0);
       await confirmCoachRecord(db, 'a', confirmation);
+      const receiptEvents = (await mealEvents()).results;
+      assert.equal(
+        receiptEvents.length,
+        1,
+        'four foods in one confirmed meal count once',
+      );
       const saved = await snapshot(db, 'a');
       assert.equal(saved.records.length, 1);
       assert.equal(saved.dishes!.length, 4);
@@ -1552,6 +1626,11 @@ for (const recover of [false, true]) {
         assert.fail('completed retry must not regenerate'),
       );
       assert.deepEqual(await snapshot(db, 'a'), saved);
+      assert.deepEqual(
+        (await mealEvents()).results,
+        receiptEvents,
+        'confirmation retries preserve the original event and time',
+      );
     } finally {
       close();
     }
@@ -1934,7 +2013,10 @@ await test('confirmed drafts use atomic version guards, including morning select
       1,
     );
     await assert.rejects(
-      saveEntry(db, 'b', { ...current, expectedUpdatedAt: current.updatedAt }),
+      saveEntry(db, 'b', {
+        ...current,
+        expectedUpdatedAt: current.updatedAt,
+      }),
       /不可编辑/,
     );
     const id = crypto.randomUUID();
@@ -2055,7 +2137,7 @@ await test('tool cards preview records, confirm in place, retain failures, and e
     .outputText.replace(
       /from (["'])([^"']+)\1/g,
       (_match, _quote, specifier: string) =>
-        `from ${JSON.stringify(specifier === './dish-details' ? dishDetailsModule : import.meta.resolve(specifier))}`,
+        `from ${JSON.stringify(specifier === './medal-card' ? medalCardModule : specifier === './dish-details' ? dishDetailsModule : import.meta.resolve(specifier))}`,
     );
   const { CoachToolCards } = (await import(
     'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
@@ -2492,7 +2574,10 @@ await test('custom dishes take precedence, canonical USDA stays authoritative, a
   assert.throws(
     () =>
       prepareRecord(
-        { ...args, data: { foods: [{ ...args.data.foods[0], grams: 450 }] } },
+        {
+          ...args,
+          data: { foods: [{ ...args.data.foods[0], grams: 450 }] },
+        },
         [],
         args.quote,
         now,
@@ -2504,7 +2589,9 @@ await test('custom dishes take precedence, canonical USDA stays authoritative, a
       prepareRecord(
         {
           ...args,
-          data: { foods: [{ dishId: crypto.randomUUID(), meal: 'lunch' }] },
+          data: {
+            foods: [{ dishId: crypto.randomUUID(), meal: 'lunch' }],
+          },
         },
         [],
         args.quote,
@@ -2589,7 +2676,9 @@ await test('custom dishes take precedence, canonical USDA stays authoritative, a
         kind: 'diet',
         date,
         quote: halfQuote,
-        data: { foods: [{ dishId: dish.id, servings: 0.5, meal: 'lunch' }] },
+        data: {
+          foods: [{ dishId: dish.id, servings: 0.5, meal: 'lunch' }],
+        },
       },
       [],
       halfQuote,
@@ -2657,7 +2746,11 @@ await test('model analysis becomes a dish and a meal only on confirmation, with 
       0,
       'analysis alone never creates a library entry',
     );
-    const request = { turnId: reply.turn!.id, runId: run.id, actionIndex: 0 };
+    const request = {
+      turnId: reply.turn!.id,
+      runId: run.id,
+      actionIndex: 0,
+    };
     await assert.rejects(confirmCoachRecord(db, 'b', request));
     await confirmCoachRecord(db, 'a', request);
     const state = await snapshot(db, 'a');
@@ -2802,7 +2895,12 @@ await test('one confirmation deduplicates a shared recipe, saves multiple new di
       status: 'logged',
       note: '',
       foods: [
-        { name: '合成早餐', grams: 60, meal: 'breakfast', basis: 'asSold' },
+        {
+          name: '合成早餐',
+          grams: 60,
+          meal: 'breakfast',
+          basis: 'asSold',
+        },
       ],
     });
     await saveEntry(db, 'a', breakfast);
@@ -2840,6 +2938,98 @@ await test('one confirmation deduplicates a shared recipe, saves multiple new di
       (breakfast.data as Diet).foods[0],
     );
     assert((saved.records[0].data as Diet).foods.every((f) => !f.dishDraft));
+  } finally {
+    close();
+  }
+});
+
+await test('Captain creates and activates a product medal through the normal tool loop without a nested model or duplicate draft', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const { newMedalDefinition } = await import('../lib/medals.ts');
+    const { listMedals, getMedal } = await import('../db/medals.ts');
+    const { getMedalFacts } = await import('../db/medal-facts.ts');
+    const input = message('做一枚伴你同行勋章，启用 AI 教练后获得');
+    const definition = {
+      ...newMedalDefinition(),
+      name: '伴你同行',
+      goal: '启用过 AI 教练',
+      metric: 'coach_enabled',
+      thresholds: [1],
+      includeHistory: true,
+    };
+    let calls = 0;
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      input,
+      async (_env, instructions, prompt) => {
+        calls++;
+        assert.match(instructions, /prepare_medal/);
+        const context = JSON.parse(prompt);
+        if (!context.toolResults.length)
+          return toolOutput({
+            name: 'prepare_medal',
+            arguments: JSON.stringify({
+              quote: input.message,
+              definition,
+            }),
+          });
+        assert.equal(context.toolResults[0].result.status, 'draft');
+        return {
+          ...output,
+          reply: '草稿已准备，核对卡片后可以开始追踪。',
+        };
+      },
+    );
+    assert.equal(calls, 2);
+    const created = (await listMedals(db, 'a'))[0];
+    assert.equal(created.status, 'draft');
+    await coachChat(db, 'a', env, input, async () => {
+      assert.fail('retry must use persisted turn');
+    });
+    assert.equal((await listMedals(db, 'a')).length, 1);
+    const acceptance = message('就按这版开始');
+    await coachChat(
+      db,
+      'a',
+      env,
+      acceptance,
+      async (_env, _instructions, prompt) => {
+        const context = JSON.parse(prompt);
+        if (!context.toolResults.length) {
+          assert(
+            context.context.conversation.some(
+              (t: { medals?: { id: string }[] }) =>
+                t.medals?.some((m) => m.id === created.id),
+            ),
+          );
+          return toolOutput({
+            name: 'activate_medal',
+            arguments: JSON.stringify({
+              id: created.id,
+              revision: created.revision,
+              previewTurnId: response.turn!.id,
+              quote: acceptance.message,
+            }),
+          });
+        }
+        assert.equal(context.toolResults[0].result.status, 'active');
+        return { ...output, reply: '已开始追踪。' };
+      },
+    );
+    assert.equal((await getMedal(db, 'a', created.id)).status, 'active');
+    const facts = await getMedalFacts(db, 'a', await snapshot(db, 'a'));
+    assert.equal(
+      facts.rows.filter((r) => r.metric === 'coach_chats').length,
+      2,
+    );
+    assert.equal(
+      facts.rows.filter((r) => r.metric === 'coach_enabled').length,
+      1,
+    );
   } finally {
     close();
   }

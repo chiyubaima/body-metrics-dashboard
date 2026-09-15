@@ -244,6 +244,15 @@ export function buildCoachContext(
           date: t.date,
           user: t.userText,
           coach: t.reply,
+          medals: t.toolRuns
+            ?.flatMap((run) => run.actions || [])
+            .filter((a) => a.type === 'medal')
+            .map((a) => ({
+              id: a.id,
+              revision: a.revision,
+              name: a.label,
+              previewTurnId: t.id,
+            })),
         },
       ];
     })

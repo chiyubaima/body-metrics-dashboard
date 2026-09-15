@@ -1,3 +1,4 @@
+import { factStatement } from './medal-facts.ts';
 import type { CoachToolRun } from '../lib/coach-tool-types.ts';
 import { InputError, validId, today } from '../lib/model.ts';
 import {
@@ -173,12 +174,27 @@ export async function saveCoachSettings(
   owner: string,
   settings: CoachSettings,
 ) {
-  await db
+  const now = new Date().toISOString();
+  const save = db
     .prepare(
       'INSERT INTO coach_settings (owner,payload,updated_at) VALUES (?,?,?) ON CONFLICT(owner) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at',
     )
-    .bind(owner, JSON.stringify(settings), new Date().toISOString())
-    .run();
+    .bind(owner, JSON.stringify(settings), now);
+  await db.batch([
+    save,
+    ...(settings.enabled
+      ? [
+          factStatement(
+            db,
+            owner,
+            'coach_enabled',
+            'first-activation',
+            now,
+            true,
+          ),
+        ]
+      : []),
+  ]);
   return settings;
 }
 export async function listCoachMemories(db: D1Database, owner: string) {
@@ -204,8 +220,10 @@ export async function expireCoachItems(
       )
       .bind(time, owner, time),
     db
-      .prepare(`UPDATE coach_commitments SET status='expired',updated_at=? WHERE owner=? AND status='pending'
-      AND COALESCE(expires_at,strftime('%Y-%m-%dT%H:%M:%fZ',due_at,'+8 hours','start of day','+1 day','-8 hours'))<=?`)
+      .prepare(
+        `UPDATE coach_commitments SET status='expired',updated_at=? WHERE owner=? AND status='pending'
+      AND COALESCE(expires_at,strftime('%Y-%m-%dT%H:%M:%fZ',due_at,'+8 hours','start of day','+1 day','-8 hours'))<=?`,
+      )
       .bind(time, owner, time),
   ]);
 }
@@ -226,14 +244,16 @@ export async function saveCoachMemory(
         : null;
   await expireCoachItems(db, owner, clock);
   const changed = await db
-    .prepare(`INSERT INTO coach_memories (id,owner,content,category,source,created_at,updated_at,expires_at,status)
+    .prepare(
+      `INSERT INTO coach_memories (id,owner,content,category,source,created_at,updated_at,expires_at,status)
     SELECT ?,?,?,?,?,?,?,?,'active' WHERE ((SELECT COUNT(*) FROM coach_memories WHERE owner=? AND status='active')<50 OR EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=? AND status='active'))
     AND (?=0 OR EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=? AND status IN ('expired','forgotten')))
     AND (?=0 OR EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=? AND status='active'))
     AND (? IS NULL OR EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=? AND updated_at=?))
     AND NOT EXISTS(SELECT 1 FROM coach_turns,json_each(proposals) WHERE coach_turns.owner=? AND json_extract(value,'$.id')=? AND json_extract(value,'$.status')='deleted')
     ON CONFLICT(id) DO UPDATE SET content=excluded.content,category=excluded.category,expires_at=excluded.expires_at,status='active',updated_at=excluded.updated_at
-    WHERE coach_memories.owner=excluded.owner AND (coach_memories.status='active' OR ?=1)`)
+    WHERE coach_memories.owner=excluded.owner AND (coach_memories.status='active' OR ?=1)`,
+    )
     .bind(
       v.id,
       owner,
@@ -306,14 +326,16 @@ export async function saveCommitment(
         : null;
   await expireCoachItems(db, owner, now);
   const changed = await db
-    .prepare(`INSERT INTO coach_commitments (id,owner,title,kind,due_at,status,completion,evidence_id,notified_at,created_at,updated_at,expires_at)
+    .prepare(
+      `INSERT INTO coach_commitments (id,owner,title,kind,due_at,status,completion,evidence_id,notified_at,created_at,updated_at,expires_at)
     SELECT ?,?,?,?,?,'pending',NULL,NULL,NULL,?,?,? WHERE ((SELECT COUNT(*) FROM coach_commitments WHERE owner=? AND status='pending')<50 OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=? AND status='pending'))
     AND (?=0 OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=? AND status IN ('expired','cancelled')))
     AND (?=0 OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=? AND status='pending'))
     AND (? IS NULL OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=? AND updated_at=?))
     AND NOT EXISTS(SELECT 1 FROM coach_turns,json_each(proposals) WHERE coach_turns.owner=? AND json_extract(value,'$.id')=? AND json_extract(value,'$.status')='deleted')
     ON CONFLICT(id) DO UPDATE SET title=excluded.title,kind=excluded.kind,due_at=excluded.due_at,expires_at=excluded.expires_at,status='pending',completion=NULL,evidence_id=NULL,notified_at=NULL,updated_at=excluded.updated_at
-    WHERE coach_commitments.owner=excluded.owner AND (coach_commitments.status='pending' OR (?=1 AND coach_commitments.status IN ('expired','cancelled')))`)
+    WHERE coach_commitments.owner=excluded.owner AND (coach_commitments.status='pending' OR (?=1 AND coach_commitments.status IN ('expired','cancelled')))`,
+    )
     .bind(
       v.id,
       owner,
@@ -570,7 +592,8 @@ export async function finishCoachTurn(
     toolRuns?: CoachToolRun[];
   } | null,
 ) {
-  const result = await db
+  const completedAt = new Date().toISOString();
+  const statement = db
     .prepare(
       `UPDATE coach_turns SET reply=?,proposals=?,evidence=?,tool_runs=(SELECT json_group_array(json(CASE WHEN EXISTS(
         SELECT 1 FROM json_each(json_extract(run.value,'$.references')) AS ref WHERE
@@ -586,12 +609,17 @@ export async function finishCoachTurn(
       owner,
       JSON.stringify(output?.toolRuns ?? []),
       output ? 'complete' : 'failed',
-      new Date().toISOString(),
+      completedAt,
       owner,
       claimed.id,
       claimed.updatedAt,
-    )
-    .run();
+    );
+  const [result] = await db.batch([
+    statement,
+    ...(output && claimed.kind === 'chat'
+      ? [factStatement(db, owner, 'coach_chats', claimed.id, completedAt, true)]
+      : []),
+  ]);
   if (!result.meta.changes)
     throw new InputError('这条回复已过期，请刷新后重试。');
   return (await getCoachTurn(db, owner, claimed.id))!;
@@ -604,14 +632,16 @@ function proposalDecision(
 ) {
   // Update only this proposal, preserving concurrent decisions on other cards.
   return db
-    .prepare(`UPDATE coach_turns SET proposals=(SELECT json_group_array(json(
+    .prepare(
+      `UPDATE coach_turns SET proposals=(SELECT json_group_array(json(
     CASE WHEN json_extract(value,'$.id')=? THEN
       CASE WHEN ?='deleted' THEN json_object('id',json_extract(value,'$.id'),'type',json_extract(value,'$.type'),'category',json_extract(value,'$.category'),'text','','quote','','dueAt',NULL,'expiresAt',NULL,'status','deleted')
       ELSE json_set(value,'$.status',?) END ELSE value END)) FROM json_each(proposals))
     WHERE owner=? AND EXISTS(SELECT 1 FROM json_each(proposals) WHERE json_extract(value,'$.id')=? AND (?='deleted' OR COALESCE(json_extract(value,'$.status'),'pending')='pending'))
     AND ((?='deleted' AND (EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=? AND status IN ('expired','forgotten')) OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=? AND status IN ('expired','cancelled'))))
       OR (?='accepted' AND (EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=?) OR EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=?)))
-      OR (?='dismissed' AND NOT EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=?) AND NOT EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=?)))`)
+      OR (?='dismissed' AND NOT EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=?) AND NOT EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=?)))`,
+    )
     .bind(
       id,
       status,
@@ -673,8 +703,10 @@ export async function permanentlyForgetCoachItem(
     proposalDecision(db, owner, id, 'deleted'),
     statement.bind(owner, id),
     db
-      .prepare(`UPDATE coach_turns SET tool_runs=(SELECT json_group_array(json(CASE WHEN EXISTS(SELECT 1 FROM json_each(json_extract(run.value,'$.references')) AS ref WHERE json_extract(ref.value,'$.id')=?) THEN json_remove(json_set(run.value,'$.summary','该条目已永久忘掉。'),'$.actions') ELSE run.value END)) FROM json_each(tool_runs) AS run)
-      WHERE owner=? AND NOT EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=?) AND NOT EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=?)`)
+      .prepare(
+        `UPDATE coach_turns SET tool_runs=(SELECT json_group_array(json(CASE WHEN EXISTS(SELECT 1 FROM json_each(json_extract(run.value,'$.references')) AS ref WHERE json_extract(ref.value,'$.id')=?) THEN json_remove(json_set(run.value,'$.summary','该条目已永久忘掉。'),'$.actions') ELSE run.value END)) FROM json_each(tool_runs) AS run)
+      WHERE owner=? AND NOT EXISTS(SELECT 1 FROM coach_memories WHERE owner=? AND id=?) AND NOT EXISTS(SELECT 1 FROM coach_commitments WHERE owner=? AND id=?)`,
+      )
       .bind(id, owner, owner, id, owner, id),
   ]);
   if (!result[1].meta.changes)
@@ -723,8 +755,10 @@ export async function acceptCoachProposal(
       now,
     );
     save = db
-      .prepare(`INSERT INTO coach_memories (id,owner,content,category,source,created_at,updated_at,expires_at,status)
-      SELECT ?,?,?,?,?,?,?,?,'active' WHERE (SELECT COUNT(*) FROM coach_memories WHERE owner=? AND status='active')<50 AND ${pending} ON CONFLICT(id) DO NOTHING`)
+      .prepare(
+        `INSERT INTO coach_memories (id,owner,content,category,source,created_at,updated_at,expires_at,status)
+      SELECT ?,?,?,?,?,?,?,?,'active' WHERE (SELECT COUNT(*) FROM coach_memories WHERE owner=? AND status='active')<50 AND ${pending} ON CONFLICT(id) DO NOTHING`,
+      )
       .bind(
         v.id,
         owner,
@@ -751,8 +785,10 @@ export async function acceptCoachProposal(
       now,
     );
     save = db
-      .prepare(`INSERT INTO coach_commitments (id,owner,title,kind,due_at,status,created_at,updated_at,expires_at)
-      SELECT ?,?,?,?,?,'pending',?,?,? WHERE (SELECT COUNT(*) FROM coach_commitments WHERE owner=? AND status='pending')<50 AND ${pending} ON CONFLICT(id) DO NOTHING`)
+      .prepare(
+        `INSERT INTO coach_commitments (id,owner,title,kind,due_at,status,created_at,updated_at,expires_at)
+      SELECT ?,?,?,?,?,'pending',?,?,? WHERE (SELECT COUNT(*) FROM coach_commitments WHERE owner=? AND status='pending')<50 AND ${pending} ON CONFLICT(id) DO NOTHING`,
+      )
       .bind(
         v.id,
         owner,

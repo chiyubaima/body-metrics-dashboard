@@ -116,6 +116,8 @@ export type Plan = {
   createdAt: string;
 };
 export type Snapshot = {
+  medals?: import('./medals.ts').MedalView[];
+  medalFacts?: import('./medal-facts.ts').MedalFacts;
   records: Entry[];
   plans: Plan[];
   profile: Profile | null;

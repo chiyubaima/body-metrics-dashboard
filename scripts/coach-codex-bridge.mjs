@@ -9,9 +9,11 @@ import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { streamFrame } from '../lib/coach-stream.ts';
 import { coachOutputSchema } from '../lib/coach-prompt.ts';
+import { medalOutputSchema } from '../lib/medal-schema.ts';
 import { InputError } from '../lib/model.ts';
 import { createCoachConfiguration } from './coach-configuration.mjs';
 import { createCodexAccount } from './coach-codex-account.mjs';
+import { runCodexImage } from './medal-codex-image.mjs';
 
 const disabledFeatures = [
   'shell_tool',
@@ -33,12 +35,12 @@ const disabledFeatures = [
 const bundledCli = fileURLToPath(
   new URL('../node_modules/@openai/codex/bin/codex.js', import.meta.url),
 );
-function cliCommand(args) {
+export function cliCommand(args) {
   return existsSync(bundledCli)
     ? { binary: process.execPath, args: [bundledCli, ...args] }
     : { binary: 'codex', args };
 }
-export function codexArguments(directory) {
+export function codexArguments(directory, image = false) {
   return [
     'app-server',
     '--stdio',
@@ -74,11 +76,34 @@ export function codexArguments(directory) {
     `sqlite_home=${JSON.stringify(directory)}`,
     '-c',
     `model_instructions_file=${JSON.stringify(join(directory, 'instructions.txt'))}`,
-    ...disabledFeatures.flatMap((name) => ['--disable', name]),
+    ...disabledFeatures
+      .filter(
+        (name) =>
+          !image || !['image_generation', 'code_mode_host'].includes(name),
+      )
+      .flatMap((name) => ['--disable', name]),
+    ...(image
+      ? [
+          '--enable',
+          'image_generation',
+          '--enable',
+          'code_mode_host',
+          '--disable',
+          'sleep_tool',
+          '--disable',
+          'goals',
+        ]
+      : []),
   ];
 }
 
-export async function runCodexCoach(instructions, input, signal, onDelta) {
+export async function runCodexCoach(
+  instructions,
+  input,
+  signal,
+  onDelta,
+  purpose,
+) {
   signal?.throwIfAborted();
   const directory = await mkdtemp(join(tmpdir(), 'body-coach-'));
   try {
@@ -178,7 +203,10 @@ export async function runCodexCoach(instructions, input, signal, onDelta) {
             return finish(new Error('Coach cannot use tools or approvals'));
           if (event.id === 1) {
             send('initialized', null, {});
-            send('config/read', 2, { includeLayers: false, cwd: directory });
+            send('config/read', 2, {
+              includeLayers: false,
+              cwd: directory,
+            });
             send('skills/list', 3, { cwds: [directory] });
           } else if (event.id === 2) {
             config = event.result.config;
@@ -202,7 +230,8 @@ export async function runCodexCoach(instructions, input, signal, onDelta) {
               input: [{ type: 'text', text: input }],
               model: 'gpt-6-astra',
               effort: 'low',
-              outputSchema: coachOutputSchema,
+              outputSchema:
+                purpose === 'medal' ? medalOutputSchema : coachOutputSchema,
               approvalPolicy: 'never',
               sandboxPolicy: { type: 'readOnly' },
               environments: [],
@@ -282,6 +311,7 @@ export async function startCodexBridge(options = {}) {
     createCodexAccount((directory) => cliCommand(codexArguments(directory)));
   const token = randomBytes(32).toString('hex');
   const controllers = new Set();
+  const imageControllers = new Set();
   const server = createServer(async (req, res) => {
     const supplied = req.headers.authorization ?? '';
     const expected = `Bearer ${token}`;
@@ -295,23 +325,32 @@ export async function startCodexBridge(options = {}) {
       res.end('{"error":"Forbidden"}');
       return;
     }
-    if (req.url !== '/coach') {
+    if (req.url !== '/coach' && req.url !== '/image') {
       try {
         let result;
         if (req.method === 'GET' && req.url === '/environment') {
           result = await configuration.environment();
-          if (result.COACH_PROVIDER === 'codex')
+          if (
+            result.COACH_PROVIDER === 'codex' ||
+            result.MEDAL_IMAGE_PROVIDER === 'codex'
+          )
             result.COACH_CODEX_AUTHENTICATED =
               (await account.status()).status === 'logged-in'
                 ? 'true'
                 : 'false';
+        } else if (req.method === 'GET' && req.url === '/image-settings') {
+          result = {
+            ...configuration.publicImageSettings(await configuration.read()),
+            codex: await account.status(),
+          };
         } else if (req.method === 'GET' && req.url === '/settings') {
           result = {
             ...configuration.publicSettings(await configuration.read()),
             codex: await account.status(),
           };
         } else if (
-          (req.method === 'PUT' && req.url === '/settings') ||
+          (req.method === 'PUT' &&
+            ['/settings', '/image-settings'].includes(req.url)) ||
           (req.method === 'POST' && req.url === '/login')
         ) {
           let text = '';
@@ -327,6 +366,8 @@ export async function startCodexBridge(options = {}) {
             throw new InputError('配置格式有误，请重新填写。');
           }
           if (req.url === '/settings') result = await configuration.save(body);
+          else if (req.url === '/image-settings')
+            result = await configuration.saveImage(body);
           else if (body?.action === 'start') result = await account.start();
           else if (body?.action === 'cancel') result = await account.cancel();
           else throw new InputError('请选择登录或取消登录。');
@@ -354,13 +395,15 @@ export async function startCodexBridge(options = {}) {
       res.end('{"error":"Method not allowed"}');
       return;
     }
-    if (controllers.size) {
+    const activeControllers =
+      req.url === '/image' ? imageControllers : controllers;
+    if (activeControllers.size) {
       res.writeHead(429);
       res.end('{"error":"Busy"}');
       return;
     }
     const controller = new AbortController();
-    controllers.add(controller);
+    activeControllers.add(controller);
     res.on('close', () => {
       if (!res.writableEnded) controller.abort();
     });
@@ -371,6 +414,17 @@ export async function startCodexBridge(options = {}) {
         if (text.length > 180_000) throw new Error('Too large');
       }
       const body = JSON.parse(text);
+      if (req.url === '/image') {
+        if ((await account.status()).status !== 'logged-in')
+          throw new InputError('请先登录 Codex，再生成专属图案。');
+        const result = await (options.runImage ?? runCodexImage)(
+          body.subject,
+          controller.signal,
+          (directory) => cliCommand(codexArguments(directory, true)),
+        );
+        res.end(JSON.stringify({ data: [{ b64_json: result }] }));
+        return;
+      }
       if (
         typeof body.instructions !== 'string' ||
         typeof body.input !== 'string'
@@ -387,23 +441,31 @@ export async function startCodexBridge(options = {}) {
         body.stream === true
           ? (delta) => res.write(streamFrame({ type: 'delta', delta }))
           : undefined,
+        body.purpose === 'medal' ? 'medal' : undefined,
       );
       res.end(
         body.stream === true
           ? streamFrame({ type: 'done', output: result })
           : JSON.stringify(result),
       );
-    } catch {
+    } catch (error) {
       if (!res.destroyed) {
         if (res.headersSent)
           res.end(streamFrame({ type: 'error', error: 'Codex unavailable' }));
         else {
           res.writeHead(502);
-          res.end('{"error":"Codex unavailable"}');
+          res.end(
+            JSON.stringify({
+              error:
+                req.url === '/image' && error instanceof InputError
+                  ? error.message
+                  : 'Codex unavailable',
+            }),
+          );
         }
       }
     } finally {
-      controllers.delete(controller);
+      activeControllers.delete(controller);
     }
   });
   server.requestTimeout = 125_000;
@@ -421,7 +483,7 @@ export async function startCodexBridge(options = {}) {
     },
     close: () => {
       account.close();
-      for (const c of controllers) c.abort();
+      for (const c of [...controllers, ...imageControllers]) c.abort();
       server.close();
       server.closeAllConnections();
     },

@@ -18,7 +18,7 @@ export type CoachLocalSettings = {
 
 export async function localCoachRequest(
   env: CoachEnvironment,
-  path: '/settings' | '/environment' | '/login',
+  path: '/settings' | '/environment' | '/login' | '/image-settings',
   method = 'GET',
   body?: unknown,
 ) {

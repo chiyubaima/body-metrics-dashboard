@@ -19,7 +19,7 @@ import { availablePort } from '../scripts/launch.mjs';
 import { readLocalServer } from '../scripts/local-server.mjs';
 
 await test(
-  'supervisor keeps service alive until confirmation, recovers failed setup and restarts the owned instance on its port',
+  'supervisor requires confirmation, recovers failed restarts and shuts down only its owned service',
   { skip: process.platform === 'win32' },
   async (t) => {
     const base = mkdtempSync(join(tmpdir(), 'body-journal-update-server-'));
@@ -66,7 +66,7 @@ await test(
     import {localServerPlugin} from '../../../scripts/local-server.mjs';import {localUpdatePlugin} from '../../../scripts/local-update.mjs';
     const handlers=[];const version=readFileSync('app.js','utf8');
     const server=createServer((req,res)=>{let index=0;const next=()=>{const handler=handlers[index++];if(handler)handler(req,res,next);else res.end(version)};next()});
-    const context={httpServer:server,middlewares:{use(fn){handlers.push(fn)}},watcher:{async close(){appendFileSync('.wrangler/freeze-count','freeze\\n')}}};
+    const context={async close(){server.closeAllConnections();await new Promise(done=>server.close(done))},httpServer:server,middlewares:{use(fn){handlers.push(fn)}},watcher:{async close(){appendFileSync('.wrangler/freeze-count','freeze\\n')}}};
     localServerPlugin(process.cwd()).configureServer(context);localUpdatePlugin().configureServer(context);
     server.listen(Number(process.argv.at(-1)),'127.0.0.1');process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
   `,
@@ -249,8 +249,29 @@ await test(
       readFileSync(join(root, '.wrangler/records.db'), 'utf8'),
       'synthetic preserved records',
     );
-    child.kill('SIGTERM');
+    const sentinel = spawn(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      { stdio: 'ignore' },
+    );
+    t.after(() => sentinel.kill('SIGTERM'));
+    const deniedExit = await fetch(url + '/__body-journal/update/shutdown', {
+      method: 'POST',
+      headers: {
+        Origin: 'https://example.invalid',
+        'X-Body-Journal-Update': '1',
+      },
+    });
+    assert.equal(deniedExit.status, 403);
+    assert.equal((await fetch(url)).status, 200);
+    assert.equal((await request('shutdown')).phase, 'stopping');
     await finished;
     assert.equal(readLocalServer(root), null);
+    assert.equal(sentinel.exitCode, null, 'other processes remain running');
+    assert.equal(
+      readFileSync(join(root, '.wrangler/records.db'), 'utf8'),
+      'synthetic preserved records',
+    );
+    await assert.rejects(fetch(url, { signal: AbortSignal.timeout(1000) }));
   },
 );

@@ -4,6 +4,9 @@ import type { Entry, Kind, Diet, MealSlot } from './model.ts';
 export const coachToolLimits = { calls: 6, rounds: 3 } as const;
 
 export const coachToolNames = [
+  'inspect_medals',
+  'prepare_medal',
+  'activate_medal',
   'find_records',
   'calculate',
   'search_catalog',
@@ -17,6 +20,13 @@ export const coachToolNames = [
 export type CoachToolName = (typeof coachToolNames)[number];
 export type CoachToolCall = { name: CoachToolName; arguments: string };
 export type CoachToolAction =
+  | {
+      type: 'medal';
+      label: string;
+      id: string;
+      revision: number;
+      medal: import('./medals.ts').MedalView;
+    }
   | {
       type: 'record';
       label: string;
@@ -66,6 +76,9 @@ export type CoachToolProgress = {
   status: 'running' | 'complete' | 'error';
 };
 export const coachToolLabels: Record<CoachToolName, string> = {
+  inspect_medals: '核对勋章条件',
+  prepare_medal: '制作勋章',
+  activate_medal: '开始追踪勋章',
   find_records: '查找日记',
   calculate: '核算数据',
   search_catalog: '查找食物与动作',

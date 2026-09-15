@@ -43,6 +43,8 @@ export type CoachScrollPosition = {
   anchor?: { id: string; offset: number };
 };
 type Props = {
+  snapshot?: import('@/lib/model').Snapshot;
+  onMedalsChanged?: () => Promise<unknown>;
   avatar?: ReactNode;
   records?: Entry[];
   onToolAction?: (action: CoachToolAction) => Promise<void>;
@@ -79,6 +81,8 @@ type Props = {
 };
 
 export function CoachConversation({
+  snapshot,
+  onMedalsChanged,
   avatar,
   onToolAction,
   records,
@@ -472,6 +476,8 @@ export function CoachConversation({
                 {turn.status === 'complete' && !!turn.toolRuns?.length && (
                   <CoachToolCards
                     runs={turn.toolRuns}
+                    snapshot={snapshot}
+                    onMedalsChanged={onMedalsChanged}
                     records={records}
                     onAction={onToolAction}
                     onConfirmRecord={

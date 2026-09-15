@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 export const updatePath = '/__body-journal/update';
-const actions = new Set(['status', 'check', 'apply', 'restart']);
+const actions = new Set(['status', 'check', 'apply', 'restart', 'shutdown']);
 export function updateRequestAllowed(req) {
   const address = req.socket.remoteAddress;
   if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address)) return false;
@@ -83,6 +83,16 @@ export function localUpdatePlugin() {
       });
       server.middlewares.use(
         updateMiddleware((action) => {
+          if (action === 'shutdown') {
+            setTimeout(async () => {
+              await server.close();
+              // A successful child exit also ends older launcher supervisors.
+              // Let close hooks abort model jobs and release owned resources.
+              process.exitCode = 0;
+              if (process.connected) process.disconnect();
+            }, 300);
+            return Promise.resolve({ phase: 'stopping' });
+          }
           if (!process.send || process.env.BODY_JOURNAL_SUPERVISED !== '1')
             return Promise.resolve({
               phase: 'unsupported',

@@ -43,6 +43,20 @@
       "when": 1789048632800,
       "tag": "0005_serious_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789378566088,
+      "tag": "0006_workable_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789462103242,
+      "tag": "0007_smart_stardust",
+      "breakpoints": true
     }
   ]
 }

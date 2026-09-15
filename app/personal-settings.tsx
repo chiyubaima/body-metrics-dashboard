@@ -8,6 +8,7 @@ import {
   Trash2,
   UserRound,
   X,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { CustomDish, Profile } from '@/lib/model';
 import { basisLabels } from '@/lib/progress';
@@ -15,6 +16,8 @@ import { ProfileForm, type Save } from './forms';
 import { DishDetails } from './dish-details';
 import { DeleteConfirm } from './delete-confirm';
 import './personal-settings.css';
+import { ModelSettings } from './model-settings';
+import type { SettingsSection } from './app-settings';
 
 export function PersonalSettings({
   profile,
@@ -25,6 +28,10 @@ export function PersonalSettings({
   onDirty,
   onRemoveDish,
   onOpenGuide,
+  initialSection = 'profile',
+  onModelChanged,
+  onModelDirty,
+  onModelBusy,
 }: {
   profile: Profile | null;
   dishes: CustomDish[];
@@ -34,8 +41,15 @@ export function PersonalSettings({
   onDirty: () => void;
   onRemoveDish: (id: string) => Promise<void>;
   onOpenGuide: () => void;
+  initialSection?: SettingsSection;
+  onModelChanged: () => void;
+  onModelDirty: (dirty: boolean) => void;
+  onModelBusy: (busy: boolean) => void;
 }) {
-  const [section, setSection] = useState('profile');
+  const [section, setSection] = useState<SettingsSection>(initialSection);
+  const [modelsVisited, setModelsVisited] = useState(
+    initialSection === 'models',
+  );
   return (
     <div className="personal-settings">
       <nav className="settings-nav" aria-label="个人设置栏目">
@@ -43,6 +57,7 @@ export function PersonalSettings({
           [
             ['profile', '个人资料', UserRound],
             ['dishes', '自建菜品', ChefHat],
+            ['models', '模型设置', SlidersHorizontal],
             ['backup', '备份与引导', Download],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -51,13 +66,30 @@ export function PersonalSettings({
             key={id}
             aria-pressed={section === id}
             disabled={busy}
-            onClick={() => setSection(id)}
+            onClick={() => {
+              setSection(id);
+              if (id === 'models') setModelsVisited(true);
+            }}
           >
             <Icon size={17} aria-hidden="true" />
             <span>{label}</span>
           </button>
         ))}
       </nav>
+      <section
+        className="settings-panel settings-models"
+        hidden={section !== 'models'}
+        aria-label="模型设置"
+      >
+        {modelsVisited && (
+          <ModelSettings
+            visible={section === 'models'}
+            onChanged={onModelChanged}
+            onDirty={onModelDirty}
+            onBusy={onModelBusy}
+          />
+        )}
+      </section>
       <section
         className="settings-panel settings-profile"
         hidden={section !== 'profile'}
@@ -117,7 +149,7 @@ export function PersonalSettings({
           </button>
           {dirty && (
             <output className="settings-guide-hint">
-              保存个人资料后可以重新打开引导。
+              保存正在编辑的设置后可以重新打开引导。
             </output>
           )}
         </article>
@@ -182,9 +214,7 @@ function DishLibrary({
           这里保留你确认过的配方，Captain 记录时会优先查找。
         </p>
         {notice && (
-          <output className="settings-library-notice">
-            {notice}
-          </output>
+          <output className="settings-library-notice">{notice}</output>
         )}
       </div>
       <div className="settings-library-list" aria-label="自建菜品列表">

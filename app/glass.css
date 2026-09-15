@@ -1824,3 +1824,43 @@ html .dish-details .dish-save-note {
     transition: none;
   }
 }
+.calendar-month-anchor {
+  position: relative;
+}
+.calendar-month-anchor .calendar-month-sheet {
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: min(390px, calc(100vw - 106px));
+}
+
+@media (max-width: 560px) {
+  .topbar .brand {
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .topbar .brand h1 {
+    font-size: 16px;
+    white-space: nowrap;
+  }
+  .topbar .brand p {
+    font-size: 8px;
+    white-space: nowrap;
+  }
+  .topbar .topbar-tools {
+    gap: 6px;
+  }
+  html .topbar-tools :is(.medals-open, .trash-open) {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    gap: 0;
+    font-size: 0 !important;
+  }
+  html .topbar-tools > .icon-button {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -1,4 +1,6 @@
 'use client';
+import { CaptainMedalCard } from './medal-card';
+import type { Snapshot } from '@/lib/model';
 import { useRef, useState } from 'react';
 import {
   ArrowUpRight,
@@ -182,6 +184,8 @@ function RecordPreview({
 }
 
 export function CoachToolCards({
+  snapshot,
+  onMedalsChanged,
   runs,
   onAction,
   onRetry,
@@ -189,6 +193,8 @@ export function CoachToolCards({
   disabled = false,
   records = [],
 }: {
+  snapshot?: Snapshot;
+  onMedalsChanged?: () => Promise<unknown>;
   runs: CoachToolRun[];
   onAction?: (action: CoachToolAction) => Promise<void>;
   onRetry?: () => void;
@@ -296,7 +302,20 @@ export function CoachToolCards({
           {!!run.actions?.length && (
             <div className="coach-tool-action-list">
               {run.actions.map((action, i) =>
-                action.type === 'record' && action.draft ? (
+                action.type === 'medal' ? (
+                  <CaptainMedalCard
+                    key={i}
+                    initial={action.medal}
+                    snapshot={snapshot}
+                    onChanged={onMedalsChanged}
+                    disabled={disabled}
+                    onEdit={() =>
+                      void act(run.id + ':' + i, async () => {
+                        await onAction?.(action);
+                      })
+                    }
+                  />
+                ) : action.type === 'record' && action.draft ? (
                   <div className="coach-record-preview" key={i}>
                     <div className="coach-record-heading">
                       <strong>

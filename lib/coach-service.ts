@@ -1,3 +1,4 @@
+import { coachMedalInstructions, executeCoachMedal } from './coach-medals.ts';
 import {
   coachToolInstructions,
   parseToolCalls,
@@ -114,6 +115,9 @@ export async function coachChat(
   generate: typeof generateCoachReply = generateCoachReply,
   now = new Date(),
   options: {
+    onMedalArtRequested?: (
+      medal: import('./medals.ts').Medal,
+    ) => Promise<unknown>;
     onProgress?: (progress: CoachToolProgress) => void;
     signal?: AbortSignal;
     fetcher?: typeof fetch;
@@ -227,6 +231,7 @@ export async function coachChat(
         env,
         coachSystemPrompt +
           coachToolInstructions +
+          coachMedalInstructions +
           (settings.tone === 'gentle'
             ? '\n用户选择温和陪伴，减少调侃和催促，先倾听。'
             : '\n用户选择直球陪伴，保持活泼和具体行动感。'),
@@ -290,16 +295,28 @@ export async function coachChat(
             t.createdAt <= toolNow.toISOString() &&
             Date.parse(t.createdAt) >= toolNow.getTime() - 86400000,
         );
-        const execution = await executeCoachTool(call, {
-          data: freshData,
-          memories: freshMemories,
-          commitments: freshCommitments,
-          message: request.userText,
-          conversation,
-          now: toolNow,
-          fetcher: options.fetcher,
-          signal,
-        });
+        const execution = [
+          'inspect_medals',
+          'prepare_medal',
+          'activate_medal',
+        ].includes(call.name)
+          ? await executeCoachMedal(call, {
+              db,
+              owner,
+              turnId: request.id,
+              message: request.userText,
+              startArt: options.onMedalArtRequested,
+            })
+          : await executeCoachTool(call, {
+              data: freshData,
+              memories: freshMemories,
+              commitments: freshCommitments,
+              message: request.userText,
+              conversation,
+              now: toolNow,
+              fetcher: options.fetcher,
+              signal,
+            });
         signal.throwIfAborted();
         toolRuns.push(execution.run);
         toolResults.push({ name: call.name, result: execution.result });

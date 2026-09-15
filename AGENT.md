@@ -1,5 +1,55 @@
 # Application working rules
 
+## Medal copy and editor simplification annotations (2026-09-15)
+
+- Handle the six initially read notes: wall title becomes 每一枚，都是你的故事; creation title becomes 纪念每一次进步！; remove the ordinary editor's context/title/intro and its natural-language adjustment disclosure. Remove only state and handlers made unused by this removal. Keep initial natural-language creation, explicit version review, validation, discard protection and artwork recovery.
+- Limit changes to existing medal component/styles and necessary documentation. Reuse the parent work/medals/qa synthetic proxy for wall/creation/editor/review and mobile checks; run existing tests/typecheck/lint/build. No additional tests for copy alone. Recheck original message and update timestamps before resolving only repaired unchanged annotations. Preserve preview and previous work; no personal health/chat data or live model calls, commit, push or deployment.
+
+
+## Medal editor navigation and artwork annotations (2026-09-15)
+
+- Handle the four initially read notes: move Back to the fixed header before its title; move Save/Preview/Confirm-version to the header's right; replace the separate image-generation module with a fourth large plus tile beside the three style samples. Keep concise configuration/credit/recovery feedback nearby.
+- Edit existing `app/medals.tsx` and `app/medals.css`; preserve discard protection, review confirmation, async generation, disabled/loading states and retry receipts. Remove only styles made unused by this change. Extend existing synthetic medal UI tests and documented parent `work/medals/qa/` browser fixtures; verify header positioning through scrolling, back/cancel retention, same-row image tiles, background/retry behavior and mobile overflow. Run test/typecheck/lint/build and recheck message/update timestamps before resolving only the unchanged repaired notes. Preserve personal data, prior work and preview; no live models, commit, push or deployment.
+
+## Three-column medal cards annotation (2026-09-15)
+
+- Show three compact wall cards per desktop row. Retain artwork, name, goal summary, progress, states and detail navigation; use fewer columns on narrow screens. Keep Captain cards and medal logic unchanged.
+- Limit application edits to existing `app/medals.css` and only necessary component markup. Reuse the documented synthetic proxy under the parent `work/medals/qa/`; verify three desktop columns, long text, mobile overflow and navigation, then run existing tests/typecheck/lint/build. Recheck the original message and update timestamp before resolving only that annotation. Preserve local preview and all previous work; no commit, push, deployment or live model tests.
+
+## Product-wide medals implementation (2026-09-15)
+
+- Implement the approved shared achievement capability, product facts/events, combination and calendar-period rules, Captain tools and inline cards. Preserve old definitions/awards and current preview. No commit, push or deployment.
+- New pure catalog/evaluator: `lib/medal-facts.ts`; fact storage/readers: `db/medal-facts.ts`; Captain adapter: `lib/coach-medals.ts`; shared card: `app/medal-card.tsx`. Extend existing routes/components/tests, append a Drizzle migration using existing generation commands and apply locally without deleting data. New route directories contain route files only.
+- Shared asynchronous art orchestration may live in `lib/medal-art-service.ts`; routes supply the runtime continuation callback, keeping pure tests independent of Cloudflare modules. Client-only feature events use the owner-scoped `app/api/medals/facts/route.ts` allowlist.
+- Keep owner-scoped authoritative facts, immutable occurrence times, known history coverage, retry/import deduplication and explicit evidence/retraction semantics. Draft creation is reversible; activation binds the displayed revision and explicit user acceptance. Preserve separate Codex/API image settings and asynchronous image behavior.
+- Use synthetic SQLite/model/browser fixtures under existing parent `work/medals/qa/`. Verify all fact families, temporal/composite rules, cross-entry drafts, confirmed activation, revisions, image retries and backup compatibility. Run test/typecheck/lint/build and browser QA. No private conversation inspection, personal-data mutation beyond additive migration or live model calls.
+
+## Coach-medal proposal and generation-button note (2026-09-15)
+
+- Propose coach activation/conversation medal support in the parent design document only. Inspect schemas and code, not personal conversations; do not implement new medal metrics or call live models.
+- Remove the generation leave-button fill while preserving keyboard focus and background completion; directly display image connection settings without a disclosure; place model settings before backup in both menu and internal navigation. Preserve login, saving and dirty-form behavior.
+- Reuse medal styles and synthetic UI tests; browser fixtures in parent `work/medals/qa/` must intercept personal/model APIs. Run test/typecheck/lint/build, check rendered states, and resolve only the unchanged repaired annotation. No commits/push/deploy; preserve existing changes and preview.
+
+## Calendar, medal generation and settings annotations (2026-09-15)
+
+- Apply the thirteen initially read annotations: anchor the month sheet to its month trigger; add default All medal status, compact horizontal cards and requested copy changes. Keep existing palettes and data semantics.
+- Keep medal state mounted while its dialog closes. Show generation in a dismissible modal, lock the affected draft, and notify completion/failure at the top right with a return action. Generate art from the editor after validated/versioned draft persistence; preserve task deduplication and retry. Closing the browser or local server is outside this background guarantee.
+- Personal settings opens a menu for profile, dishes, backup, model settings and confirmed exit. Move both existing model configuration forms into shared settings, preserving explicit coach consent, dirty forms and credential boundaries. Exit uses the existing supervised loopback/same-origin transport and stops only owned service processes; render a closed state when browser tab closing is unavailable.
+- Reuse existing components/styles/scripts; new UI may live in `app/app-settings.tsx` and `app/model-settings.tsx`. Extend synthetic tests and documented temporary `work/annotation-check/` browser fixtures; isolate all personal APIs and models, then clean temporary tooling. Run test/typecheck/lint/build and UI QA, resolve only initial unchanged notes. Preserve local preview/earlier changes; no commit/push/deploy.
+
+## Codex medal images (2026-09-14)
+
+- Reuse the official local Codex account for image generation; keep a separate Image API option and preserve its configuration. Default unconfigured local images to Codex; never silently fall back between billed providers. Only the official process handles login credentials.
+- Put the isolated image runner in `scripts/medal-codex-image.mjs`, sharing the bridge account and private transport. Allow only image generation and its required Codex code-mode dispatcher, public style reference and a subject; preserve the text coach's disabled tools. Validate actual image output before existing private durable storage; preserve revision, owner and generation-receipt boundaries.
+- Extend current connection UI and configuration without altering coach settings/consent. Add synthetic provider/protocol/UI tests under `tests/medals*.test.ts`; one actual synthetic-image smoke is authorized. Store no account payloads or personal records in test output. Run test/typecheck/lint/build and UI QA; local only.
+
+## Custom medals (2026-09-14)
+
+- Implement the approved custom-medal MVP from the parent design: structured natural-language drafts, editable supported rules, consistent artwork, activation, progress/earned views, automatic evidence and self-confirmed events. Keep advanced streak/recurring/mixed rules explicitly unsupported. Local only; no commit/push/deployment.
+- Domain logic: `lib/medals.ts`; model/art adapter: `lib/medal-generation.ts`; storage: `db/medals.ts`; routes under `app/api/medals/`; UI/styles: `app/medals.tsx`, `app/medals.css`. Append schema migrations. Keep owner isolation, optimistic version checks, stage receipts/notification deduplication and original-record correction separate from rule revisions.
+- Model output is validated declarative data, never executable code. Reuse the existing text-model connection; images use official Codex login or explicitly configured server-side API credentials and durable artwork. Store no keys in database, client state or exports. Missing connection and generation failures preserve usable drafts; system artwork is labeled honestly.
+- Public, synthetic style examples live in `public/medals/` with source notes. Task-only asset/QA work lives in parent `work/medals/` under its instructions. Tests in `tests/medals*.test.ts` use isolated data and fake providers. Run test/typecheck/lint/build and synthetic UI QA; preserve existing preview and personal records.
+
 ## Annotation scrolling and record details (2026-09-14)
 
 - Give review panels an explicit viewport-bounded height on the dashboard, in dialogs and on narrow screens. Keep header/tabs/footer fixed and only the list scrollable. Focus the named list for keyboard scrolling and reset it when switching status; preserve red styling and existing annotation actions.

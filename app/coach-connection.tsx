@@ -24,10 +24,14 @@ export function CoachConnection({
   visible,
   disabled,
   onSaved,
+  onDirty,
+  onBusy,
 }: {
   visible: boolean;
   disabled: boolean;
   onSaved: () => Promise<unknown>;
+  onDirty?: (dirty: boolean) => void;
+  onBusy?: (busy: boolean) => void;
 }) {
   const [settings, setSettings] = useState<CoachLocalSettings | null>(null);
   const [mode, setMode] = useState('codex');
@@ -99,6 +103,21 @@ export function CoachConnection({
       clearInterval(timer);
     };
   }, [visible, settings?.codex.status]);
+
+  useEffect(() => {
+    if (!settings || !initialized.current) return;
+    onDirty?.(
+      mode !== (settings.provider === 'codex' ? 'codex' : 'api') ||
+        protocol !== settings.api.protocol ||
+        baseUrl.trim().replace(/\/+$/, '') !==
+          settings.api.baseUrl.replace(/\/+$/, '') ||
+        model.trim() !== settings.api.model ||
+        !!apiKey,
+    );
+  }, [settings, mode, protocol, baseUrl, model, apiKey, onDirty]);
+  useEffect(() => {
+    onBusy?.(working);
+  }, [working, onBusy]);
 
   async function check() {
     setWorking(true);

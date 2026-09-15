@@ -52,6 +52,14 @@ export async function createCoachConfiguration({
     seed = { ...process.env, ...vars };
   }
   const initial = {
+    image: {
+      provider:
+        seed.MEDAL_IMAGE_PROVIDER ||
+        (seed.MEDAL_IMAGE_MODEL || seed.MEDAL_IMAGE_API_KEY ? 'api' : 'codex'),
+      baseUrl: seed.MEDAL_IMAGE_BASE_URL || defaultApi.baseUrl,
+      model: seed.MEDAL_IMAGE_MODEL || '',
+      apiKey: seed.MEDAL_IMAGE_API_KEY || '',
+    },
     provider: seed.COACH_PROVIDER || (seed.COACH_MODEL ? 'responses' : 'codex'),
     revision: '',
     api: {
@@ -74,6 +82,16 @@ export async function createCoachConfiguration({
         !['responses', 'chat-completions'].includes(value.api.protocol) ||
         ['baseUrl', 'model', 'apiKey'].some(
           (key) => typeof value.api[key] !== 'string',
+        )
+      )
+        throw new Error();
+      value.image ??= structuredClone(initial.image);
+      value.image.provider ??=
+        value.image.model || value.image.apiKey ? 'api' : 'codex';
+      if (
+        !['codex', 'api'].includes(value.image.provider) ||
+        ['baseUrl', 'model', 'apiKey'].some(
+          (key) => typeof value.image[key] !== 'string',
         )
       )
         throw new Error();
@@ -132,7 +150,12 @@ export async function createCoachConfiguration({
           apiKey,
         };
       }
-      const value = { provider: input.provider, api, revision: randomUUID() };
+      const value = {
+        ...current,
+        provider: input.provider,
+        api,
+        revision: randomUUID(),
+      };
       const temporary = `${path}.${randomUUID()}.tmp`;
       try {
         await writeFile(temporary, JSON.stringify(value) + '\n', {
@@ -148,10 +171,63 @@ export async function createCoachConfiguration({
     saving = operation.catch(() => {});
     return operation;
   }
+  function publicImageSettings(value) {
+    return {
+      provider: value.image.provider,
+      baseUrl: value.image.baseUrl,
+      model: value.image.model || 'gpt-image-2.5-flare',
+      hasKey: !!value.image.apiKey,
+    };
+  }
+  function saveImage(input) {
+    const operation = saving.then(async () => {
+      const current = await read();
+      const provider = input?.provider ?? 'api';
+      if (!['codex', 'api'].includes(provider))
+        throw new InputError('请选择 Codex 登录或图片 API。');
+      let image = { ...current.image, provider };
+      if (provider === 'api') {
+        const address = apiAddress(input.baseUrl);
+        const model = typeof input.model === 'string' ? input.model.trim() : '';
+        if (!model || model.length > 150 || /[\r\n\x00-\x1f]/.test(model))
+          throw new InputError('请填写有效的图像模型名称。');
+        if (
+          typeof input.apiKey !== 'string' ||
+          input.apiKey.length > 4096 ||
+          /[\r\n\x00-\x1f]/.test(input.apiKey)
+        )
+          throw new InputError('请填写有效密钥。');
+        const same =
+          address.baseUrl === current.image.baseUrl.replace(/\/+$/, '');
+        const apiKey =
+          input.apiKey.trim() || (same ? current.image.apiKey : '');
+        if (!apiKey && !address.local)
+          throw new InputError('请为此图案服务地址填写密钥。');
+        image = { provider, baseUrl: address.baseUrl, model, apiKey };
+      }
+      // Image changes must not invalidate the text coach's sharing consent.
+      const value = { ...current, image };
+      const temporary = `${path}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(temporary, JSON.stringify(value) + '\n', {
+          mode: 0o600,
+          flag: 'wx',
+        });
+        await rename(temporary, path);
+      } finally {
+        await rm(temporary, { force: true });
+      }
+      return publicImageSettings(value);
+    });
+    saving = operation.catch(() => {});
+    return operation;
+  }
   return {
     read,
     save,
     publicSettings,
+    publicImageSettings,
+    saveImage,
     async environment() {
       const value = await read();
       return {
@@ -160,6 +236,10 @@ export async function createCoachConfiguration({
         COACH_MODEL: value.api.model,
         COACH_API_KEY: value.api.apiKey,
         COACH_CONFIG_REVISION: value.revision,
+        MEDAL_IMAGE_PROVIDER: value.image.provider,
+        MEDAL_IMAGE_BASE_URL: value.image.baseUrl,
+        MEDAL_IMAGE_MODEL: value.image.model,
+        MEDAL_IMAGE_API_KEY: value.image.apiKey,
       };
     },
   };

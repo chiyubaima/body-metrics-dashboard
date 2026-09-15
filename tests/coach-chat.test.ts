@@ -1,3 +1,4 @@
+import { medalCardModule } from './medal-card-module.ts';
 import { dishDetailsModule } from './dish-details-module.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -168,7 +169,7 @@ await test('conversation component preserves drafting, retries, reading anchors 
     .outputText.replace(
       /from (["'])([^"']+)\1/g,
       (_match, _quote, specifier: string) =>
-        `from ${JSON.stringify(specifier === './dish-details' ? dishDetailsModule : import.meta.resolve(specifier))}`,
+        `from ${JSON.stringify(specifier === './medal-card' ? medalCardModule : specifier === './dish-details' ? dishDetailsModule : import.meta.resolve(specifier))}`,
     );
   const toolUrl =
     'data:text/javascript;base64,' + Buffer.from(toolSource).toString('base64');

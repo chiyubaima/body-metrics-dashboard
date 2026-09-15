@@ -32,6 +32,7 @@ await test('personal settings preserve profile drafts across sections and suppor
     'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
   const react = `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))};`;
   const stubs: Record<string, string> = {
+    './model-settings': 'export const ModelSettings=()=>null;',
     './meal-form': 'export const MealForm=()=>null;',
     './training-form': 'export const TrainingForm=()=>null;',
     './calendar': 'export const DatePicker=()=>null;',
@@ -171,6 +172,12 @@ await test('personal settings preserve profile drafts across sections and suppor
       input.dispatchEvent(new win.Event('input', { bubbles: true }));
     });
   await act(async () => render());
+  assert.deepEqual(
+    [...container.querySelectorAll('.settings-nav button')].map((b) =>
+      b.textContent.trim(),
+    ),
+    ['个人资料', '自建菜品', '模型设置', '备份与引导'],
+  );
   const profilePanel = container.querySelector('.settings-profile')!;
   const libraryPanel = container.querySelector('.settings-dishes')!;
   assert.equal(profilePanel.hasAttribute('hidden'), false);
@@ -252,7 +259,7 @@ await test('personal settings preserve profile drafts across sections and suppor
   assert(
     container
       .querySelector('.settings-guide-hint')
-      ?.textContent.includes('保存个人资料'),
+      ?.textContent.includes('保存正在编辑的设置'),
   );
   const backup = container.querySelector('a[download]')!;
   assert.equal(backup.getAttribute('href'), '/api/export');

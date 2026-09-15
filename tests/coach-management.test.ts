@@ -463,7 +463,15 @@ await test('Captain detail navigation preserves the composer and its actions wor
   assert.equal(composer.value, 'Synthetic unsent draft');
   state.now = '2026-09-09T02:00:00.000Z';
   await click('[data-annotate="coach.settings"]');
-  await click('.coach-connection > button');
+  assert.equal(
+    container.querySelectorAll('.coach-provider-settings').length,
+    0,
+  );
+  // Enabling now belongs to shared model settings; simulate its persisted result
+  // and the same focus refresh, preserving the greeting schedule regression.
+  state.active = true;
+  state.settings.enabled = true;
+  await act(async () => win.dispatchEvent(new win.Event('focus')));
   assert.equal(generated, 1);
   assert.equal(composer.value, 'Synthetic unsent draft');
   const tick = async (now: string) => {

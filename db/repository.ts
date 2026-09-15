@@ -17,6 +17,7 @@ import type {
 } from '../lib/model.ts';
 import { listDishes } from './dishes.ts';
 import { dishFood, dishNameKey } from '../lib/dishes.ts';
+import { factStatement } from './medal-facts.ts';
 type Row = {
   id: string;
   owner: string;
@@ -266,6 +267,29 @@ export async function saveEntry(
           now,
         ),
     );
+  if (confirmation && v.kind === 'diet') {
+    const action = JSON.parse(confirmation.actionJson) as {
+      dietMeals?: string[];
+    };
+    const meals = action.dietMeals || [];
+    for (const meal of meals)
+      if ((v.data as Diet).foods.some((f) => (f.meal || 'unsorted') === meal))
+        statements.push(
+          db
+            .prepare(
+              "INSERT OR IGNORE INTO medal_facts(id,owner,metric,source_id,occurred_at) SELECT ?,?,'coach_recorded_meals',?,? WHERE EXISTS(SELECT 1 FROM records WHERE owner=? AND id=? AND updated_at=? AND deleted_at IS NULL)",
+            )
+            .bind(
+              crypto.randomUUID(),
+              owner,
+              `${v.id}|${v.date}|${meal}`,
+              now,
+              owner,
+              v.id,
+              now,
+            ),
+        );
+  }
   try {
     const saved = await db.batch(statements);
     if (!saved[recordIndex]?.meta.changes)
@@ -297,7 +321,10 @@ export async function trash(
     )
     .bind(owner)
     .all<Row>();
-  return rows.results.map((r) => ({ ...entry(r), deletedAt: r.deleted_at! }));
+  return rows.results.map((r) => ({
+    ...entry(r),
+    deletedAt: r.deleted_at!,
+  }));
 }
 function recordIds(value: unknown) {
   const ids = Array.isArray(value) ? value : [value];
@@ -402,11 +429,17 @@ export async function saveProfile(
   value: unknown,
 ) {
   const profile = validateProfile(value);
-  await db
+  const now = new Date().toISOString();
+  const statement = db
     .prepare(
       'INSERT INTO profiles (owner,payload,updated_at) VALUES (?,?,?) ON CONFLICT(owner) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at',
     )
-    .bind(owner, JSON.stringify(profile), new Date().toISOString())
-    .run();
+    .bind(owner, JSON.stringify(profile), now);
+  await db.batch([
+    statement,
+    ...(profile.name && profile.height
+      ? [factStatement(db, owner, 'profile_complete', 'first-complete', now)]
+      : []),
+  ]);
   return { saved: true };
 }

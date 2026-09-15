@@ -4,10 +4,10 @@ import type { CoachToolAction } from '@/lib/coach-tool-types';
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import {
   Activity,
+  Award,
   Dumbbell,
   Utensils,
   Trash2,
-  Settings2,
   X,
   Check,
   Sparkles,
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { RecordForm, PlanForm } from './forms';
 import { PersonalSettings } from './personal-settings';
+import { AppSettings, type SettingsSection } from './app-settings';
 import { BodyPanel, DietPanel, TrainingPanel, compactDate } from './panels';
 import { HistoryView } from './history';
 import { JournalCalendar } from './calendar';
@@ -35,6 +36,7 @@ import { DeveloperMode } from './developer-mode';
 import { AppUpdate } from './app-update';
 import { Coach } from './coach';
 import { Onboarding } from './onboarding';
+import { Medals } from './medals';
 import { today, activePlan } from '@/lib/model';
 import {
   workoutAchievements,
@@ -59,7 +61,8 @@ type Modal =
     }
   | { type: 'history'; kind: Kind; initialDate?: string }
   | { type: 'plan'; kind: 'diet' | 'training' }
-  | { type: 'settings' }
+  | { type: 'medals' }
+  | { type: 'settings'; section?: SettingsSection }
   | { type: 'trash' };
 const labels = { body: '身体', diet: '饮食', training: '训练' };
 const initial: Snapshot = { records: [], plans: [], profile: null };
@@ -106,6 +109,16 @@ export default function Dashboard({
   const continueEditing = useRef<HTMLButtonElement | null>(null);
   const [onboardingRequest, setOnboardingRequest] = useState(0);
   const [coachSettingsRequest, setCoachSettingsRequest] = useState(0);
+  const [modelVersion, setModelVersion] = useState(0);
+  const [modelDirty, setModelDirty] = useState(false);
+  const [medalBusy, setMedalBusy] = useState(false);
+  const [medalTarget, setMedalTarget] = useState<{
+    id: string;
+    sequence: number;
+  }>();
+  const [medalDirty, setMedalDirty] = useState(false);
+  const [coachPending, setCoachPending] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [celebration, setCelebration] = useState('');
   useEffect(() => {
     if (!celebration) return;
@@ -133,6 +146,26 @@ export default function Dashboard({
         setData(next);
         setLoaded(true);
         setLoadError('');
+        if (
+          next.medals?.some(
+            (m) =>
+              m.status === 'active' &&
+              [m.progress, ...m.past].some((p) => p.achieved.length),
+          )
+        ) {
+          request<{ awards: string[] }>('/api/medals/notifications', {})
+            .then((result) => {
+              if (result.awards.length)
+                setCelebration(
+                  '点亮勋章：' +
+                    result.awards.slice(0, 2).join('、') +
+                    (result.awards.length > 2
+                      ? ` 等 ${result.awards.length} 个阶段`
+                      : ''),
+                );
+            })
+            .catch(() => {});
+        }
       }
       return next;
     } catch (e) {
@@ -149,17 +182,31 @@ export default function Dashboard({
       if (!working.current) refresh().catch(() => {});
     };
     window.addEventListener('focus', focused);
-    return () => window.removeEventListener('focus', focused);
+    let day = today();
+    const rollover = setInterval(() => {
+      if (today() !== day && !working.current) {
+        void refresh()
+          .then(() => {
+            day = today();
+          })
+          .catch(() => {});
+      }
+    }, 60000);
+    return () => {
+      window.removeEventListener('focus', focused);
+      clearInterval(rollover);
+    };
   }, [refresh]);
   const open = useCallback((next: Modal) => {
     modalGeneration.current++;
     setDirty(false);
+    setModelDirty(false);
     setConfirmClose(false);
     setModal(next);
   }, []);
   const close = () => {
     if (busy) return;
-    if (dirty) {
+    if (dirty || modelDirty) {
       setConfirmClose(true);
       return;
     }
@@ -181,7 +228,13 @@ export default function Dashboard({
   }, []);
   async function openCoachAction(action: CoachToolAction) {
     if (modal || busy) throw new Error('请先保存或关闭当前表单。');
-    if (action.type === 'record') {
+    if (action.type === 'medal') {
+      if (medalDirty || medalBusy)
+        throw new Error('勋章还有未保存的编辑，请先回到勋章墙处理。');
+      await refresh();
+      setMedalTarget({ id: action.id, sequence: Date.now() });
+      open({ type: 'medals' });
+    } else if (action.type === 'record') {
       const generation = modalGeneration.current;
       const fresh = await refresh();
       if (modalGeneration.current !== generation || working.current)
@@ -199,7 +252,11 @@ export default function Dashboard({
     } else if (action.type === 'page') {
       setDate(action.date);
       changeModule(action.kind);
-      open({ type: 'history', kind: action.kind, initialDate: action.date });
+      open({
+        type: 'history',
+        kind: action.kind,
+        initialDate: action.date,
+      });
     }
   }
   async function save(path: string, payload: unknown, method = 'POST') {
@@ -275,7 +332,7 @@ export default function Dashboard({
             : `餐盘已更新 · ${meals} 类餐次${foodSummary.total.protein !== null ? ` · 已知蛋白质 ${Math.round(foodSummary.total.protein)}g` : ''}`,
         );
       }
-      setModal(null);
+      if (path !== '/api/profile' || !modelDirty) setModal(null);
       setDirty(false);
       setNotice(
         method === 'DELETE'
@@ -422,6 +479,7 @@ export default function Dashboard({
 
   const statsReady = loaded && !loadError;
   const panelProps = {
+    onFactsChanged: refresh,
     records: data.records,
     plans: data.plans,
     date,
@@ -443,7 +501,9 @@ export default function Dashboard({
           ? `${labels[modal.kind]}计划`
           : modal?.type === 'trash'
             ? '回收站'
-            : '个人资料与备份';
+            : modal?.type === 'medals'
+              ? '勋章墙'
+              : '个人设置';
   async function complete(entry: Entry) {
     try {
       await save('/api/records', {
@@ -456,6 +516,16 @@ export default function Dashboard({
       setNotice(e instanceof Error ? e.message : '保存失败，请重试。');
     }
   }
+  if (stopped)
+    return (
+      <main className="app-stopped">
+        <Activity size={38} />
+        <h1>身体日记已退出</h1>
+        <p>
+          后台服务已关闭，记录已保留。可以关闭此页面，下次双击启动即可继续。
+        </p>
+      </main>
+    );
   return (
     <main className="dashboard" data-annotate="dashboard">
       <header className="topbar" data-annotate="layout.header">
@@ -471,10 +541,23 @@ export default function Dashboard({
           </div>
         </div>
         <div className="topbar-tools">
+          <button
+            className="secondary small medals-open"
+            aria-label="勋章墙"
+            disabled={!statsReady}
+            onClick={() => {
+              setMedalTarget(undefined);
+              open({ type: 'medals' });
+            }}
+          >
+            <Award size={17} />
+            勋章墙
+          </button>
           {localPreview && <AppUpdate />}
           {localPreview && <DeveloperMode date={date} ready={statsReady} />}
           <button
             className="secondary small trash-open"
+            aria-label="回收站"
             disabled={!statsReady}
             onClick={() => open({ type: 'trash' })}
           >
@@ -485,14 +568,15 @@ export default function Dashboard({
             <i />
             {localPreview ? '本机数据' : '我的记录空间'}
           </span>
-          <button
-            className="icon-button"
-            aria-label="个人资料与备份"
+          <AppSettings
             disabled={!statsReady}
-            onClick={() => open({ type: 'settings' })}
-          >
-            <Settings2 size={21} />
-          </button>
+            local={localPreview}
+            pendingWork={
+              medalBusy || medalDirty || coachPending || dirty || modelDirty
+            }
+            onSelect={(section) => open({ type: 'settings', section })}
+            onStopped={() => setStopped(true)}
+          />
         </div>
       </header>
       <div className="dashboard-companion-row">
@@ -512,6 +596,11 @@ export default function Dashboard({
           onToolAction={openCoachAction}
           onRecordsChanged={refresh}
           settingsRequest={coachSettingsRequest}
+          modelVersion={modelVersion}
+          onPendingWork={setCoachPending}
+          onOpenModelSettings={() =>
+            open({ type: 'settings', section: 'models' })
+          }
         />
       </div>
       <nav className="mobile-tabs" aria-label="看板模块">
@@ -573,6 +662,7 @@ export default function Dashboard({
         </output>
       )}
       <Onboarding
+        onFactsChanged={refresh}
         ready={statsReady}
         snapshot={data}
         blocked={modal !== null}
@@ -586,8 +676,26 @@ export default function Dashboard({
           }
         }}
       />
+      <Medals
+        medals={data.medals || []}
+        facts={data.medalFacts}
+        openTarget={medalTarget}
+        records={data.records}
+        date={date}
+        visible={modal?.type === 'medals'}
+        blocked={!!modal && modal.type !== 'medals'}
+        onOpen={() => open({ type: 'medals' })}
+        onClose={() => setModal(null)}
+        onChanged={refresh}
+        onDirty={setMedalDirty}
+        onBusy={setMedalBusy}
+        onEvidence={(e) => {
+          if (e.kind !== 'manual' && e.kind !== 'product')
+            open({ type: 'history', kind: e.kind, initialDate: e.date });
+        }}
+      />
       <Dialog
-        open={modal !== null}
+        open={modal !== null && modal.type !== 'medals'}
         onOpenChange={(v) => {
           if (!v) close();
         }}
@@ -656,7 +764,7 @@ export default function Dashboard({
               <X size={20} />
             </button>
           </div>
-          {modal?.type !== 'record' && (
+          {modal?.type !== 'record' && modal?.type !== 'medals' && (
             <DialogDescription>
               {modal?.type === 'history'
                 ? '按日期筛选记录，支持修改和批量删除。'
@@ -666,7 +774,7 @@ export default function Dashboard({
                     ? modal.kind === 'diet'
                       ? '按所选日期调整营养目标，实际饮食记录保持原样。'
                       : '训练计划从今天或未来生效，历史版本会保留。'
-                    : '管理你的资料、常用配方与账本备份。'}
+                    : '管理个人资料、常用配方、备份与模型连接。'}
             </DialogDescription>
           )}
           <div className="dialog-form-region">
@@ -702,11 +810,15 @@ export default function Dashboard({
             )}
             {modal?.type === 'settings' && (
               <PersonalSettings
+                initialSection={modal.section}
+                onModelChanged={() => setModelVersion((value) => value + 1)}
+                onModelDirty={setModelDirty}
+                onModelBusy={setBusy}
                 profile={data.profile}
                 dishes={data.dishes ?? []}
                 save={save}
                 busy={busy}
-                dirty={dirty}
+                dirty={dirty || modelDirty}
                 onDirty={() => setDirty(true)}
                 onRemoveDish={removeDish}
                 onOpenGuide={() => {
@@ -755,6 +867,7 @@ export default function Dashboard({
                   className="danger-button"
                   onClick={() => {
                     setDirty(false);
+                    setModelDirty(false);
                     setConfirmClose(false);
                     setModal(null);
                   }}

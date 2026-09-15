@@ -74,6 +74,7 @@ type PanelProps = {
   edit: (kind: Kind, entry?: Entry, meal?: MealSlot) => void;
   history: (kind: Kind) => void;
   plan: (kind: 'diet' | 'training') => void;
+  onFactsChanged?: () => Promise<unknown>;
 };
 export const compactDate = (d: string) => d.slice(5).replace('-', '/');
 export const numeric = (n: number | null | undefined, digits = 1) =>
@@ -671,7 +672,8 @@ function FoodEquivalents({ target }: { target?: DietPlan }) {
       })}
       <p>
         每行只比较一种营养素，不是把三行食物加起来当食谱。食物还含其他营养；数值按
-        USDA 每 100g 数据换算，无需模型。{!target && '先设置营养目标即可查看。'}
+        USDA 每 100g 数据换算，无需模型。
+        {!target && '先设置营养目标即可查看。'}
       </p>
     </div>
   );
@@ -960,7 +962,21 @@ export function TrainingPanel(props: PanelProps) {
             其他历史动作 <ChevronRight size={13} />
           </button>
         )}
-        <details className="strength-method">
+        <details
+          className="strength-method"
+          onToggle={(e) => {
+            if (e.currentTarget.open)
+              void fetch('/api/medals/facts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ metric: 'strength_viewed' }),
+              })
+                .then((response) => {
+                  if (response.ok) return props.onFactsChanged?.();
+                })
+                .catch(() => {});
+          }}
+        >
           <summary>力量值与等级怎么算？</summary>
           <p>
             没有可比数据时，100 只是初始值。各部位相对首次的历史最佳正向增长，每

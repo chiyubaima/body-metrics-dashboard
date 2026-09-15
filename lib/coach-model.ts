@@ -1,5 +1,6 @@
 import { InputError } from './model.ts';
 import { coachOutputSchema } from './coach-prompt.ts';
+import { medalOutputSchema } from './medal-schema.ts';
 import type { CoachConnection } from './coach.ts';
 import { partialCoachReply, readEventStream } from './coach-stream.ts';
 
@@ -13,6 +14,10 @@ export type CoachEnvironment = {
   COACH_LOCAL_URL?: string;
   COACH_CODEX_AUTHENTICATED?: string;
   COACH_CONFIG_REVISION?: string;
+  MEDAL_IMAGE_PROVIDER?: string;
+  MEDAL_IMAGE_BASE_URL?: string;
+  MEDAL_IMAGE_MODEL?: string;
+  MEDAL_IMAGE_API_KEY?: string;
 };
 export function coachConnection(env: CoachEnvironment): CoachConnection {
   const revision = env.COACH_CONFIG_REVISION
@@ -63,7 +68,11 @@ export async function generateCoachReply(
   instructions: string,
   input: string,
   fetcher: typeof fetch = fetch,
-  stream?: { onDelta?: (delta: string) => void; signal?: AbortSignal },
+  stream?: {
+    onDelta?: (delta: string) => void;
+    signal?: AbortSignal;
+    purpose?: 'medal';
+  },
 ) {
   if (!coachConnection(env).configured)
     throw new InputError('教练还没连接模型，请打开设置完成连接。');
@@ -74,15 +83,21 @@ export async function generateCoachReply(
       ? env.COACH_CODEX_URL!
       : `${(env.COACH_API_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')}/${provider === 'responses' ? 'responses' : 'chat/completions'}`;
   const key = provider === 'codex' ? env.COACH_CODEX_TOKEN : env.COACH_API_KEY;
+  const outputSchema =
+    stream?.purpose === 'medal' ? medalOutputSchema : coachOutputSchema;
   const format = {
     type: 'json_schema',
     name: 'coach_reply',
     strict: true,
-    schema: coachOutputSchema,
+    schema: outputSchema,
   };
   const body =
     provider === 'codex'
-      ? { instructions, input }
+      ? {
+          instructions,
+          input,
+          ...(stream?.purpose ? { purpose: stream.purpose } : {}),
+        }
       : provider === 'responses'
         ? {
             model: env.COACH_MODEL,
@@ -103,7 +118,7 @@ export async function generateCoachReply(
               json_schema: {
                 name: 'coach_reply',
                 strict: true,
-                schema: coachOutputSchema,
+                schema: outputSchema,
               },
             },
           };

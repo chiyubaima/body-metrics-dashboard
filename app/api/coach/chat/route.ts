@@ -1,4 +1,7 @@
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
+import { startMedalArt } from '@/lib/medal-art-service';
+import { resolveCoachEnvironment } from '@/lib/coach-local';
+import type { Medal } from '@/lib/medals';
 import { api, readBody } from '@/lib/api';
 import { coachChat } from '@/lib/coach-service';
 import { generateCoachReply } from '@/lib/coach-model';
@@ -9,8 +12,23 @@ export async function POST(r: Request) {
     r,
     async (db, owner) => {
       const body = await readBody(r);
+      const onMedalArtRequested = async (m: Medal) =>
+        startMedalArt(
+          db,
+          owner,
+          env.MEDAL_IMAGES,
+          await resolveCoachEnvironment(env),
+          {
+            id: m.id,
+            revision: m.revision,
+            requestId: `${m.id}_${m.revision}_art`,
+          },
+          waitUntil,
+        );
       if (!r.headers.get('accept')?.includes('text/event-stream'))
-        return coachChat(db, owner, env, body);
+        return coachChat(db, owner, env, body, undefined, undefined, {
+          onMedalArtRequested,
+        });
       const abort = new AbortController();
       const signal = AbortSignal.any([r.signal, abort.signal]);
       const encoder = new TextEncoder();
@@ -38,6 +56,7 @@ export async function POST(r: Request) {
                 new Date(),
                 {
                   signal,
+                  onMedalArtRequested,
                   onProgress: (progress) => send({ type: 'tool', progress }),
                 },
               );

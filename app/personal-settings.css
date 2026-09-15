@@ -69,7 +69,7 @@ html .personal-settings-dialog > [data-slot='dialog-description'] {
 }
 .settings-nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   flex-shrink: 0;
   margin: 20px 24px 0;
@@ -510,4 +510,214 @@ html .personal-settings-confirm [data-slot='dialog-title'] {
   .settings-backup-card {
     padding: 20px;
   }
+}
+
+html .app-settings-menu {
+  width: 224px;
+  padding: 7px;
+  border: 1px solid #ffffffd9;
+  border-radius: 17px;
+  color: #34343b;
+  background: #f9f9fbed;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 12px 38px #00000024;
+}
+.app-settings-menu [role='menuitem'] {
+  min-height: 43px;
+  gap: 12px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.app-settings-menu [role='menuitem']:is(:hover, [data-highlighted]) {
+  background: #e8e8ee;
+  color: #202026;
+}
+.app-settings-menu .app-settings-exit {
+  margin-top: 5px;
+  border-top: 1px solid #dedee5;
+}
+html .dialog-popup.app-exit-dialog {
+  width: min(390px, calc(100vw - 32px)) !important;
+  max-width: 390px !important;
+  height: auto !important;
+  min-height: 0;
+  padding: 26px !important;
+  border-radius: 22px !important;
+  background: #fafafa !important;
+  color: #34343c;
+  gap: 16px;
+}
+html .app-exit-dialog [data-slot='alert-dialog-title'] {
+  color: #303035;
+  font-size: 20px;
+}
+html .app-exit-dialog [data-slot='alert-dialog-description'] {
+  color: #74747d;
+  line-height: 1.8;
+}
+html .app-exit-dialog button {
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+html .app-exit-dialog .primary {
+  background: #303037;
+  color: white;
+  border-color: #303037;
+}
+html .app-exit-dialog .secondary {
+  background: #eeeef2;
+  color: #44444d;
+  border: 1px solid #dcdce4;
+}
+.app-exit-dialog [role='alert'] {
+  color: #a33b3b;
+  font-size: 13px;
+}
+.app-stopped {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 100dvh;
+  padding: 32px;
+  color: #42424b;
+  background: #f5f5f8;
+  text-align: center;
+}
+.app-stopped h1 {
+  font-size: 24px;
+}
+.app-stopped p {
+  max-width: 400px;
+  line-height: 1.8;
+}
+.model-settings {
+  display: grid;
+  gap: 18px;
+}
+.model-settings-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e1e1e6;
+  border-radius: 18px;
+  background: #fff;
+}
+.model-settings-card > h3 {
+  margin: 0 0 8px;
+  color: #30303a;
+  font-size: 18px;
+}
+.model-settings-card > p {
+  margin: 10px 0 16px;
+  color: #757580;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.model-settings-destination {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-block: 1px solid #e7e7ec;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.model-settings-destination span,
+.model-settings-destination small {
+  color: #858590;
+}
+.model-settings fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.model-settings .medal-image-connection label {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.model-settings .medal-image-connection input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dddde4;
+  border-radius: 11px;
+  color: #30303b;
+  font-size: 14px;
+}
+.model-settings .coach-provider-settings {
+  padding: 0;
+}
+.model-settings .coach-provider-settings form {
+  gap: 14px;
+}
+.model-settings .coach-provider-settings .field {
+  margin: 12px 0;
+}
+.model-settings .coach-provider-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.model-settings .coach-provider-options label {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid #dddde5;
+  border-radius: 12px;
+  background: #f4f4f8;
+  padding: 10px;
+  color: #555560;
+}
+.model-settings .coach-provider-settings button {
+  min-height: 38px;
+  border-radius: 10px;
+}
+.model-settings .coach-provider-settings .coach-setting-copy {
+  color: #747480;
+  font-size: 13px;
+  line-height: 1.7;
+}
+@media (max-width: 560px) {
+  .settings-nav button {
+    font-size: 12px;
+  }
+  .model-settings-card {
+    padding: 16px;
+  }
+}
+html .personal-settings-dialog .model-settings .text-button {
+  color: #61616d;
+  background: #f3f3f6;
+  border: 1px solid #e3e3e9;
+  border-radius: 10px;
+  padding: 9px 12px;
+  text-decoration: none;
+}
+.model-settings .medal-provider-options {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.model-settings .medal-provider-options button {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid #dddde5;
+  border-radius: 10px;
+  background: #f5f5f8;
+  color: #63636e;
+}
+.model-settings .medal-provider-options button[aria-pressed='true'] {
+  background: #34343b;
+  color: #fff;
+  border-color: #34343b;
+}
+.model-settings .medal-codex-connection {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  font-size: 13px;
+  line-height: 1.75;
 }

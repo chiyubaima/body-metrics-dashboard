@@ -38,7 +38,6 @@ import {
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 import { Field, Picker } from './form-controls';
-import { CoachConnection } from './coach-connection';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   commitmentLabels,
@@ -136,6 +135,9 @@ export function Coach({
   settingsRequest = 0,
   onToolAction,
   onRecordsChanged,
+  onOpenModelSettings,
+  modelVersion = 0,
+  onPendingWork,
 }: {
   date: string;
   ready: boolean;
@@ -145,6 +147,9 @@ export function Coach({
   settingsRequest?: number;
   onToolAction?: (action: CoachToolAction) => Promise<void>;
   onRecordsChanged?: () => Promise<unknown>;
+  onOpenModelSettings?: () => void;
+  modelVersion?: number;
+  onPendingWork?: (pending: boolean) => void;
 }) {
   const toneId = useId();
   const editorGeneration = useRef(0);
@@ -202,6 +207,9 @@ export function Coach({
     if (open && previousTab.current !== tab) heading.current?.focus();
     previousTab.current = tab;
   }, [open, tab]);
+  useEffect(() => {
+    onPendingWork?.(busy || saving || !!draft.trim() || !!editorDraft);
+  }, [busy, saving, draft, editorDraft, onPendingWork]);
   const readPosition = useCallback(() => scrollPosition.current, []);
   const savePosition = useCallback((value: CoachScrollPosition) => {
     scrollPosition.current = value;
@@ -318,6 +326,10 @@ export function Coach({
     }
   }
   useEffect(() => {
+    if (ready && modelVersion)
+      void refresh(false).catch((e) => setError(e.message));
+  }, [ready, modelVersion, refresh]);
+  useEffect(() => {
     if (!ready) return;
     void refresh().catch((e) => setError(e.message));
   }, [ready, snapshot, refresh]);
@@ -417,6 +429,7 @@ export function Coach({
           turns.filter((turn) => turn.id !== request.id),
         );
         await refresh(false).catch(() => {});
+        await onRecordsChanged?.().catch(() => {});
       } catch (error) {
         setLocalTurns((turns) =>
           turns.map((turn) =>
@@ -440,7 +453,7 @@ export function Coach({
         setBusy(false);
       }
     },
-    [date, refresh],
+    [date, refresh, onRecordsChanged],
   );
   useEffect(() => {
     if (
@@ -707,6 +720,8 @@ export function Coach({
               className="coach-chat-panel"
             >
               <CoachConversation
+                snapshot={snapshot}
+                onMedalsChanged={onRecordsChanged}
                 avatar={
                   <CaptainAvatar
                     activity="greeting"
@@ -1146,59 +1161,20 @@ export function Coach({
                   </span>
                   <h3>模型连接</h3>
                 </div>
-                {open && (
-                  <CoachConnection
-                    visible={tab === 'settings'}
-                    disabled={saving || busy}
-                    onSaved={refresh}
-                  />
-                )}
-                <div className="coach-model-row">
-                  <span>模型服务</span>
-                  <strong>
-                    {state?.connection.destination || '正在读取…'}
-                  </strong>
-                </div>
-                <div className="coach-model-row">
-                  <span>当前模型</span>
-                  <code>{state?.connection.model || '尚未选择'}</code>
-                </div>
                 <p className="coach-setting-copy">
-                  启用后，Captain
-                  会将你的近期身体、饮食和训练摘要、所选日明细、个人资料、近期聊天以及已保存的记忆与约定发送到上方模型服务，用于回应你。按需查询的历史记录也会提供给模型。知识查询只向
-                  Europe PMC 发送通用主题词，来源可在回复中展开查看。
+                  {state?.active
+                    ? '模型已连接，Captain 已启用。'
+                    : '在个人设置中连接模型并启用 Captain。'}
                 </p>
-                <p className="coach-setting-copy">
-                  聊天与记忆保存在本机账本。调用模型需要联网；通过 Codex
-                  连接时会使用当前账户的 Codex 额度。
-                </p>
-                {state?.connection.configured ? (
-                  <button
-                    className={state.active ? 'secondary' : 'primary'}
-                    disabled={saving}
-                    onClick={async () => {
-                      const enable = !state.active;
-                      const ok = await mutate(
-                        '/api/coach',
-                        {
-                          enabled: enable,
-                          consentConfig: state.connection.fingerprint,
-                        },
-                        'PATCH',
-                        enable
-                          ? 'Captain 已启用，可以开始聊了'
-                          : 'Captain 已停用',
-                      );
-                      if (ok && enable) setTab('chat');
-                    }}
-                  >
-                    {state.active ? '停用 AI 聊天' : '启用 Captain，开始聊聊'}
-                  </button>
-                ) : (
-                  <div className="coach-setup">
-                    <p>在上方完成登录或保存 API 配置，就可以启用 Captain。</p>
-                  </div>
-                )}
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenModelSettings?.();
+                  }}
+                >
+                  前往模型设置
+                </button>
               </section>
               <section className="coach-detail-card" aria-label="怎么陪你">
                 <div className="coach-section-heading">
@@ -1312,7 +1288,7 @@ export function Coach({
                   切换，重启后核对服务并重新启用。密钥不会进入网页或备份。
                 </p>
                 <p className="coach-setting-copy">
-                  聊天、记忆和约定会随“个人资料与备份”中的全部记录一起导出。
+                  聊天、记忆和约定会随“个人设置”中的全部记录一起导出。
                 </p>
               </details>
             </section>

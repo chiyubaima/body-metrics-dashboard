@@ -6,6 +6,55 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+export const medalFacts = sqliteTable('medal_facts', {
+  id: text('id').primaryKey(),
+  owner: text('owner').notNull(),
+  metric: text('metric').notNull(),
+  sourceId: text('source_id').notNull(),
+  occurredAt: text('occurred_at').notNull(),
+}, (t) => [uniqueIndex('idx_medal_fact_source').on(t.owner, t.metric, t.sourceId)]);
+export const medalAwards = sqliteTable('medal_awards', {
+  id: text('id').primaryKey(),
+  owner: text('owner').notNull(),
+  medalId: text('medal_id').notNull(),
+  version: integer('version').notNull(),
+  stage: integer('stage').notNull(),
+  threshold: integer('threshold').notNull(),
+  date: text('date').notNull(),
+});
+
+export const medals = sqliteTable(
+  'medals',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    revision: integer('revision').notNull(),
+    payload: text('payload').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [index('idx_medals_owner').on(t.owner)],
+);
+export const medalNotifications = sqliteTable(
+  'medal_notifications',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('idx_medal_notifications_owner').on(t.owner)],
+);
+export const medalGenerations = sqliteTable(
+  'medal_generations',
+  {
+    id: text('id').primaryKey(),
+    owner: text('owner').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    status: text('status').notNull(),
+    result: text('result'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('idx_medal_generations_owner').on(t.owner)],
+);
 export const records = sqliteTable(
   'records',
   {
