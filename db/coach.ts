@@ -549,7 +549,7 @@ export async function claimCoachTurn(
     const result = existing
       ? await db
           .prepare(
-            "UPDATE coach_turns SET status='pending',updated_at=? WHERE owner=? AND id=? AND status='failed'",
+            "UPDATE coach_turns SET status='pending',tool_runs='[]',updated_at=? WHERE owner=? AND id=? AND status='failed'",
           )
           .bind(stamp, owner, id)
           .run()
@@ -591,6 +591,7 @@ export async function finishCoachTurn(
     evidence: Evidence[];
     toolRuns?: CoachToolRun[];
   } | null,
+  failedSteps: CoachToolRun[] = [],
 ) {
   const completedAt = new Date().toISOString();
   const statement = db
@@ -607,7 +608,16 @@ export async function finishCoachTurn(
       JSON.stringify(output?.evidence ?? []),
       owner,
       owner,
-      JSON.stringify(output?.toolRuns ?? []),
+      JSON.stringify(
+        output?.toolRuns ??
+          failedSteps.map(({ id, name, title, summary, status }) => ({
+            id,
+            name,
+            title,
+            summary,
+            status,
+          })),
+      ),
       output ? 'complete' : 'failed',
       completedAt,
       owner,

@@ -1,5 +1,12 @@
 # Application working rules
 
+## Captain duplicate request recovery (2026-09-15)
+
+- Synthetic reproduction also shows half-unit validation rejects 半只/半根. Extend only the existing coach-drafts half-serving unit list for these two forms; retain explicit quantity evidence and explain whole-unit reference recipes before multiplying by 0.5. Regress synthetic chicken/corn halves and reject unsupported half-serving claims.
+- Reuse same-turn owned tool results for identical names and canonical JSON arguments, including empty/error results. Do not execute, duplicate cards or charge another execution for a reused call. Supply request IDs/arguments with results and corrective feedback. Retain six requests per batch, six new executions total, three tool rounds/four generations and the shared 120-second timeout; persistent repetition stops at the final answer boundary.
+- Keep fresh context, forgetting cleanup, cancellation, whitelist and confirmation/version guards; existing medal side effects must not replay on duplicates. Persist only tool name, round and execution/reuse/block status in existing tool_runs on failure, excluding arguments, result contents, actions, health values and raw exceptions. Clear diagnostics when claiming a retry; failed steps cannot be confirmed or enter conversation context.
+- Extend existing coach service/instructions/storage/tests and README/parent H5 docs. Synthetic regressions cover reordered keys, same/cross-batch duplication, mixed budget, empty/error results, draft confirmation/idempotency, bounded failure, diagnostic privacy/ownership/retry and forgetting. Run test/typecheck/lint/build and a local read-only check. No new directories/migrations, personal-message replay, live models/diary edits, automatic commit/push/deploy.
+
 ## Medal copy and editor simplification annotations (2026-09-15)
 
 - Handle the six initially read notes: wall title becomes 每一枚，都是你的故事; creation title becomes 纪念每一次进步！; remove the ordinary editor's context/title/intro and its natural-language adjustment disclosure. Remove only state and handlers made unused by this removal. Keep initial natural-language creation, explicit version review, validation, discard protection and artwork recovery.

@@ -1659,7 +1659,10 @@ for (const recover of [false, true]) {
             return toolOutput(...(recover ? queries.slice(0, 4) : queries));
           if (recover && step === 1) {
             assert.equal(supplied.remainingToolCalls, 2);
-            return toolOutput(...queries.slice(3));
+            return toolOutput(
+              ...queries.slice(4),
+              call('search_catalog', { kind: 'food', query: '合成超额菜品' }),
+            );
           }
           if (recover && step === 2) {
             assert.equal(supplied.remainingToolCalls, 2);
@@ -1783,6 +1786,339 @@ await test('opening and final-answer generations cannot execute tools', async ()
   }
 });
 
+await test('repeated food queries and reordered draft requests produce one confirmable half-chicken and half-corn meal', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const recipes = ['合成烤鸡', '合成烤玉米'].map((name) => ({
+      ...recipe(),
+      name,
+    }));
+    const input = message(
+      `晚餐吃了半只${recipes[0].name}和半根${recipes[1].name}`,
+    );
+    const queries = recipes.map((r) =>
+      call('search_catalog', { kind: 'food', query: r.name }),
+    );
+    const foods = recipes.map((estimatedDish) => ({
+      estimatedDish,
+      servings: 0.5,
+      meal: 'dinner',
+    }));
+    let generations = 0;
+    let firstResults = '';
+    const progress: string[] = [];
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      input,
+      async (_env, _prompt, raw) => {
+        const supplied = JSON.parse(raw);
+        const step = generations++;
+        if (step === 0) return toolOutput(...queries, queries[0]);
+        assert.match(supplied.toolRequestFeedback, /复用/);
+        if (step === 1) {
+          assert.equal(supplied.remainingToolCalls, 4);
+          assert.equal(supplied.toolResults.length, 2);
+          supplied.toolResults.forEach(
+            (
+              r: {
+                id: string;
+                arguments: string;
+                result: { foods: unknown[] };
+              },
+              i: number,
+            ) => {
+              assert(r.id);
+              assert.equal(JSON.parse(r.arguments).query, recipes[i].name);
+              assert.deepEqual(r.result.foods, []);
+            },
+          );
+          firstResults = JSON.stringify(supplied.toolResults);
+          return toolOutput(
+            ...recipes.map((r) =>
+              call('search_catalog', { query: r.name, kind: 'food' }),
+            ),
+          );
+        }
+        if (step === 2) {
+          assert.equal(supplied.remainingToolCalls, 4);
+          assert.equal(JSON.stringify(supplied.toolResults), firstResults);
+          assert.equal(progress.length, 4);
+          return toolOutput(
+            call('prepare_record', {
+              kind: 'diet',
+              date,
+              quote: input.message,
+              data: { foods },
+            }),
+            call('prepare_record', {
+              data: {
+                foods: foods.map((f) => ({
+                  meal: f.meal,
+                  servings: f.servings,
+                  estimatedDish: f.estimatedDish,
+                })),
+              },
+              quote: input.message,
+              date,
+              kind: 'diet',
+            }),
+          );
+        }
+        assert.equal(supplied.toolResults.length, 3);
+        assert.equal(supplied.toolsAvailable, false);
+        return { ...output, reply: '已整理两项估算份量，请核对后确认记录。' };
+      },
+      now,
+      { onProgress: (p) => progress.push(p.status) },
+    );
+    assert.equal(generations, 4);
+    assert.deepEqual(progress, [
+      'running',
+      'complete',
+      'running',
+      'complete',
+      'running',
+      'complete',
+    ]);
+    assert.equal(response.turn!.toolRuns!.length, 3);
+    const run = response.turn!.toolRuns![2];
+    const action = draftAction(run.actions![0]);
+    assert.deepEqual(
+      (action.entry.data as Diet).foods.map((f) => [
+        f.name,
+        f.grams,
+        f.estimatedPortion,
+      ]),
+      recipes.map((r) => [r.name, r.portionGrams / 2, true]),
+    );
+    assert.equal((await snapshot(db, 'a')).records.length, 0);
+    assert.equal((await listDishes(db, 'a')).length, 0);
+    const confirmation = { turnId: input.id, runId: run.id, actionIndex: 0 };
+    await confirmCoachRecord(db, 'a', confirmation);
+    const saved = await snapshot(db, 'a');
+    assert.equal(saved.records.length, 1);
+    assert.equal(saved.dishes!.length, 2);
+    assert.equal((saved.records[0].data as Diet).foods.length, 2);
+    await confirmCoachRecord(db, 'a', confirmation);
+    assert.deepEqual(await snapshot(db, 'a'), saved);
+    for (const quote of [
+      `吃了${recipes[0].name}`,
+      `吃了一只${recipes[0].name}`,
+    ])
+      assert.throws(
+        () =>
+          prepareRecord(
+            { kind: 'diet', date, quote, data: { foods: [foods[0]] } },
+            [],
+            quote,
+            now,
+          ),
+        /没有数量依据/,
+      );
+  } finally {
+    close();
+  }
+});
+
+await test('a mixed batch reuses requests and spends only its two remaining executions', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const queries = Array.from({ length: 6 }, (_, i) =>
+      call('search_catalog', { kind: 'food', query: `合成混合菜品${i}` }),
+    );
+    let generations = 0;
+    const progress: string[] = [];
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      message(),
+      async (_env, _prompt, raw) => {
+        const supplied = JSON.parse(raw);
+        if (++generations === 1) return toolOutput(...queries.slice(0, 4));
+        if (generations === 2) {
+          assert.equal(supplied.remainingToolCalls, 2);
+          return toolOutput(
+            queries[0],
+            queries[4],
+            queries[4],
+            queries[1],
+            queries[5],
+            queries[5],
+          );
+        }
+        assert.equal(supplied.remainingToolCalls, 0);
+        assert.equal(supplied.toolsAvailable, false);
+        assert.equal(supplied.toolResults.length, 6);
+        assert.match(supplied.toolRequestFeedback, /复用/);
+        return output;
+      },
+      now,
+      { onProgress: (p) => progress.push(p.status) },
+    );
+    assert.equal(generations, 3);
+    assert.equal(response.turn!.toolRuns!.length, 6);
+    assert.equal(progress.length, 12);
+  } finally {
+    close();
+  }
+});
+
+await test('an identical failed tool is reused as an error instead of repeatedly executing or inventing success', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const query = call('find_records', {
+      kind: 'diet',
+      start: date,
+      end: shiftDate(date, 1),
+    });
+    let generations = 0;
+    let firstResult = '';
+    const progress: string[] = [];
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      message(),
+      async (_env, _prompt, raw) => {
+        const supplied = JSON.parse(raw);
+        if (++generations === 1) return toolOutput(query);
+        assert.equal(supplied.toolResults.length, 1);
+        assert.equal(supplied.toolResults[0].status, 'error');
+        assert.equal(supplied.toolResults[0].result.completed, false);
+        assert.equal(supplied.remainingToolCalls, 5);
+        if (generations === 2) {
+          firstResult = JSON.stringify(supplied.toolResults);
+          return toolOutput(query);
+        }
+        assert.equal(JSON.stringify(supplied.toolResults), firstResult);
+        assert.match(supplied.toolRequestFeedback, /不代表成功查到/);
+        return { ...output, reply: '日期需要补充确认。' };
+      },
+      now,
+      { onProgress: (p) => progress.push(p.status) },
+    );
+    assert.equal(response.turn!.toolRuns!.length, 1);
+    assert.deepEqual(progress, ['running', 'error']);
+  } finally {
+    close();
+  }
+});
+
+await test('failed attempts retain private owner-scoped step metadata without a saveable draft and clear it on retry', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const input = message('合成私密原话：今天早上81公斤');
+    let generations = 0;
+    await assert.rejects(
+      coachChat(db, 'a', env, input, async () => {
+        if (++generations === 1)
+          return toolOutput(
+            call('prepare_record', {
+              kind: 'body',
+              date,
+              quote: input.message,
+              data: { weight: 81, condition: 'morning' },
+            }),
+          );
+        throw new Error('synthetic-private-provider-error');
+      }),
+      /synthetic-private-provider-error/,
+    );
+    const failed = (await getCoachTurn(db, 'a', input.id))!;
+    assert.equal(failed.status, 'failed');
+    assert.equal(failed.toolRuns!.length, 1);
+    assert.equal(failed.toolRuns![0].name, 'prepare_record');
+    assert.match(failed.toolRuns![0].summary, /第1轮：工具执行完成/);
+    assert.deepEqual(Object.keys(failed.toolRuns![0]).sort(), [
+      'id',
+      'name',
+      'status',
+      'summary',
+      'title',
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(failed.toolRuns),
+      /weight|合成私密原话|synthetic-private-provider-error|actions|arguments/,
+    );
+    assert.equal(await getCoachTurn(db, 'b', input.id), null);
+    assert.equal(
+      buildCoachContext(empty(), date, [], [], [failed], now).context
+        .conversation.length,
+      0,
+    );
+    await assert.rejects(
+      confirmCoachRecord(db, 'a', {
+        turnId: input.id,
+        runId: failed.toolRuns![0].id,
+        actionIndex: 0,
+      }),
+      /已不可用/,
+    );
+    assert.equal((await snapshot(db, 'a')).records.length, 0);
+    const retried = await coachChat(db, 'a', env, input, async () => {
+      const pending = (await getCoachTurn(db, 'a', input.id))!;
+      assert.equal(pending.status, 'pending');
+      assert.deepEqual(pending.toolRuns, []);
+      return output;
+    });
+    assert.equal(retried.turn!.status, 'complete');
+    assert.deepEqual(retried.turn!.toolRuns, []);
+  } finally {
+    close();
+  }
+});
+
+await test('reused agreement results cannot restore a memory permanently forgotten during generation', async () => {
+  const { db, close } = connect();
+  try {
+    await enable(db);
+    const id = crypto.randomUUID();
+    const content = '合成临时偏好待忘掉';
+    await saveCoachMemory(db, 'a', {
+      id,
+      content,
+      category: 'preference',
+      expiresAt: null,
+    });
+    const query = call('inspect_agreements', {});
+    let generations = 0;
+    const response = await coachChat(
+      db,
+      'a',
+      env,
+      message(),
+      async (_env, _prompt, raw) => {
+        const supplied = JSON.parse(raw);
+        if (++generations === 1) return toolOutput(query);
+        if (generations === 2) {
+          assert.equal(
+            supplied.toolResults[0].result.memories[0].content,
+            content,
+          );
+          await deleteCoachMemory(db, 'a', id);
+          await permanentlyForgetCoachItem(db, 'a', 'memory', id);
+          return toolOutput(query);
+        }
+        assert.equal(supplied.toolResults.length, 1);
+        assert.match(supplied.toolResults[0].result.unavailable, /永久忘掉/);
+        assert(!raw.includes(content));
+        return output;
+      },
+    );
+    assert.equal(response.turn!.toolRuns!.length, 1);
+    assert.equal(response.turn!.toolRuns![0].actions, undefined);
+  } finally {
+    close();
+  }
+});
+
 await test('tool loops bound retries and cancellation, preserve failed messages and validate source IDs', async () => {
   const { db, close } = connect();
   try {
@@ -1796,10 +2132,16 @@ await test('tool loops bound retries and cancellation, preserve failed messages 
           call('find_records', { kind: 'all', start: date, end: date }),
         );
       }),
-      /没有取得新结果/,
+      /反复查询同一内容/,
     );
-    assert.equal(count, 2);
-    assert.equal((await getCoachTurn(db, 'a', input.id))?.status, 'failed');
+    assert.equal(count, 4);
+    const failed = (await getCoachTurn(db, 'a', input.id))!;
+    assert.equal(failed.status, 'failed');
+    assert.equal(failed.toolRuns!.length, 4);
+    assert.match(failed.toolRuns![0].summary, /第1轮：工具执行完成/);
+    assert.match(failed.toolRuns![1].summary, /复用第1次执行/);
+    assert.match(failed.toolRuns![3].summary, /未执行/);
+    assert.equal(await getCoachTurn(db, 'b', input.id), null);
     const abort = new AbortController();
     abort.abort();
     let generated = false;
@@ -2969,7 +3311,7 @@ await test('Captain creates and activates a product medal through the normal too
         calls++;
         assert.match(instructions, /prepare_medal/);
         const context = JSON.parse(prompt);
-        if (!context.toolResults.length)
+        if (calls <= 2)
           return toolOutput({
             name: 'prepare_medal',
             arguments: JSON.stringify({
@@ -2978,13 +3320,15 @@ await test('Captain creates and activates a product medal through the normal too
             }),
           });
         assert.equal(context.toolResults[0].result.status, 'draft');
+        assert.equal(context.toolResults.length, 1);
+        assert.match(context.toolRequestFeedback, /复用/);
         return {
           ...output,
           reply: '草稿已准备，核对卡片后可以开始追踪。',
         };
       },
     );
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     const created = (await listMedals(db, 'a'))[0];
     assert.equal(created.status, 'draft');
     await coachChat(db, 'a', env, input, async () => {
@@ -3006,7 +3350,7 @@ await test('Captain creates and activates a product medal through the normal too
                 t.medals?.some((m) => m.id === created.id),
             ),
           );
-          return toolOutput({
+          const activate: CoachToolCall = {
             name: 'activate_medal',
             arguments: JSON.stringify({
               id: created.id,
@@ -3014,8 +3358,11 @@ await test('Captain creates and activates a product medal through the normal too
               previewTurnId: response.turn!.id,
               quote: acceptance.message,
             }),
-          });
+          };
+          return toolOutput(activate, activate);
         }
+        assert.equal(context.toolResults.length, 1);
+        assert.match(context.toolRequestFeedback, /复用/);
         assert.equal(context.toolResults[0].result.status, 'active');
         return { ...output, reply: '已开始追踪。' };
       },

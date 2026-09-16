@@ -249,7 +249,7 @@ export function prepareRecord(
             throw new InputError('请核对菜品份数。');
           if (
             food.servings !== undefined &&
-            !(servings === 0.5 && /半(?:份|碗|盘|个)/.test(quote))
+            !(servings === 0.5 && /半(?:份|碗|盘|个|只|根)/.test(quote))
           )
             requireReportedNumber(servings, undefined, quote, 'count');
           grams = Math.round(dish.recipe.portionGrams * servings * 10) / 10;

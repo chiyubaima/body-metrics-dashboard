@@ -145,6 +145,7 @@ export async function coachChat(
     };
   const claimed = await claimCoachTurn(db, owner, request, now);
   if (!claimed.claimed) return { turn: claimed.turn };
+  const failedSteps: CoachToolRun[] = [];
   try {
     const data = await snapshot(db, owner);
     await reconcileCommitments(db, owner, data.records, now);
@@ -178,7 +179,7 @@ export async function coachChat(
     };
     const toolRuns: CoachToolRun[] = [],
       toolResults: unknown[] = [],
-      seen = new Set<string>();
+      seen = new Map<string, number>();
     let output: unknown,
       toolRequestFeedback: string | null = null;
     for (let round = 0; round <= coachToolLimits.rounds; round++) {
@@ -250,26 +251,74 @@ export async function coachChat(
       const requestedCalls = coachObject(output).toolCalls;
       if (
         Array.isArray(requestedCalls) &&
-        requestedCalls.length > remainingToolCalls
+        requestedCalls.length > coachToolLimits.calls
       ) {
         if (request.kind === 'opening' || round === coachToolLimits.rounds)
           throw new InputError(
             'Captain 未能在本次查询范围内整理完回复，原消息已保留，请重试。',
           );
-        toolRequestFeedback = `上一批请求了${requestedCalls.length}次工具，超过本条消息剩余的${remainingToolCalls}次额度；整批未执行，没有新增工具结果或记录草稿。请按接下来提供的剩余额度调整查询，不重复已完成的查询，不遗漏用户要记录的食物。额度为0时toolCalls必须为空，只根据已核对结果答复或询问缺少的信息，不能声称已生成不存在的草稿。`;
+        toolRequestFeedback = `上一批请求了${requestedCalls.length}次工具，超过每批${coachToolLimits.calls}个请求的上限；整批未执行，没有新增工具结果或记录草稿。请按剩余额度调整，不遗漏用户要记录的食物，不能声称已生成不存在的草稿。`;
         continue;
       }
       const calls = parseToolCalls(output);
       if (!calls.length) break;
+      const requests = calls.map((call) => ({
+        call,
+        key:
+          call.name +
+          JSON.stringify(
+            coachObject(JSON.parse(call.arguments)),
+            (_key, value) =>
+              value && typeof value === 'object' && !Array.isArray(value)
+                ? Object.fromEntries(
+                    Object.keys(value)
+                      .sort()
+                      .map((key) => [key, value[key]]),
+                  )
+                : value,
+          ),
+        step: {
+          id: crypto.randomUUID(),
+          name: call.name,
+          title: coachToolLabels[call.name],
+          summary: `第${round + 1}轮：请求未执行。`,
+          status: 'error',
+        } as CoachToolRun,
+      }));
+      failedSteps.push(...requests.map((r) => r.step));
+      const newCalls = new Set(
+        requests.filter((r) => !seen.has(r.key)).map((r) => r.key),
+      ).size;
+      if (
+        request.kind === 'opening' ||
+        round === coachToolLimits.rounds ||
+        newCalls > remainingToolCalls
+      ) {
+        for (const { step } of requests)
+          step.summary = `第${round + 1}轮：超过本轮查询范围，未执行。`;
+        if (request.kind === 'opening' || round === coachToolLimits.rounds)
+          throw new InputError(
+            newCalls === 0
+              ? 'Captain 反复查询同一内容，暂时没能整理完记录。原消息已保留，请重试。'
+              : 'Captain 未能在本次查询范围内整理完回复，原消息已保留，请重试。',
+          );
+        toolRequestFeedback = `上一批需要${newCalls}次新执行，超过剩余的${remainingToolCalls}次额度；整批未执行，没有新增工具结果或记录草稿。请复用已有toolResults并按剩余额度调整，不遗漏用户要记录的食物。`;
+        continue;
+      }
       toolRequestFeedback = null;
       if (coachObject(output).reply)
         throw new InputError('工具结果还没核对完整，请重试这条消息。');
-      for (const call of calls) {
-        const key =
-          call.name + JSON.stringify(coachObject(JSON.parse(call.arguments)));
-        if (seen.has(key))
-          throw new InputError('查询没有取得新结果，请换一个条件后重试。');
-        seen.add(key);
+      for (const { call, key, step } of requests) {
+        signal.throwIfAborted();
+        const previous = seen.get(key);
+        if (previous !== undefined) {
+          step.status = toolRuns[previous].status;
+          step.summary = `第${round + 1}轮：重复请求，复用第${previous + 1}次执行的结果，未再次执行。`;
+          toolRequestFeedback =
+            '上一批含重复工具请求，已复用toolResults内对应id、name和arguments的结果，没有再次执行或新增卡片，也未消耗新的执行额度。已有结果可能为空、失败或不可用，不代表成功查到。请根据已有结果继续准备完整草稿；无匹配菜品按估算规则分析，缺少必要信息则询问，不要重复相同请求。';
+          continue;
+        }
+        step.summary = `第${round + 1}轮：工具执行未完成。`;
         options.onProgress?.({
           title: coachToolLabels[call.name],
           status: 'running',
@@ -317,9 +366,18 @@ export async function coachChat(
               fetcher: options.fetcher,
               signal,
             });
+        step.status = execution.run.status;
+        step.summary = `第${round + 1}轮：工具执行${execution.run.status === 'complete' ? '完成' : '失败'}。`;
         signal.throwIfAborted();
+        seen.set(key, toolRuns.length);
         toolRuns.push(execution.run);
-        toolResults.push({ name: call.name, result: execution.result });
+        toolResults.push({
+          id: execution.run.id,
+          name: call.name,
+          arguments: call.arguments,
+          status: execution.run.status,
+          result: execution.result,
+        });
         if (JSON.stringify(toolResults).length > 90000)
           throw new InputError('本次查询内容过多，请缩小范围后重试。');
         for (const item of execution.evidence)
@@ -368,7 +426,9 @@ export async function coachChat(
       throw new InputError('教练已暂停，这次回复未保存。');
     return { turn: await finishCoachTurn(db, owner, claimed.turn, parsed) };
   } catch (error) {
-    await finishCoachTurn(db, owner, claimed.turn, null).catch(() => {});
+    await finishCoachTurn(db, owner, claimed.turn, null, failedSteps).catch(
+      () => {},
+    );
     throw error;
   }
 }
