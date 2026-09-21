@@ -277,6 +277,9 @@ export function prepareRecord(
         return {
           ...previous,
           grams: food.grams,
+          ...(food.grams === previous.grams
+            ? {}
+            : { portion: undefined, estimatedPortion: false }),
           meal: food.meal ?? previous.meal,
         };
       if (food.fdcId) {

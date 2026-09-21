@@ -5,6 +5,7 @@ import {
   validatePlan,
   validateProfile,
   validId,
+  today,
 } from '../lib/model.ts';
 import { coachObject } from '../lib/coach.ts';
 import type {
@@ -75,15 +76,28 @@ export async function snapshot(
         'SELECT * FROM plans WHERE owner=? ORDER BY date DESC, created_at DESC',
       )
       .bind(owner),
-    db.prepare('SELECT payload FROM profiles WHERE owner=?').bind(owner),
+    db
+      .prepare('SELECT payload,updated_at FROM profiles WHERE owner=?')
+      .bind(owner),
   ]);
   return {
     records: (records.results as Row[]).map(entry),
     dishes: await listDishes(db, owner),
     plans: (plans.results as PlanRow[]).map(plan),
     profile: profile.results[0]
-      ? JSON.parse((profile.results[0] as { payload: string }).payload)
+      ? profileWithAgeDate(
+          profile.results[0] as { payload: string; updated_at: string },
+        )
       : null,
+  };
+}
+function profileWithAgeDate(row: { payload: string; updated_at: string }) {
+  const profile = JSON.parse(row.payload) as import('../lib/model.ts').Profile;
+  return {
+    ...profile,
+    ...(profile.age === null
+      ? {}
+      : { ageAsOf: profile.ageAsOf ?? today(new Date(row.updated_at)) }),
   };
 }
 type CoachRecordConfirmation = {
@@ -430,6 +444,16 @@ export async function saveProfile(
 ) {
   const profile = validateProfile(value);
   const now = new Date().toISOString();
+  const row = await db
+    .prepare('SELECT payload,updated_at FROM profiles WHERE owner=?')
+    .bind(owner)
+    .first<{ payload: string; updated_at: string }>();
+  const previous = row ? profileWithAgeDate(row) : null;
+  if (!profile.strength && previous?.strength)
+    profile.strength = previous.strength;
+  if (profile.age !== null)
+    profile.ageAsOf =
+      previous?.age === profile.age ? previous.ageAsOf : today();
   const statement = db
     .prepare(
       'INSERT INTO profiles (owner,payload,updated_at) VALUES (?,?,?) ON CONFLICT(owner) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at',

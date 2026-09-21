@@ -3,26 +3,14 @@ import { shiftDate } from './model.ts';
 import { exerciseDefinition } from './exercises.ts';
 import { exerciseKey, workingSets } from './progress.ts';
 
-export const strengthGroups = ['胸', '背', '肩', '臀腿', '手臂', '核心'];
-export function strengthGroup(exercise: Exercise): string {
-  const group = exerciseDefinition(exercise)?.group ?? '其他';
-  return group === '腿' || group === '臀' ? '臀腿' : group;
-}
+type Performance = { date: string; weight: number; reps: number };
 
-// Brzycki estimate, limited to 1–10 recorded reps and comparable external loads.
-// This is a personal performance proxy: RIR, effort and form were not measured.
-export function estimatedStrength(exercise: Exercise): number | null {
-  const definition = exerciseDefinition(exercise);
-  if (!definition || definition.bodyOnly || exercise.load === 'bodyweight')
-    return null;
-  const values = workingSets(exercise)
-    .filter((s) => s.weight! > 0 && s.reps! >= 1 && s.reps! <= 10)
-    .map((s) =>
-      s.reps === 1 ? s.weight! : s.weight! / (1.0278 - 0.0278 * s.reps!),
-    );
-  return values.length ? Math.max(...values) : null;
-}
-export function strengthOverview(records: Entry[], date: string) {
+// Show recorded sets, not an inferred maximum or a score with an arbitrary baseline.
+export function exerciseProgress(records: Entry[], date: string) {
+  const actions = new Map<
+    string,
+    { exercise: Exercise; days: Map<string, Performance> }
+  >();
   const sessions = records
     .filter(
       (r) =>
@@ -36,60 +24,79 @@ export function strengthOverview(records: Entry[], date: string) {
         a.createdAt.localeCompare(b.createdAt) ||
         a.id.localeCompare(b.id),
     );
-  return strengthGroups.map((group) => {
-    const qualifying = sessions.flatMap((entry) =>
-      ((entry.data as Training).exercises ?? []).flatMap((exercise) => {
-        if (strengthGroup(exercise) !== group) return [];
-        const estimate = estimatedStrength(exercise);
-        return estimate === null
-          ? []
-          : [{ date: entry.date, exercise, estimate }];
-      }),
+  for (const session of sessions)
+    for (const exercise of (session.data as Training).exercises ?? []) {
+      const definition = exerciseDefinition(exercise);
+      const key = definition
+        ? `${definition.id}:${exercise.load}`
+        : exerciseKey(exercise);
+      for (const set of workingSets(exercise)) {
+        if (
+          !Number.isFinite(set.weight) ||
+          set.weight! < 0 ||
+          (set.weight === 0 && exercise.load !== 'bodyweight') ||
+          !Number.isInteger(set.reps) ||
+          set.reps! < 1
+        )
+          continue;
+        let action = actions.get(key);
+        if (!action) {
+          action = { exercise, days: new Map() };
+          actions.set(key, action);
+        }
+        const previous = action.days.get(session.date);
+        if (
+          !previous ||
+          set.weight! > previous.weight ||
+          (set.weight === previous.weight && set.reps! > previous.reps)
+        )
+          action.days.set(session.date, {
+            date: session.date,
+            weight: set.weight!,
+            reps: set.reps!,
+          });
+      }
+    }
+  return [...actions]
+    .map(([key, action]) => {
+      const history = [...action.days.values()];
+      const first = history[0],
+        last = history.at(-1)!;
+      const bodyOnly =
+        action.exercise.load === 'bodyweight' &&
+        history.every((p) => p.weight === 0);
+      const baseline = history.length === 1;
+      const changeUnit =
+        bodyOnly || (first.weight === last.weight && first.reps !== last.reps)
+          ? '次'
+          : 'kg';
+      const comparable =
+        bodyOnly || first.reps === last.reps || first.weight === last.weight;
+      const change =
+        baseline || !comparable
+          ? null
+          : changeUnit === '次'
+            ? last.reps - first.reps
+            : last.weight - first.weight;
+      return {
+        key,
+        name: exerciseDefinition(action.exercise)?.name ?? action.exercise.name,
+        load: action.exercise.load,
+        first,
+        last,
+        history,
+        bodyOnly,
+        baseline,
+        comparable,
+        change,
+        changeUnit,
+        stale: last.date < shiftDate(date, -27),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.last.date.localeCompare(a.last.date) || a.key.localeCompare(b.key),
     );
-    // Keep the earliest eligible exercise as the reference; adding exercises cannot add points.
-    const reference = qualifying[0]?.exercise ?? null;
-    const daily = new Map<string, number>();
-    for (const item of qualifying)
-      if (reference && exerciseKey(item.exercise) === exerciseKey(reference))
-        daily.set(
-          item.date,
-          Math.max(daily.get(item.date) ?? 0, item.estimate),
-        );
-    const history = [...daily].map(([date, estimate]) => ({ date, estimate }));
-    const first = history[0],
-      last = history.at(-1);
-    const stale = !!last && last.date < shiftDate(date, -28);
-    const score =
-      first && last ? Math.round((last.estimate / first.estimate) * 100) : null;
-    return {
-      group,
-      reference,
-      history,
-      first,
-      last,
-      score: stale ? null : score,
-      previousScore: score,
-      stale,
-      baseline: history.length === 1,
-    };
-  });
-}
-
-export function strengthGrowth(parts: ReturnType<typeof strengthOverview>) {
-  const progress = parts.reduce((sum, part) => {
-    if (!part.first) return sum;
-    const best = Math.max(...part.history.map((point) => point.estimate));
-    return sum + Math.max(0, (best / part.first.estimate - 1) * 100);
-  }, 0);
-  const points = Math.floor(progress + 1e-7);
-  const level = Math.min(20, 1 + Math.floor(points / 10));
-  return {
-    points,
-    level,
-    next: level === 20 ? 0 : level * 10 - points,
-    fraction: level === 20 ? 1 : (points % 10) / 10,
-    baselines: parts.filter((part) => part.first).length,
-  };
 }
 
 export function trainingDayLabel(rows: Entry[], planned: string): string {

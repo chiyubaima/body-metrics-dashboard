@@ -1,4 +1,8 @@
 import { resistanceExercises, cardioTypes } from './exercises.ts';
+import { validateFoodPortion } from './food-portions.ts';
+import type { FoodPortion } from './food-portions.ts';
+import { standardFor, strengthPatterns } from './strength-standards.ts';
+import type { StrengthSettings } from './strength-standards.ts';
 export type Kind = 'body' | 'diet' | 'training';
 export type PlanKind = 'diet' | 'training';
 export type Body = {
@@ -38,6 +42,7 @@ export type Food = {
   dish?: CustomDish;
   dishDraft?: boolean;
   estimatedPortion?: boolean;
+  portion?: FoodPortion;
   originalName?: string;
   localizedName?: string;
 };
@@ -97,6 +102,8 @@ export type Profile = {
   age: number | null;
   sex: string;
   note: string;
+  ageAsOf?: string;
+  strength?: StrengthSettings;
 };
 export type Entry = {
   id: string;
@@ -400,7 +407,7 @@ export function validateEntry(value: unknown) {
         const a = object(f),
           name = text(a.name, 80);
         if (!name) throw new InputError('请填写食物名称。');
-        return {
+        const food: Food = {
           name,
           grams: number(a.grams, 1, 10000)!,
           basis: choice(a.basis, ['raw', 'cooked', 'asSold']),
@@ -427,6 +434,17 @@ export function validateEntry(value: unknown) {
             ? { originalName: text(a.originalName, 500) }
             : {}),
         };
+        if (a.portion !== undefined) {
+          try {
+            food.portion = validateFoodPortion(a.portion, food);
+            food.estimatedPortion = true;
+          } catch (error) {
+            throw new InputError(
+              error instanceof Error ? error.message : '请重新填写日常份量。',
+            );
+          }
+        }
+        return food;
       }),
       ...(d.complete !== undefined ? { complete: bool(d.complete) } : {}),
     };
@@ -598,11 +616,36 @@ export function validatePlan(value: unknown) {
 }
 export function validateProfile(value: unknown): Profile {
   const d = object(value);
+  let strength: StrengthSettings | undefined;
+  if (d.strength !== undefined) {
+    const settings = object(d.strength);
+    if (typeof settings.enabled !== 'boolean')
+      throw new InputError('请选择是否启用力量对标。');
+    const references = object(settings.references);
+    if (
+      Object.keys(references).some(
+        (key) => !strengthPatterns.some((p) => p.id === key),
+      )
+    )
+      throw new InputError('力量类别无效。');
+    strength = { enabled: settings.enabled, references: {} };
+    for (const pattern of strengthPatterns) {
+      const id = references[pattern.id];
+      if (id === undefined) continue;
+      if (
+        typeof id !== 'string' ||
+        (id !== 'none' && standardFor(id)?.pattern !== pattern.id)
+      )
+        throw new InputError('请选择适用于该类别的参照动作。');
+      strength.references[pattern.id] = id;
+    }
+  }
   return {
     name: text(d.name, 40),
     height: number(d.height, 80, 250, true),
     age: number(d.age, 18, 110, true),
     sex: choice(d.sex, ['male', 'female', 'unspecified']),
     note: text(d.note, 1000),
+    ...(strength ? { strength } : {}),
   };
 }

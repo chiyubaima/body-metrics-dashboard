@@ -66,6 +66,7 @@ await test('meal editor selects from both libraries without recipe management, a
         ),
     );
   modules['./delete-confirm'] = compile('delete-confirm.tsx');
+  modules['./food-portion'] = compile('food-portion.tsx');
   const { MealForm } = await import(compile('meal-form.tsx'));
   const { createRoot } = await import('react-dom/client');
   const container = win.document.createElement('div');
@@ -135,6 +136,7 @@ await test('meal editor selects from both libraries without recipe management, a
     formId: 'dish-meal',
     date: today(),
     records: [],
+    dishes: [dish],
     meal: 'lunch',
     busy: false,
     onDirty: () => {},
@@ -329,6 +331,43 @@ await test('meal editor selects from both libraries without recipe management, a
   );
   assert.equal(selectedMeal(), '晚餐');
 
+  await act(async () =>
+    root.render(
+      createElement(MealForm, { ...props, key: 'empty-library', dishes: [] }),
+    ),
+  );
+  await settle();
+  assert.equal(
+    button('USDA 食物库').getAttribute('aria-pressed'),
+    'true',
+    'empty accounts start with a usable catalog',
+  );
+  await act(async () =>
+    root.render(
+      createElement(MealForm, {
+        ...props,
+        key: 'recent-default',
+        records: [draft],
+        dishes: [],
+      }),
+    ),
+  );
+  assert.equal(
+    button('最近吃过').getAttribute('aria-pressed'),
+    'true',
+    'returning users see their recent food first',
+  );
+  await act(async () =>
+    container
+      .querySelector<import('happy-dom').HTMLButtonElement>('.food-option')!
+      .click(),
+  );
+  assert.equal(
+    container.querySelector('.food-nutrition-reference')!.hasAttribute('open'),
+    false,
+    'nutrient editing is progressive',
+  );
+
   // Exercise the actual panel wiring and layered CSS with synthetic data.
   stubs['next/image'] =
     `${react} export default function Image({src,alt,width,height}) { return h('img',{src,alt,width,height}); }`;
@@ -338,6 +377,7 @@ await test('meal editor selects from both libraries without recipe management, a
     export const Line=({connectNulls,dataKey})=>h('output',{'data-chart-line':dataKey,'data-connect':String(connectNulls)});
     export const CartesianGrid=()=>null; export const Tooltip=()=>null; export const XAxis=()=>null; export const YAxis=()=>null;`;
   modules['./nutrition'] = compile('nutrition.tsx');
+  modules['./strength-rating'] = compile('strength-rating.tsx');
   const { DietPanel, BodyPanel, TrainingPanel } = await import(
     compile('panels.tsx')
   );
@@ -567,37 +607,17 @@ await test('meal editor selects from both libraries without recipe management, a
       }),
     ),
   );
-  assert.equal(
-    container.querySelectorAll('.strength-body-grid > button').length,
-    6,
-  );
-  assert.equal(
-    win.getComputedStyle(
-      container.querySelector('.strength-body-grid > button > span')!,
-    ).color,
-    '#252529',
-  );
-  assert.equal(
-    win.getComputedStyle(container.querySelector('.strength-growth-copy p')!)
-      .color,
-    '#68686f',
-  );
-  const chest = container.querySelector<import('happy-dom').HTMLButtonElement>(
-    '[data-annotate="training.group.胸"]',
-  )!;
-  await act(async () => chest.click());
-  assert.equal(chest.getAttribute('aria-expanded'), 'true');
+  assert.equal(container.querySelectorAll('.strength-body-grid').length, 0);
+  assert.equal(container.querySelectorAll('.exercise-progress-row').length, 0);
   assert(
     container
-      .querySelector('#strength-exercise-detail')
-      ?.textContent.includes('还没有可展示的工作组'),
+      .querySelector('.exercise-progress')
+      ?.textContent.includes('记录训练的重量和次数'),
   );
-  await act(async () => chest.click());
-  assert.equal(container.querySelector('#strength-exercise-detail'), null);
   assert.equal(
-    win.getComputedStyle(container.querySelector('.strength-growth > img')!)
-      .mixBlendMode,
-    'multiply',
+    container.querySelector('.strength-growth > img'),
+    null,
+    'unrated users have no fabricated level-one avatar',
   );
   assert.equal(
     win.getComputedStyle(container.querySelector('.strength-growth')!)
@@ -635,6 +655,107 @@ await test('meal editor selects from both libraries without recipe management, a
     kind: 'training',
     data: { type, status, minutes, content: '', details: '' },
   });
+  const strengthSession = (date: string, weight: number, reps = 12): Entry => {
+    const row = session(date, 'resistance');
+    (row.data as import('../lib/model.ts').Training).exercises = [
+      {
+        catalogId: 'bench-press',
+        name: '杠铃卧推',
+        load: 'total',
+        sets: [
+          {
+            id: crypto.randomUUID(),
+            weight,
+            reps,
+            completed: true,
+            warmup: false,
+          },
+        ],
+      },
+    ];
+    return row;
+  };
+  const strengthFirst = strengthSession('2026-09-01', 40);
+  const strengthLater = strengthSession('2026-09-08', 44);
+  for (const [records, date, sets, label] of [
+    [[strengthFirst], '2026-09-08', '40 kg × 12次', '首次记录 · 待比较'],
+    [
+      [strengthFirst, strengthSession('2026-09-08', 40)],
+      '2026-09-08',
+      '40→40 kg × 12次',
+      '与首次持平',
+    ],
+    [
+      [strengthFirst, strengthLater],
+      '2026-09-08',
+      '40→44 kg × 12次',
+      '较首次增加 4 kg',
+    ],
+    [
+      [strengthFirst, strengthLater, strengthSession('2026-09-09', 60, 8)],
+      '2026-09-09',
+      '40 kg × 12次→60 kg × 8次',
+      '次数不同 · 不直接比较加重',
+    ],
+    [
+      [strengthFirst, strengthLater],
+      '2026-10-08',
+      '40→44 kg × 12次',
+      '上次较首次增加 4 kg',
+    ],
+  ] as const) {
+    await act(async () =>
+      root.render(
+        createElement(TrainingPanel, {
+          ...panelProps,
+          module: 'training',
+          date,
+          records: [...records],
+        }),
+      ),
+    );
+    const row = container.querySelector('.exercise-progress-row')!;
+    assert.equal(
+      row.querySelector('.exercise-progress-heading strong')?.textContent,
+      '杠铃卧推',
+    );
+    assert.equal(
+      row.querySelector('.exercise-progress-sets')?.textContent,
+      sets,
+    );
+    assert.equal(
+      row.querySelector('.exercise-progress-caption > span')?.textContent,
+      label,
+    );
+    assert.equal(container.querySelector('.strength-body-grid'), null);
+  }
+  const progressRow = container.querySelector<
+    import('happy-dom').HTMLButtonElement
+  >('.exercise-progress-row')!;
+  assert(progressRow.textContent.includes('久未记录'));
+  await act(async () => progressRow.click());
+  assert.equal(progressRow.getAttribute('aria-expanded'), 'true');
+  assert(
+    container
+      .querySelector('#strength-exercise-detail .chart-note')
+      ?.textContent.includes('09/01 首次记录 · 共 2 个训练日'),
+  );
+  const progressPoints = JSON.parse(
+    container
+      .querySelector('#strength-exercise-detail [data-chart-points]')!
+      .getAttribute('data-chart-points')!,
+  );
+  assert.deepEqual(progressPoints, [
+    { date: '2026-09-01', value: 40 },
+    { date: '2026-09-08', value: 44 },
+  ]);
+  assert(
+    container
+      .querySelector('.strength-growth-copy strong')
+      ?.textContent.includes('待评级'),
+  );
+  await act(async () => progressRow.click());
+  assert.equal(container.querySelector('#strength-exercise-detail'), null);
   const latestCardio = session('2026-09-10', 'cardio', 'completed', 40);
   latestCardio.data = {
     ...(latestCardio.data as import('../lib/model.ts').Training),
@@ -773,4 +894,113 @@ await test('meal editor selects from both libraries without recipe management, a
     1,
     "today's saved sessions remain editable",
   );
+  const { strengthThresholds } = await import('../lib/strength-standards.ts');
+  const { resistanceExercises } = await import('../lib/exercises.ts');
+  const ratingRecords: Entry[] = ['2026-09-07', '2026-09-10'].map((date) => {
+    const row = session(date, 'resistance');
+    (row.data as import('../lib/model.ts').Training).exercises = [
+      'bench-press',
+      'barbell-row',
+      'squat',
+      'romanian-deadlift',
+    ].map((id) => ({
+      catalogId: id,
+      name: resistanceExercises.find((e) => e.id === id)!.name,
+      load: 'total',
+      sets: [
+        {
+          id: crypto.randomUUID(),
+          weight: strengthThresholds(id, 'male', 30, 80)![2],
+          reps: 1,
+          warmup: false,
+          completed: true,
+        },
+      ],
+    }));
+    return row;
+  });
+  ratingRecords.push({
+    ...draft,
+    id: crypto.randomUUID(),
+    kind: 'body',
+    date: '2026-09-07',
+    primaryMorning: 1,
+    data: {
+      weight: 80,
+      waist: null,
+      bodyFat: null,
+      condition: 'morning',
+      primary: true,
+      estimated: false,
+      note: '',
+    },
+  });
+  const ratingProfile = {
+    name: 'Synthetic',
+    height: 175,
+    age: 30,
+    ageAsOf: '2026-09-07',
+    sex: 'male',
+    note: '',
+  };
+  let openedRatingSettings = false;
+  await act(async () =>
+    root.render(
+      createElement(TrainingPanel, {
+        ...panelProps,
+        records: ratingRecords,
+        profile: ratingProfile,
+        module: 'training',
+        ratingSettings: () => {
+          openedRatingSettings = true;
+        },
+      }),
+    ),
+  );
+  assert(
+    container
+      .querySelector('.strength-growth-copy strong')
+      ?.textContent.includes('Lv. 15'),
+  );
+  assert.equal(
+    container.querySelectorAll('.strength-rating-category').length,
+    4,
+  );
+  assert.equal(
+    container.querySelector('.strength-growth > img')?.getAttribute('src'),
+    '/strength-avatar/level-15.png',
+  );
+  await act(async () => button('调整评级设置').click());
+  assert(openedRatingSettings);
+  assert(
+    container
+      .querySelector('.strength-rating-evidence')
+      ?.textContent.includes('单次实记'),
+  );
+  await act(async () =>
+    root.render(
+      createElement(TrainingPanel, {
+        ...panelProps,
+        records: ratingRecords,
+        profile: {
+          ...ratingProfile,
+          strength: { enabled: false, references: {} },
+        },
+        module: 'training',
+      }),
+    ),
+  );
+  assert.equal(
+    container.querySelector('.strength-growth-copy strong')?.textContent,
+    '对标已关闭',
+  );
+  assert.equal(
+    container.querySelectorAll('.strength-rating-category').length,
+    0,
+  );
+  assert.equal(container.querySelectorAll('.exercise-progress-row').length, 3);
+  await act(async () => button('查看全部 4 个动作').click());
+  assert.equal(container.querySelectorAll('.exercise-progress-row').length, 4);
+  await act(async () => button('收起动作').click());
+  assert.equal(container.querySelectorAll('.exercise-progress-row').length, 3);
 });

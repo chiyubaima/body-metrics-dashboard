@@ -361,7 +361,7 @@ html :is(.chart-card, .history-card, .history-table-wrap) {
   border-radius: 18px;
   box-shadow: inset 0 1px 0 #fff;
 }
-html :is(.body-metric-strip, .strength-body-grid) > button {
+html .body-metric-strip > button {
   background: #ffffff80;
   border: 1px solid #ffffffd9;
   border-radius: 16px;
@@ -369,7 +369,7 @@ html :is(.body-metric-strip, .strength-body-grid) > button {
     inset 0 1px 0 #fff,
     0 2px 6px #344f6305;
 }
-html :is(.body-metric-strip, .strength-body-grid) > button.selected {
+html .body-metric-strip > button.selected {
   background: linear-gradient(145deg, #ffffff99, #ffffff00), var(--glass-tint);
   border-color: color-mix(in srgb, var(--glass-accent) 32%, transparent);
   box-shadow:
@@ -377,7 +377,6 @@ html :is(.body-metric-strip, .strength-body-grid) > button.selected {
     0 3px 10px #344f630a;
 }
 html .body-panel .body-metric-strip > button strong,
-html .strength-body-grid > button > strong,
 html .strength-growth-copy > strong {
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -567,8 +566,7 @@ html
     .history-summary,
     .selection-toolbar,
     .plan-energy-preview,
-    .plan-scope-note,
-    .strength-reference
+    .plan-scope-note
   ) {
   background: color-mix(in srgb, var(--glass-tint) 75%, #ffffffb3);
   border-color: var(--glass-line);
@@ -839,7 +837,6 @@ html
     .nutrition-reference-label,
     .nutrition-reference-label span,
     .food-portion small,
-    .food-portion label span,
     .meal-summary-caption small,
     .meal-summary-values small,
     .meal-summary-values strong small,
@@ -976,6 +973,133 @@ html .record-dialog .meal-summary-values > span > small {
 html .record-dialog .meal-editor-grid {
   gap: 12px;
 }
+html .meal-dialog .meal-form {
+  gap: 8px;
+}
+html .meal-dialog .meal-form-top {
+  gap: 12px;
+}
+html .meal-dialog .meal-live-summary {
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+html .meal-dialog .meal-summary-values {
+  margin-top: 5px;
+}
+html .meal-dialog .meal-summary-values strong {
+  font-size: 21px;
+}
+html .meal-dialog .food-nutrition-reference summary {
+  display: list-item;
+  list-style-position: inside;
+  cursor: pointer;
+  padding-block: 7px;
+  margin: 0;
+}
+html .meal-dialog .food-nutrition-reference summary span {
+  margin-left: 6px;
+  font-size: 10px;
+}
+.plan-start-recording {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  background: var(--surface-raised, #ffffffb3);
+}
+.plan-start-recording p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--surface-muted, #667064);
+}
+html .meal-dialog .everyday-portion .food-portion {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+html .meal-dialog .everyday-portion :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--surface-text);
+  border: 1px solid var(--surface-line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+html .meal-dialog .everyday-portion .food-portion > input {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--surface-accent);
+}
+.portion-conversion,
+.portion-reference,
+.portion-cup-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--surface-muted, #64686b);
+  line-height: 1.5;
+}
+.portion-reference {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.portion-reference .text-button {
+  min-height: 28px;
+  font-size: 11px;
+}
+.portion-cup-note {
+  display: block;
+}
+.portion-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+  gap: 6px 8px;
+  margin-top: 8px;
+}
+.portion-custom label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+}
+.portion-custom > small {
+  grid-column: 1 / -1;
+  color: var(--surface-muted, #64686b);
+  font-size: 10px;
+}
+.portion-basis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.portion-basis select {
+  width: auto;
+  padding: 6px 8px;
+}
+@media (max-width: 720px) {
+  html .meal-dialog .meal-scroll-region {
+    overflow-y: auto;
+  }
+  html .meal-dialog .meal-editor-grid {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+  }
+  html .meal-dialog .meal-editor-grid > section {
+    overflow: visible;
+  }
+}
 html .record-dialog .food-library {
   background: #ffffff4d;
   border: 1px solid var(--glass-edge);
@@ -1067,11 +1191,6 @@ html .record-dialog .selected-food {
   border-radius: 18px;
   background: var(--surface-raised);
   box-shadow: 0 2px 6px #00000003;
-}
-html .record-dialog .food-portion > label {
-  background: var(--surface-raised);
-  border-color: var(--surface-line);
-  border-radius: 10px;
 }
 html .record-dialog .food-portion :is(input, strong) {
   color: var(--surface-accent);
@@ -1283,7 +1402,6 @@ html
     .strength-growth-copy > span,
     .strength-growth-copy p,
     .strength-growth-copy small,
-    .strength-body-grid > button > small,
     .strength-method p,
     .strength-avatar-gallery figcaption > span,
     .strength-avatar-gallery figcaption > small
@@ -1331,28 +1449,149 @@ html .strength-overview progress::-webkit-progress-value {
 html .strength-overview progress::-moz-progress-bar {
   background: var(--glass-fill);
 }
-html .strength-overview .strength-body-grid {
+.strength-rating .section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.strength-rating .section-title h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.strength-rating-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-html .strength-overview .strength-body-grid > button {
+.strength-rating .strength-growth:has(> .strength-growth-copy:only-child) {
+  grid-template-columns: 1fr;
+}
+.strength-rating-category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  background: var(--surface-frost);
+  min-width: 0;
+}
+.strength-rating-category > strong {
+  color: var(--surface-accent);
+  font-size: 20px;
+}
+.strength-rating-category > span {
+  font-size: 12px;
+  color: var(--surface-text);
+}
+.strength-rating-category > small {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--surface-muted);
+}
+.strength-rating-detail {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--glass-edge);
+}
+.strength-rating-detail > div {
+  display: flex;
+  justify-content: space-between;
   gap: 8px;
-  padding: 12px 10px;
+  font-size: 13px;
+}
+.strength-rating-detail b {
+  color: var(--surface-accent);
+  flex-shrink: 0;
+}
+.rating-settings {
+  margin-block: 12px;
+}
+.rating-settings .field {
+  margin-top: 12px;
+}
+.exercise-progress-list {
+  display: grid;
+  gap: 8px;
+}
+.exercise-progress-item {
+  min-width: 0;
   background: var(--surface-raised);
   border: 1px solid var(--glass-edge);
-  border-radius: 18px;
+  border-radius: 16px;
   box-shadow: var(--surface-shadow);
+  overflow: hidden;
 }
-html .strength-overview .strength-body-grid > button.selected {
+.exercise-progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  padding: 13px;
+  text-align: left;
+  background: transparent;
+}
+.exercise-progress-row[aria-expanded='true'] {
   background: var(--glass-tint);
-  border-color: color-mix(in srgb, var(--glass-accent) 30%, transparent);
 }
-html .strength-overview .strength-body-grid > button > span {
+.exercise-progress-row:focus-visible {
+  outline: 2px solid var(--surface-accent);
+  outline-offset: -3px;
+}
+.exercise-progress-heading,
+.exercise-progress-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.exercise-progress-heading {
   color: var(--surface-text);
-  font-size: 12px;
+  font-size: 13px;
 }
-html .strength-overview .strength-body-grid > button > strong {
+.exercise-progress-heading > svg {
+  flex-shrink: 0;
+}
+.exercise-progress-sets {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  color: var(--surface-muted);
+}
+.exercise-progress-sets > b {
+  color: var(--surface-text);
+  font-weight: 650;
+}
+.exercise-progress-caption {
+  font-size: 11px;
   color: var(--surface-accent);
-  font-size: 30px;
+}
+.exercise-progress-caption > small {
+  color: var(--surface-muted);
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.exercise-progress-date {
+  font-size: 10px;
+  color: var(--surface-muted);
+}
+.exercise-progress-chart {
+  padding: 0 12px 12px;
+}
+.exercise-progress-chart .chart-note {
+  padding-top: 12px;
+  font-size: 11px;
+}
+.exercise-progress-more {
+  margin-top: 10px;
+}
+.exercise-progress .strength-method > summary {
+  font-size: 12px;
+  color: var(--surface-muted);
 }
 html .strength-overview :is(.strength-method, .strength-journey) > summary {
   padding: 12px;
@@ -1384,7 +1623,7 @@ html .strength-overview .strength-avatar-gallery figure {
 html .strength-overview .strength-avatar-gallery figure.unlocked {
   border-color: color-mix(in srgb, var(--glass-accent) 28%, transparent);
 }
-html .strength-exercise-detail :is(.subtle, .strength-reference, .chart-note) {
+html .strength-exercise-detail :is(.subtle, .chart-note) {
   color: var(--surface-muted);
 }
 @media (max-width: 520px) {
@@ -1518,8 +1757,7 @@ html .discard-dialog [data-slot='alert-dialog-description'] {
   html
     :is(.primary, .panel .panel-action, .dialog-popup .primary):active:not(
       :disabled
-    ),
-  html .strength-body-grid > button:hover {
+    ) {
     transform: none;
   }
 }

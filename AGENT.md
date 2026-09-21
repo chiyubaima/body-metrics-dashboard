@@ -1,5 +1,29 @@
 # Application working rules
 
+## Exercise progress presentation (2026-09-21)
+
+- Replace the six baseline-100 score cards with actual exercise weight/reps and change since first record, keeping normative ratings unchanged. Show the three most recently recorded exercises first, expand all on demand, and open charts inline. Reuse existing strength/panels modules, tests and styles; no dependencies, migrations or new rating rules.
+- Group by exercise identity/load and date; completed working sets only, highest weight then reps per day. Compare weight only at identical reps; differing reps show both actual sets without a strength-gain claim. Pure bodyweight compares reps, added load is explicitly labelled. Preserve first-only/unchanged/stale/history-edit/date-cutoff semantics. Replace Captain's legacy group index evidence with the same raw progress; remove only newly unused legacy code/styles.
+- Update docs and run test/typecheck/lint/build plus isolated synthetic browser checks in the existing parent work/strength-rating/qa directory using progress- filenames. Preserve personal data, the existing service and other changes; no model calls, commit, push or deployment.
+
+## Advanced strength ratings (2026-09-21)
+
+- Implement the authorized parent Advanced=L20 plan: versioned public joint age/bodyweight standards, supported free-weight exercise ratings, four equally weighted fixed movement references and separate existing personal progress. Missing/inapplicable/excluded/stale categories cannot produce a full overall level. Use the lower rating from the latest two distinct dates within 28 days; one date is provisional.
+- New files: data/strength-standards.json, scripts/build-strength-standards.mjs, lib/strength-standards.ts, lib/strength-rating.ts, app/strength-rating.tsx and tests/strength-rating*.test.ts. Reuse profile JSON for optional opt-out/reference preferences and a server-owned age reference date; preserve omitted legacy fields. No migrations/dependencies. Public source and synthetic QA files go in the documented parent work/strength-rating directory.
+- Use training-date bodyweight only (7-day main-morning mean or most recent main-morning measurement within 28 days), honest missing-data/age-range states, explicit estimated 1RM for 2–15 reps, no invented medical corrections. Keep data local and update Captain/documentation. Run synthetic domain/persistence/UI tests and existing test/typecheck/lint/build; read-only personal audit, no live model calls, personal mutations, commit/push/deploy.
+
+## Strength progress at matching reps (2026-09-21)
+
+- Implement the authorized parent strength repair in existing strength/panels/coach-context files and tests. The earliest eligible external-load exercise remains each group's reference. Preserve Brzycki comparison when the first reference has 1–10-rep sets; otherwise fix the reps of its heaviest working set (higher reps break ties) and compare weights at exactly those reps. Never extrapolate high-rep maximum strength or reward changing reps, adding exercises or sets.
+- Distinguish no reference, first baseline, unchanged performance, incompatible latest reps and stale evidence. Show reference method/reps in details and include these semantics in Captain context. Keep daily best, historical growth, date cutoff and correction/deletion recalculation. No migrations, new dependencies or personal-record writes; synthetic domain/UI regressions, read-only recalculation, test/typecheck/lint/build and documentation updates. Preserve preview; no model calls, commit/push/deploy.
+
+## UX fixes and everyday portions (2026-09-16)
+
+- Implement the six reviewed UX problem groups before adding everyday portions: semantic food matching/egg names, current restore feedback, compact meal editing/useful default library, a direct logging path from diet targets, and returning to retained history filters/scroll after edit or cancel. Preserve unsaved-input confirmation and existing glass styling; backup import is out of scope.
+- Add shared pure portion rules/types in `lib/food-portions.ts`, a small public exact-FDC-ID catalog in `data/food-portions.json`, and if useful `app/food-portion.tsx`. Verify public source values, document provenance in data/README, never infer weights from generic names. Allow explicit user-defined unit/grams mappings when no reference exists.
+- Persist optional portion snapshots in existing food JSON, retain grams as nutritional authority, and validate quantity, unit grams, product consistency and claimed reference on the server. Mark reference portions estimated; support fractions, editable unit weight, gram input, recent reuse, old entries and export. No migrations or new dependencies.
+- Extend existing tests plus `tests/food-portions.test.ts`; source downloads and isolated browser QA belong in the parent's documented `work/ux-fixes-2026-09-16/`. Use synthetic records, no personal data/model requests. Run test/typecheck/lint/build, translation audit and desktop/narrow UI QA. Preserve the original preview and all previous changes; no automatic commit/push/deploy.
+
 ## Captain duplicate request recovery (2026-09-15)
 
 - Synthetic reproduction also shows half-unit validation rejects 半只/半根. Extend only the existing coach-drafts half-serving unit list for these two forms; retain explicit quantity evidence and explain whole-unit reference recipes before multiplying by 0.5. Regress synthetic chicken/corn halves and reject unsupported half-serving claims.

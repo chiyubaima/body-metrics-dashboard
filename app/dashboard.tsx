@@ -30,6 +30,7 @@ import { PersonalSettings } from './personal-settings';
 import { AppSettings, type SettingsSection } from './app-settings';
 import { BodyPanel, DietPanel, TrainingPanel, compactDate } from './panels';
 import { HistoryView } from './history';
+import type { HistoryState } from './history';
 import { JournalCalendar } from './calendar';
 import { TrashView } from './trash';
 import { DeveloperMode } from './developer-mode';
@@ -51,6 +52,12 @@ import type {
   Training,
   MealSlot,
 } from '@/lib/model';
+type HistoryModal = {
+  type: 'history';
+  kind: Kind;
+  initialDate?: string;
+  initialState?: HistoryState;
+};
 type Modal =
   | {
       type: 'record';
@@ -58,8 +65,9 @@ type Modal =
       entry?: Entry;
       draft?: Entry;
       meal?: MealSlot;
+      returnTo?: HistoryModal;
     }
-  | { type: 'history'; kind: Kind; initialDate?: string }
+  | HistoryModal
   | { type: 'plan'; kind: 'diet' | 'training' }
   | { type: 'medals' }
   | { type: 'settings'; section?: SettingsSection }
@@ -136,6 +144,7 @@ export default function Dashboard({
     [confirmClose, setConfirmClose] = useState(false),
     [notice, setNotice] = useState('');
   const modalGeneration = useRef(0);
+  const closeTarget = useRef<Modal | null>(null);
   const requestSequence = useRef(0),
     working = useRef(false);
   const refresh = useCallback(async () => {
@@ -202,16 +211,20 @@ export default function Dashboard({
     setDirty(false);
     setModelDirty(false);
     setConfirmClose(false);
+    setNotice('');
     setModal(next);
   }, []);
-  const close = () => {
+  const leave = (next: Modal | null) => {
     if (busy) return;
     if (dirty || modelDirty) {
+      closeTarget.current = next;
       setConfirmClose(true);
       return;
     }
-    setModal(null);
+    setModal(next);
   };
+  const close = () =>
+    leave(modal?.type === 'record' ? (modal.returnTo ?? null) : null);
   const changeModule = (value: string) => {
     setModule(value as Kind);
     try {
@@ -332,7 +345,8 @@ export default function Dashboard({
             : `餐盘已更新 · ${meals} 类餐次${foodSummary.total.protein !== null ? ` · 已知蛋白质 ${Math.round(foodSummary.total.protein)}g` : ''}`,
         );
       }
-      if (path !== '/api/profile' || !modelDirty) setModal(null);
+      if (path !== '/api/profile' || !modelDirty)
+        setModal(modal?.type === 'record' ? (modal.returnTo ?? null) : null);
       setDirty(false);
       setNotice(
         method === 'DELETE'
@@ -394,7 +408,12 @@ export default function Dashboard({
     setBusy(true);
     try {
       await request('/api/trash', { ids }, 'PATCH');
-      await refresh();
+      setNotice(`已恢复 ${ids.length} 条记录。`);
+      try {
+        await refresh();
+      } catch {
+        setNotice('记录已恢复，界面暂未更新。请点击重试读取。');
+      }
     } finally {
       working.current = false;
       setBusy(false);
@@ -480,6 +499,8 @@ export default function Dashboard({
   const statsReady = loaded && !loadError;
   const panelProps = {
     onFactsChanged: refresh,
+    profile: data.profile,
+    ratingSettings: () => open({ type: 'settings', section: 'profile' }),
     records: data.records,
     plans: data.plans,
     date,
@@ -790,6 +811,7 @@ export default function Dashboard({
                 busy={busy}
                 onDirty={() => setDirty(true)}
                 records={data.records}
+                dishes={data.dishes ?? []}
                 meal={modal.meal}
               />
             )}
@@ -806,6 +828,15 @@ export default function Dashboard({
                 save={save}
                 busy={busy}
                 onDirty={() => setDirty(true)}
+                onStartRecording={() =>
+                  leave({
+                    type: 'record',
+                    kind: 'diet',
+                    entry: data.records.find(
+                      (entry) => entry.kind === 'diet' && entry.date === date,
+                    ),
+                  })
+                }
               />
             )}
             {modal?.type === 'settings' && (
@@ -837,7 +868,15 @@ export default function Dashboard({
                   plans={data.plans}
                   date={date}
                   initialDate={modal.initialDate}
-                  edit={(r) => open({ type: 'record', kind: r.kind, entry: r })}
+                  initialState={modal.initialState}
+                  edit={(r, initialState) =>
+                    open({
+                      type: 'record',
+                      kind: r.kind,
+                      entry: r,
+                      returnTo: { ...modal, initialState },
+                    })
+                  }
                   remove={remove}
                   busy={busy}
                 />
@@ -869,7 +908,7 @@ export default function Dashboard({
                     setDirty(false);
                     setModelDirty(false);
                     setConfirmClose(false);
-                    setModal(null);
+                    setModal(closeTarget.current);
                   }}
                 >
                   放弃并关闭

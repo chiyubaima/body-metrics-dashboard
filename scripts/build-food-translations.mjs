@@ -81,7 +81,7 @@ const translate = (description) => {
 };
 const foods = rows.map(([id, description]) => [id, translate(description)]);
 const output = {
-  version: '2026-09-08',
+  version: '2026-09-16',
   sourceSha256: createHash('sha256').update(catalogSource).digest('hex'),
   foods,
 };

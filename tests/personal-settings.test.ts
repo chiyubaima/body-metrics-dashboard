@@ -187,6 +187,19 @@ await test('personal settings preserve profile drafts across sections and suppor
   await edit(name, '合成新称呼');
   assert(props.dirty);
   await click('女性');
+  const push = container.querySelector<import('happy-dom').HTMLSelectElement>(
+    '[aria-label="上肢推代表动作"]',
+  )!;
+  await act(async () => {
+    push.value = 'dumbbell-bench';
+    push.dispatchEvent(new win.Event('change', { bubbles: true }));
+  });
+  await click(
+    '关闭',
+    container.querySelector<import('happy-dom').HTMLElement>(
+      '[aria-label="群体力量对标"]',
+    )!,
+  );
   await click('自建菜品');
   assert.equal(profilePanel.hasAttribute('hidden'), true);
   assert.equal(win.getComputedStyle(profilePanel).display, 'none');
@@ -282,6 +295,7 @@ await test('personal settings preserve profile drafts across sections and suppor
     age: null,
     sex: 'female',
     note: '',
+    strength: { enabled: false, references: { push: 'dumbbell-bench' } },
   });
   assert(!profilePanel.textContent.includes('合成保存失败'));
   await click('备份与引导');

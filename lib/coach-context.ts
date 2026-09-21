@@ -5,7 +5,8 @@ import {
   workingSets,
   loadLabels,
 } from './progress.ts';
-import { strengthOverview } from './strength.ts';
+import { exerciseProgress } from './strength.ts';
+import { strengthRating } from './strength-rating.ts';
 import {
   commitmentLabels,
   memoryActive,
@@ -158,22 +159,50 @@ export function buildCoachContext(
     );
   const detailed = [...selected.slice(0, 15), ...others.slice(0, 12)];
   evidence.push(...detailed.map(entryEvidence));
-  const strength = strengthOverview(eligible, date).map((s) => ({
-    group: s.group,
-    reference: s.reference?.name ?? null,
-    score: s.score,
-    baseline: s.baseline,
-    stale: s.stale,
-    first: s.first ?? null,
-    last: s.last ?? null,
-  }));
+  const progress = exerciseProgress(eligible, date)
+    .slice(0, 12)
+    .map((item) => ({
+      name: item.name,
+      load: item.load,
+      first: item.first,
+      last: item.last,
+      bodyOnly: item.bodyOnly,
+      baseline: item.baseline,
+      comparable: item.comparable,
+      change: item.change,
+      changeUnit: item.changeUnit,
+      stale: item.stale,
+    }));
   evidence.push({
     id: 'strength-reference',
     date,
-    label: '个人力量参考',
+    label: '动作训练进步',
     detail:
-      JSON.stringify(strength) +
-      '；仅为可比动作估算，首次为基线，不能作真实肌力诊断。',
+      JSON.stringify(progress) +
+      '；first/last是正式组实记重量和次数，不是估计最大力量或部位分数。同次数才比较加重，同重量可比较次数；comparable=false不直接判断进步。perHand为单手，bodyweight且bodyOnly=false为额外负重。baseline只建立参照，stale是28天内未更新。与群体力量等级独立。',
+  });
+  const rating = strengthRating(eligible, data.profile, date);
+  evidence.push({
+    id: 'strength-rating',
+    date,
+    label: '高阶力量评级',
+    detail:
+      JSON.stringify({
+        version: rating.version,
+        level: rating.level,
+        coverage: rating.coverage,
+        issue: rating.profileIssue,
+        patterns: rating.patterns.map((p) => ({
+          pattern: p.name,
+          reference: p.exercise?.name,
+          level: p.exercise?.level ?? null,
+          provisional: p.exercise?.provisional,
+          ready: p.ready,
+          reason: p.reason,
+          last: p.exercise?.last,
+        })),
+      }) +
+      '；高阶=20，各类封顶20后四类等权向下取整；近28天最近两次不同训练日取较低评级确认。缺条件不计0，不用个人进步指数推断等级。来源为训练人群，不是生理上限；身体资料不能完整反映伤病等差异，不适用可关闭或排除。',
   });
   const completeDiet = recent.filter(
     (r) => r.kind === 'diet' && (r.data as Diet).complete,

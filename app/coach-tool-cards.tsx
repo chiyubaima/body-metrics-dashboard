@@ -1,4 +1,5 @@
 'use client';
+import { foodPortionLabel } from '../lib/food-portions.ts';
 import { CaptainMedalCard } from './medal-card';
 import type { Snapshot } from '@/lib/model';
 import { useRef, useState } from 'react';
@@ -102,7 +103,8 @@ function RecordPreview({
                   <li key={i}>
                     <span>{food.localizedName || food.name}</span>
                     <b>
-                      {food.grams} g<small>{basisLabels[food.basis]}</small>
+                      {foodPortionLabel(food)}
+                      <small>{basisLabels[food.basis]}</small>
                     </b>
                     {food.dish && (
                       <DishDetails

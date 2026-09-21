@@ -95,6 +95,9 @@ const terms: [string, string][] = [
   ['酸奶', 'yogurt'],
   ['奶酪', 'cheese'],
   ['鸡蛋', 'egg'],
+  ['鸭蛋', 'duck egg'],
+  ['鹅蛋', 'goose egg'],
+  ['鹌鹑蛋', 'quail egg'],
   ['水煮蛋', 'egg boiled'],
   ['鸡蛋白', 'egg white'],
   ['蛋清', 'egg white'],
@@ -226,7 +229,7 @@ export function searchFoods(query: string, offset = 0, basis = 'all') {
       ? /\b(?!sweetbreads?\b)[a-z]*bread(?:s|sticks|crumbs)?\b/
       : token === 'rye'
         ? /\b(?:rye|pumpernickel)\b/
-        : new RegExp(`\\b${token}`),
+        : new RegExp(`\\b${token}(?:s|es)?\\b`),
   );
   let remaining = raw;
   const chineseTokens: string[] = [];
@@ -249,7 +252,7 @@ export function searchFoods(query: string, offset = 0, basis = 'all') {
     chineseTokens.every((token) =>
       /[\u3400-\u9fff]/.test(token)
         ? chineseNames.get(r[0])!.includes(token)
-        : new RegExp(`\\b${token}`).test(descriptions.get(r[0])!),
+        : new RegExp(`\\b${token}(?:s|es)?\\b`).test(descriptions.get(r[0])!),
     );
   const cookingFilter = (r: Row) =>
     basis === 'all' ||
@@ -307,6 +310,9 @@ export function searchFoods(query: string, offset = 0, basis = 'all') {
     const main = name.split(',')[0];
     return (
       (curated.has(row[0]) ? 1000 : 0) +
+      (tokens[0] && new RegExp(`^${tokens[0]}(?:s|es)?$`).test(main)
+        ? 200
+        : 0) +
       (chinese &&
       unsupportedAlias &&
       chineseNames.get(row[0])!.startsWith(compact(raw))

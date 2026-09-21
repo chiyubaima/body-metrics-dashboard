@@ -39,7 +39,14 @@ import {
   finishCoachTurn,
   confirmCoachRecord,
 } from '../db/coach.ts';
-import { saveEntry, snapshot, removeEntry } from '../db/repository.ts';
+import {
+  saveEntry,
+  snapshot,
+  removeEntry,
+  restoreEntry,
+  trash,
+} from '../db/repository.ts';
+import { portionReferences } from '../lib/food-portions.ts';
 import { buildCoachContext } from '../lib/coach-context.ts';
 import { streamFrame, requestCoachStream } from '../lib/coach-stream.ts';
 import { dishFood, searchFoodLibraries } from '../lib/dishes.ts';
@@ -1359,18 +1366,30 @@ await test('knowledge transport runs in workerd and rejects redirects without fo
           } };
         `,
       },
-      ...['coach-knowledge', 'model', 'exercises'].map((name) => ({
+      ...[
+        'coach-knowledge',
+        'model',
+        'exercises',
+        'food-portions',
+        'strength-standards',
+      ].map((name) => ({
         type: 'ESModule' as const,
         path: `lib/${name}.ts`,
-        contents: ts.transpileModule(
-          readFileSync(new URL(`../lib/${name}.ts`, import.meta.url), 'utf8'),
-          {
-            compilerOptions: {
-              module: ts.ModuleKind.ESNext,
-              target: ts.ScriptTarget.ES2022,
+        contents: ts
+          .transpileModule(
+            readFileSync(new URL(`../lib/${name}.ts`, import.meta.url), 'utf8'),
+            {
+              compilerOptions: {
+                module: ts.ModuleKind.ESNext,
+                target: ts.ScriptTarget.ES2022,
+              },
             },
-          },
-        ).outputText,
+          )
+          .outputText.replace(
+            /import catalog from [^;]+;/,
+            () =>
+              `const catalog = ${readFileSync(new URL(`../data/${name === 'strength-standards' ? 'strength-standards' : 'food-portions'}.json`, import.meta.url), 'utf8')};`,
+          ),
       })),
     ],
     outboundService: (request) => {
@@ -2775,7 +2794,7 @@ await test('tool cards preview records, confirm in place, retain failures, and e
     assert(container.querySelector('.coach-record-confirm'));
     assert.equal(container.querySelector('script'), null);
     if (preview.kind === 'diet') {
-      assert(container.textContent.includes('135 g'));
+      assert(container.textContent.includes('135g'));
       assert(container.textContent.includes('午餐'));
       assert(container.textContent.includes('熟重'));
     } else if ((preview.data as Training).type === 'resistance') {
@@ -3376,6 +3395,87 @@ await test('Captain creates and activates a product medal through the normal too
     assert.equal(
       facts.rows.filter((r) => r.metric === 'coach_enabled').length,
       1,
+    );
+  } finally {
+    close();
+  }
+});
+
+await test('portion snapshots survive persistence, reuse, deletion, restore and later gram edits without changing legacy records', async () => {
+  const { db, close } = connect();
+  try {
+    const food = foodById(173424)!;
+    const portion = { ...portionReferences(food)[0], quantity: 2 };
+    const fixture = entry('diet', {
+      status: 'logged',
+      note: '',
+      foods: [
+        { ...food, grams: 100, meal: 'lunch', portion, estimatedPortion: true },
+      ],
+    });
+    await saveEntry(db, 'a', fixture);
+    let stored = (await snapshot(db, 'a')).records[0];
+    const savedFood = (stored.data as Diet).foods[0];
+    assert.deepEqual(savedFood.portion, portion);
+    assert.equal(savedFood.estimatedPortion, true);
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(await snapshot(db, 'a'))).records[0].data
+        .foods[0].portion,
+      portion,
+    );
+    await removeEntry(db, 'a', stored.id);
+    assert.deepEqual(
+      ((await trash(db, 'a'))[0].data as Diet).foods[0].portion,
+      portion,
+    );
+    await assert.rejects(restoreEntry(db, 'b', stored.id));
+    await restoreEntry(db, 'a', stored.id);
+    stored = (await snapshot(db, 'a')).records[0];
+    assert.deepEqual((stored.data as Diet).foods[0].portion, portion);
+    assert.equal((await snapshot(db, 'b')).records.length, 0);
+    const quote = '合成测试：午餐鸡蛋改为150克';
+    const action = draftAction(
+      prepareRecord(
+        {
+          id: stored.id,
+          kind: 'diet',
+          date,
+          quote,
+          data: {
+            foods: [
+              {
+                name: savedFood.name,
+                grams: 150,
+                basis: savedFood.basis,
+                fdcId: savedFood.fdcId,
+                meal: 'lunch',
+              },
+            ],
+          },
+        },
+        [stored],
+        quote,
+      ),
+    );
+    assert.equal((action.entry.data as Diet).foods[0].portion, undefined);
+    assert.equal((action.entry.data as Diet).foods[0].grams, 150);
+    await saveEntry(db, 'a', action.entry);
+    const legacy = entry(
+      'diet',
+      {
+        status: 'logged',
+        note: '',
+        foods: [{ name: '合成旧食物', grams: 88, basis: 'cooked' }],
+      },
+      shiftDate(date, -1),
+    );
+    await saveEntry(db, 'a', legacy);
+    assert.equal(
+      (
+        (await snapshot(db, 'a')).records.find((r) => r.id === legacy.id)!
+          .data as Diet
+      ).foods[0].portion,
+      undefined,
     );
   } finally {
     close();

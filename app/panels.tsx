@@ -1,4 +1,5 @@
 'use client';
+import { foodPortionLabel } from '@/lib/food-portions';
 import { useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import {
@@ -47,21 +48,14 @@ import {
   bodyDomain,
   foodEquivalent,
   canCompleteDiet,
-  exerciseCatalog,
-  exerciseKey,
-  exerciseTimeline,
-  loadLabels,
   mealLabels,
   nutritionSummary,
   workoutStats,
-  workingSets,
 } from '@/lib/progress';
-import { exerciseDefinition, cardioTypes } from '@/lib/exercises';
-import {
-  strengthOverview,
-  strengthGroup,
-  strengthGrowth,
-} from '@/lib/strength';
+import { cardioTypes } from '@/lib/exercises';
+import { exerciseProgress } from '@/lib/strength';
+import { strengthRating } from '@/lib/strength-rating';
+import { StrengthRating } from './strength-rating';
 import { referenceFoods } from '@/lib/foods';
 import { displayFoodName } from '@/lib/food-labels';
 import { MealIcon, MacroLine, NutritionRings } from './nutrition';
@@ -75,32 +69,12 @@ type PanelProps = {
   history: (kind: Kind) => void;
   plan: (kind: 'diet' | 'training') => void;
   onFactsChanged?: () => Promise<unknown>;
+  profile?: import('@/lib/model').Profile | null;
+  ratingSettings?: () => void;
 };
 export const compactDate = (d: string) => d.slice(5).replace('-', '/');
 export const numeric = (n: number | null | undefined, digits = 1) =>
   n == null ? '—' : Number(n.toFixed(digits)).toLocaleString('zh-CN');
-const strengthStages = [
-  '整装出发',
-  '舒展肩背',
-  '稳稳下蹲',
-  '踮脚平衡',
-  '弓步启程',
-  '弹力舒展',
-  '握住力量',
-  '从容弯举',
-  '抱铃蓄力',
-  '稳稳托举',
-  '向上推举',
-  '扎实提铃',
-  '初握杠铃',
-  '挺胸承重',
-  '宽站稳持',
-  '稳步负重',
-  '弓步进阶',
-  '单侧掌控',
-  '从容持杠',
-  '力量自如',
-];
 function Panel({
   kind,
   title,
@@ -590,7 +564,7 @@ export function DietPanel(
                 <div className="plate-food-description">
                   <strong>{displayFoodName(food)}</strong>
                   <small>
-                    {food.grams}g ·{' '}
+                    {foodPortionLabel(food)} ·{' '}
                     {food.basis === 'raw'
                       ? '生重'
                       : food.basis === 'cooked'
@@ -681,16 +655,9 @@ function FoodEquivalents({ target }: { target?: DietPlan }) {
 export function TrainingPanel(props: PanelProps) {
   const { records, plans, date, ready, edit, history, plan } = props,
     [selected, setSelected] = useState(''),
-    [group, setGroup] = useState('');
-  const overview = strengthOverview(records, date),
-    allExercises = exerciseCatalog(records, date),
-    catalog = allExercises.filter((e) => strengthGroup(e) === group),
-    exercise = catalog.find((e) => exerciseKey(e) === selected) ?? catalog[0];
-  const timeline = exercise
-      ? exerciseTimeline(records, exerciseKey(exercise), date)
-      : [],
-    last = timeline.at(-1),
-    first = timeline[0];
+    [showAll, setShowAll] = useState(false);
+  const progress = exerciseProgress(records, date);
+  const visible = showAll ? progress : progress.slice(0, 3);
   const cp = activePlan(plans, 'training', date),
     target = (cp?.data as TrainingPlan) ?? trainingDraft;
   const sessions = records
@@ -719,22 +686,7 @@ export function TrainingPanel(props: PanelProps) {
         ? latestActivities.reduce((sum, activity) => sum + activity.minutes!, 0)
         : null
       : latestTraining?.minutes;
-  const growth = strengthGrowth(overview);
-  const bodyOnly = exercise
-    ? exerciseDefinition(exercise)?.bodyOnly ||
-      (exercise.load === 'bodyweight' &&
-        timeline.every((t) =>
-          workingSets(t.exercise).every((s) => s.weight === 0),
-        ))
-    : false;
-  const result = (point: (typeof timeline)[number]) =>
-    bodyOnly
-      ? Math.max(...workingSets(point.exercise).map((s) => s.reps!))
-      : point.best;
-  const unit = bodyOnly ? '次' : 'kg';
-  const points = timeline
-    .slice(-12)
-    .map((p) => ({ date: p.entry.date, value: result(p) }));
+  const rating = strengthRating(records, props.profile, date);
   const schedule = cp
     ? target.schedule[weekDates(date).indexOf(date)]
     : 'unplanned';
@@ -870,233 +822,154 @@ export function TrainingPanel(props: PanelProps) {
           </div>
         )}
       </section>
-      <div
-        className="strength-overview summary-block"
+      <StrengthRating
+        rating={rating}
+        onSettings={props.ratingSettings}
+        onRecordBody={() => edit('body')}
+      />
+      <section
+        className="exercise-progress summary-block"
         data-annotate="training.strength"
+        aria-label="训练进步"
       >
-        <SectionTitle
-          aside={<span className="subtle">个人参考 · 首次 100</span>}
-        >
-          我的力量值
+        <SectionTitle aside={<span className="subtle">较首次记录</span>}>
+          训练进步
         </SectionTitle>
-        <div className="strength-growth" data-annotate="training.avatar">
-          <Image
-            key={growth.level}
-            src={`/strength-avatar/level-${String(growth.level).padStart(2, '0')}.png`}
-            alt={`力量成长第 ${growth.level} 级形象`}
-            aria-label={`力量成长第 ${growth.level} 级 · ${strengthStages[growth.level - 1]}`}
-            sizes="160px"
-            width={144}
-            height={144}
-          />
-          <div className="strength-growth-copy">
-            <span>力量成长 · {strengthStages[growth.level - 1]}</span>
-            <strong>
-              Lv. {growth.level}
-              <small> / 20</small>
-            </strong>
-            <p>
-              {growth.baselines === 0
-                ? '从第一份力量基线开始'
-                : growth.level === 20
-                  ? '20 级形象全部解锁'
-                  : `再积累 ${growth.next} 点进步，解锁新形象`}
-            </p>
-            <progress
-              max={10}
-              value={growth.fraction * 10}
-              aria-label="下一级力量成长进度"
-            />
-            <small>{growth.baselines}/6 个部位已建立参照</small>
+        {!progress.length ? (
+          <p className="empty-inline">
+            记录训练的重量和次数，下一次就能看到变化。
+          </p>
+        ) : (
+          <div className="exercise-progress-list">
+            {visible.map((item) => {
+              const expanded = selected === item.key;
+              const setLabel = (point: typeof item.last) =>
+                item.bodyOnly
+                  ? `${point.reps} 次`
+                  : `${numeric(point.weight, 2)} kg × ${point.reps}次`;
+              const summary = item.baseline
+                ? '首次记录 · 待比较'
+                : !item.comparable
+                  ? '次数不同 · 不直接比较加重'
+                  : item.change === 0
+                    ? '与首次持平'
+                    : `${item.stale ? '上次较首次' : '较首次'}${item.change! > 0 ? '增加' : '减少'} ${numeric(Math.abs(item.change!), 2)} ${item.changeUnit}`;
+              return (
+                <div key={item.key} className="exercise-progress-item">
+                  <button
+                    className="exercise-progress-row"
+                    aria-expanded={expanded}
+                    aria-controls={
+                      expanded ? 'strength-exercise-detail' : undefined
+                    }
+                    onClick={() => setSelected(expanded ? '' : item.key)}
+                  >
+                    <span className="exercise-progress-heading">
+                      <strong>{item.name}</strong>
+                      <ChevronRight
+                        size={15}
+                        className={expanded ? 'rotate-90' : ''}
+                      />
+                    </span>
+                    <span className="exercise-progress-sets">
+                      {!item.baseline && (
+                        <>
+                          <span>
+                            {item.bodyOnly
+                              ? item.first.reps
+                              : item.first.reps === item.last.reps
+                                ? numeric(item.first.weight, 2)
+                                : setLabel(item.first)}
+                          </span>
+                          <span aria-hidden="true">→</span>
+                        </>
+                      )}
+                      <b>{setLabel(item.last)}</b>
+                    </span>
+                    <span className="exercise-progress-caption">
+                      <span>{summary}</span>
+                      <small>
+                        {item.bodyOnly
+                          ? '自重'
+                          : item.load === 'perHand'
+                            ? '单手重量'
+                            : item.load === 'bodyweight'
+                              ? '额外负重'
+                              : '总重量'}
+                      </small>
+                    </span>
+                    <small className="exercise-progress-date">
+                      最近 {compactDate(item.last.date)}
+                      {item.stale ? ' · 久未记录' : ''}
+                    </small>
+                  </button>
+                  {expanded && (
+                    <div
+                      className="strength-exercise-detail exercise-progress-chart"
+                      id="strength-exercise-detail"
+                    >
+                      <p className="chart-note">
+                        {compactDate(item.first.date)} 首次记录 · 共{' '}
+                        {item.history.length} 个训练日
+                      </p>
+                      <TrendChart
+                        points={item.history.slice(-12).map((point) => ({
+                          date: point.date,
+                          value: item.bodyOnly ? point.reps : point.weight,
+                        }))}
+                        color="#e38a16"
+                        unit={item.bodyOnly ? '次' : 'kg'}
+                      />
+                      <p className="helper">
+                        {item.bodyOnly
+                          ? '每天正式组的最多次数，保持动作幅度一致。'
+                          : '每天最重正式组的实记重量，各日次数可能不同，曲线上升不直接代表力量提升。'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <div className="strength-body-grid">
-          {overview.map((part) => {
-            const count = allExercises.filter(
-              (e) => strengthGroup(e) === part.group,
-            ).length;
-            return (
-              <button
-                key={part.group}
-                data-annotate={`training.group.${part.group}`}
-                aria-expanded={group === part.group}
-                aria-controls="strength-exercise-detail"
-                className={group === part.group ? 'selected' : ''}
-                onClick={() => {
-                  setGroup(group === part.group ? '' : part.group);
-                  setSelected('');
-                }}
-              >
-                <span>
-                  {part.group}
-                  <ChevronRight
-                    size={12}
-                    className={group === part.group ? 'rotate-90' : ''}
-                  />
-                </span>
-                <strong>{part.stale ? '—' : (part.score ?? 100)}</strong>
-                <small>
-                  {part.stale
-                    ? '参照待更新'
-                    : part.score === null
-                      ? count
-                        ? '初始值 · 待参照'
-                        : '初始值'
-                      : part.baseline
-                        ? '基线已建立'
-                        : `${part.score >= 100 ? '+' : ''}${part.score - 100}% 较首次`}
-                </small>
-              </button>
-            );
-          })}
-        </div>
-        {allExercises.some((e) => !exerciseDefinition(e)) && (
+        )}
+        {progress.length > 3 && (
           <button
-            className="text-button"
-            aria-expanded={group === '其他'}
+            className="text-button exercise-progress-more"
+            aria-expanded={showAll}
             onClick={() => {
-              setGroup(group === '其他' ? '' : '其他');
+              setShowAll(!showAll);
               setSelected('');
             }}
           >
-            其他历史动作 <ChevronRight size={13} />
+            {showAll ? '收起动作' : `查看全部 ${progress.length} 个动作`}
           </button>
         )}
-        <details
-          className="strength-method"
-          onToggle={(e) => {
-            if (e.currentTarget.open)
-              void fetch('/api/medals/facts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ metric: 'strength_viewed' }),
-              })
-                .then((response) => {
-                  if (response.ok) return props.onFactsChanged?.();
+        {progress.length > 0 && (
+          <details
+            className="strength-method"
+            onToggle={(e) => {
+              if (e.currentTarget.open)
+                void fetch('/api/medals/facts', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ metric: 'strength_viewed' }),
                 })
-                .catch(() => {});
-          }}
-        >
-          <summary>力量值与等级怎么算？</summary>
-          <p>
-            没有可比数据时，100 只是初始值。各部位相对首次的历史最佳正向增长，每
-            1 个百分点积累 1 点进步；合计每 10 点升一级，最高 20
-            级。新增部位的首次记录不加分。等级保留已达到的进步，不因短期状态下降或漏记降级；历史更正、删除会重新计算。
-          </p>
-          <p>
-            每个部位固定使用最早有可比数据的动作作为参照。首次记为
-            100，以后比较同一动作的重量与次数估算；新增动作和多做几组不会自动加分。
-          </p>
-          <p>
-            仅使用已完成、非热身、1～10 次的外部负重组。以 Brzycki
-            公式折算：重量 ÷ (1.0278 − 0.0278 ×
-            次数)，再计算与首次的比例。自重动作、只有额外负重的数据及高次数组保留明细，不强行估算；参照超过
-            28 天显示“待更新”。
-          </p>
-          <p>
-            这是个人训练表现的参考，不是部位的真实力量或人群排名。没有采集力竭程度、动作质量和器械型号；请保持动作幅度与器械一致。历史更正或删除会重新计算基线。
-          </p>
-          <a
-            href="https://www.unm.edu/~rrobergs/478PredictionAccuracy.pdf"
-            target="_blank"
-            rel="noreferrer"
+                  .then((response) => {
+                    if (response.ok) return props.onFactsChanged?.();
+                  })
+                  .catch(() => {});
+            }}
           >
-            了解估算方法与局限 ↗
-          </a>
-        </details>
-        <details className="strength-journey" data-annotate="training.levels">
-          <summary>查看 20 级成长形象</summary>
-          <div className="strength-avatar-gallery">
-            {strengthStages.map((stage, index) => (
-              <figure
-                key={stage}
-                className={index < growth.level ? 'unlocked' : ''}
-              >
-                <Image
-                  src={`/strength-avatar/level-${String(index + 1).padStart(2, '0')}.png`}
-                  alt={stage}
-                  aria-label={`力量成长第 ${index + 1} 级 · ${stage}`}
-                  sizes="96px"
-                  width={96}
-                  height={96}
-                  loading="lazy"
-                />
-                <figcaption>
-                  <strong>Lv. {index + 1}</strong>
-                  <span>{stage}</span>
-                  <small>{index < growth.level ? '已解锁' : '待解锁'}</small>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </details>
-      </div>
-      {group && (
-        <div
-          className="strength-exercise-detail chart-card"
-          id="strength-exercise-detail"
-        >
-          <SectionTitle
-            aside={<span className="subtle">{catalog.length} 个动作</span>}
-          >
-            {group} · 动作明细
-          </SectionTitle>
-          {(() => {
-            const part = overview.find((p) => p.group === group);
-            return (
-              part?.reference && (
-                <p className="strength-reference">
-                  参照：{part.reference.name} ·{' '}
-                  {part.first ? compactDate(part.first.date) : ''} 建立
-                  {part.last ? ` · 最近 ${compactDate(part.last.date)}` : ''}
-                  {part.stale ? ` · 上次指数 ${part.previousScore}` : ''}
-                </p>
-              )
-            );
-          })()}
-          {exercise && last ? (
-            <>
-              <label className="exercise-select">
-                <select
-                  aria-label="选择查看能力变化的动作"
-                  value={exerciseKey(exercise)}
-                  onChange={(e) => setSelected(e.target.value)}
-                >
-                  {catalog.map((e) => (
-                    <option value={exerciseKey(e)} key={exerciseKey(e)}>
-                      {e.name} ·{' '}
-                      {exerciseDefinition(e)?.weightLabel ?? loadLabels[e.load]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="exercise-detail-stat">
-                <strong>
-                  {numeric(result(last))}
-                  <small>{unit}</small>
-                </strong>
-                <span>
-                  {bodyOnly ? '最近单组最多次数' : '最近最重工作组'}
-                  <small>
-                    首次 {numeric(result(first))} {unit} · 共 {timeline.length}{' '}
-                    次记录
-                  </small>
-                </span>
-              </div>
-              <TrendChart points={points} color="#e38a16" unit={unit} />
-              <p className="helper">
-                {bodyOnly
-                  ? '相同动作下比较单组次数，保持动作幅度与标准一致。'
-                  : '展示每次最重工作组。每次次数可能不同，重量变化不直接等于力量增长。'}
-              </p>
-            </>
-          ) : (
-            <p className="empty-inline">
-              这个部位还没有可展示的工作组。保存训练后，动作明细会出现在这里。
+            <summary>如何比较训练进步？</summary>
+            <p>
+              同一个动作、同一种负重口径，每天取最重的已完成正式组，同重取次数最多的一组。和首次记录相比，次数相同才计算加重；重量相同可比较次数。两者都变了就保留原成绩，不直接判断力量变化。
             </p>
-          )}
-        </div>
-      )}
+            <p>
+              自重动作看次数，哑铃注明单手重量，负重引体等只显示额外负重。更正或删除历史会重新计算。这里展示实际训练记录，不参与上方的力量等级。
+            </p>
+          </details>
+        )}
+      </section>
     </Panel>
   );
 }

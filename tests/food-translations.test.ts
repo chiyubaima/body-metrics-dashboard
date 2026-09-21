@@ -42,6 +42,10 @@ await test('food context distinguishes egg white, kidney beans, tea, whole milk,
   const fixtures: [string, RegExp, RegExp][] = [
     ['Bread, rye, toasted', /黑麦面包.*烤过/, /rye/],
     ['Egg, white, raw, frozen, pasteurized', /蛋清/, /白色/],
+    ['Duck egg, cooked', /鸭蛋.*熟/, /鸭肉|鸡蛋/],
+    ['Goose egg, cooked', /鹅蛋.*熟/, /鹅肉|鸡蛋/],
+    ['Quail egg, canned', /鹌鹑蛋.*罐装/, /鸡蛋/],
+    ['Egg, whole, cooked, hard-boiled', /水煮至全熟/, /硬质/],
     [
       'Beans, kidney, red, mature seeds, cooked, boiled, with salt',
       /红腰豆.*水煮.*加盐/,
@@ -139,6 +143,30 @@ await test('new Chinese names and qualifiers search across food families without
   );
   assert.equal(searchFoods('不存在的食物').total, 0);
   assert.equal(searchFoods('无糖酱牛肉').total, 0);
+});
+
+await test('egg searches match whole words, retain plural foods and return correct species', () => {
+  const result = searchFoods('鸡蛋');
+  assert(result.total > 0);
+  for (let offset = 0; offset < result.total; offset += 24) {
+    for (const food of searchFoods('鸡蛋', offset).foods) {
+      assert.doesNotMatch(food.originalName, /eggplant|eggnog/i);
+      assert.match(food.originalName, /\beggs?\b/i);
+    }
+  }
+  assert(
+    searchFoods('苹果').foods.some((food) =>
+      /^apples\b/i.test(food.originalName),
+    ),
+  );
+  assert(
+    searchFoods('鸭蛋').foods.every(
+      (food) =>
+        /\bduck\b/i.test(food.originalName) &&
+        /\beggs?\b/i.test(food.originalName),
+    ),
+  );
+  assert.equal(searchFoods('水煮蛋').foods[0].fdcId, 173424);
 });
 
 await test('saved and recycled USDA foods receive complete names without changing user weights, corrected nutrients or manual names', () => {

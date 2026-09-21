@@ -1,7 +1,14 @@
 'use client';
 import { useEffect, useState, type SubmitEvent } from 'react';
 import { Check, Copy, Plus, Search, Trash2, Utensils } from 'lucide-react';
-import type { Diet, Entry, Food, MealSlot, Nutrition } from '@/lib/model';
+import type {
+  CustomDish,
+  Diet,
+  Entry,
+  Food,
+  MealSlot,
+  Nutrition,
+} from '@/lib/model';
 import { today } from '@/lib/model';
 import {
   basisLabels,
@@ -12,6 +19,7 @@ import {
 import { DatePicker } from './calendar';
 import { DeleteConfirm } from './delete-confirm';
 import { DishDetails } from './dish-details';
+import { FoodPortionInput } from './food-portion';
 import { Field } from './form-controls';
 import type { Save } from './forms';
 import { compactDate, numeric } from './panels';
@@ -23,6 +31,7 @@ export function MealForm({
   draft,
   date,
   records,
+  dishes = [],
   meal,
   save,
   busy,
@@ -33,6 +42,7 @@ export function MealForm({
   draft?: Entry;
   date: string;
   records: Entry[];
+  dishes?: CustomDish[];
   meal?: MealSlot;
   save: Save;
   busy: boolean;
@@ -61,7 +71,16 @@ export function MealForm({
     ),
     [note, setNote] = useState(original?.note ?? ''),
     [query, setQuery] = useState(''),
-    [tab, setTab] = useState('custom'),
+    [tab, setTab] = useState(() =>
+      records.some(
+        (r) =>
+          r.kind === 'diet' && r.date <= date && (r.data as Diet).foods.length,
+      )
+        ? 'recent'
+        : dishes.length
+          ? 'custom'
+          : 'library',
+    ),
     [results, setResults] = useState<Food[]>([]),
     [total, setTotal] = useState(0),
     [catalogCount, setCatalogCount] = useState(0),
@@ -345,7 +364,8 @@ export function MealForm({
                   setResults([]);
                   setSearching(true);
                   setOffset(0);
-                  if (tab === 'recent') setTab('custom');
+                  if (tab === 'recent')
+                    setTab(dishes.length ? 'custom' : 'library');
                 }}
                 maxLength={80}
               />
@@ -393,40 +413,6 @@ export function MealForm({
                 最近吃过
               </button>
             </div>
-            <details className="library-sources">
-              <summary>营养数据来源 · 未知项留空</summary>
-              <p>
-                <a
-                  href="https://fdc.nal.usda.gov/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  USDA FoodData Central
-                </a>{' '}
-                提供参考值；按实际份量计算，可根据包装标签更正。
-              </p>
-              <p>
-                自建菜品使用确认过的 AI
-                估算配方，原料、做法、参考份量与估算假设可展开查看。
-              </p>
-              {[
-                ...new Map(
-                  [...foods, ...options]
-                    .filter((f) => f.fdcId && f.source?.startsWith('USDA FDC '))
-                    .map((f) => [f.fdcId, f]),
-                ).values(),
-              ].map((f) => (
-                <a
-                  key={f.fdcId}
-                  href={`https://fdc.nal.usda.gov/food-details/${f.fdcId}/nutrients`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={f.originalName}
-                >
-                  {displayFoodName(f)} ↗
-                </a>
-              ))}
-            </details>
             {tab === 'recent' && !recent.length && (
               <p className="helper library-hint">
                 常吃的食物会自动留在这里。先从下面选一种。
@@ -453,7 +439,9 @@ export function MealForm({
                     </button>
                   ))}
                 </div>
-                <p className="food-match-hint">{hint}</p>
+                {(!options.length || hint.includes('中式酱卤配方不同')) && (
+                  <p className="food-match-hint">{hint}</p>
+                )}
                 <p className="helper">
                   {searching
                     ? '正在找食物…'
@@ -552,6 +540,40 @@ export function MealForm({
               <Plus size={16} />
               手动添加{query ? `「${query}」` : ''}
             </button>
+            <details className="library-sources">
+              <summary>营养数据来源 · 未知项留空</summary>
+              <p>
+                <a
+                  href="https://fdc.nal.usda.gov/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  USDA FoodData Central
+                </a>{' '}
+                提供参考值；按实际份量计算，可根据包装标签更正。
+              </p>
+              <p>
+                自建菜品使用确认过的 AI
+                估算配方，原料、做法、参考份量与估算假设可展开查看。
+              </p>
+              {[
+                ...new Map(
+                  [...foods, ...options]
+                    .filter((f) => f.fdcId && f.source?.startsWith('USDA FDC '))
+                    .map((f) => [f.fdcId, f]),
+                ).values(),
+              ].map((f) => (
+                <a
+                  key={f.fdcId}
+                  href={`https://fdc.nal.usda.gov/food-details/${f.fdcId}/nutrients`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={f.originalName}
+                >
+                  {displayFoodName(f)} ↗
+                </a>
+              ))}
+            </details>
             <p className="library-source">
               常见食物参考{' '}
               <a
@@ -633,52 +655,10 @@ export function MealForm({
                       <Trash2 size={16} />
                     </button>
                   </div>
-                  <div className="food-portion">
-                    <label>
-                      <input
-                        aria-label={`${displayFoodName(f)}重量克`}
-                        type="number"
-                        inputMode="decimal"
-                        min={1}
-                        max={10000}
-                        step="any"
-                        required
-                        value={f.grams || ''}
-                        onChange={(e) =>
-                          update(i, {
-                            grams: Number(e.target.value),
-                            estimatedPortion: false,
-                          })
-                        }
-                      />
-                      <span>g</span>
-                    </label>
-                    <select
-                      aria-label={`${displayFoodName(f)}重量口径`}
-                      value={f.basis}
-                      onChange={(e) =>
-                        update(i, {
-                          basis: e.target.value as Food['basis'],
-                          nutrition: null,
-                          source: '手动记录',
-                          fdcId: undefined,
-                          originalName: undefined,
-                          dish: undefined,
-                          dishDraft: undefined,
-                        })
-                      }
-                    >
-                      {Object.entries(basisLabels).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <strong>
-                      {numeric(nutritionSummary([f]).total.energy, 0)}
-                      <small>大卡</small>
-                    </strong>
-                  </div>
+                  <FoodPortionInput
+                    food={f}
+                    onChange={(change) => update(i, change)}
+                  />
                   {f.dish && (
                     <DishDetails
                       recipe={f.dish.recipe}
@@ -687,10 +667,36 @@ export function MealForm({
                       pending={f.dishDraft}
                     />
                   )}
-                  <div className="food-nutrition-reference">
-                    <p className="nutrition-reference-label">
-                      每 100g 营养参考 <span>可调整 · 未知留空</span>
-                    </p>
+                  <details className="food-nutrition-reference">
+                    <summary className="nutrition-reference-label">
+                      {f.nutrition ? '调整营养参考' : '补充营养参考'}
+                      <span>每 100g · 未知留空</span>
+                    </summary>
+                    <label className="portion-basis">
+                      重量口径
+                      <select
+                        aria-label={`${displayFoodName(f)}重量口径`}
+                        value={f.basis}
+                        onChange={(e) =>
+                          update(i, {
+                            basis: e.target.value as Food['basis'],
+                            nutrition: null,
+                            portion: undefined,
+                            source: '手动记录',
+                            fdcId: undefined,
+                            originalName: undefined,
+                            dish: undefined,
+                            dishDraft: undefined,
+                          })
+                        }
+                      >
+                        {Object.entries(basisLabels).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="nutrition-inputs">
                       {(
                         [
@@ -724,6 +730,13 @@ export function MealForm({
                                       : Number(e.target.value),
                                 } as Nutrition,
                                 source: '手动营养值',
+                                portion: f.portion
+                                  ? {
+                                      ...f.portion,
+                                      source: 'custom',
+                                      referenceId: undefined,
+                                    }
+                                  : undefined,
                                 fdcId: undefined,
                                 originalName: undefined,
                                 dish: undefined,
@@ -734,7 +747,7 @@ export function MealForm({
                         </Field>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 </article>
               ))}
             </div>

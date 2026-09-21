@@ -49,11 +49,13 @@ await test('record close confirmation uses a nested alert, preserves all three d
   const react = `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))};`;
   const stubs: Record<string, string> = {
     './app-settings': `${react} export const AppSettings=({onSelect})=>h('button',{onClick:()=>onSelect('models')},'Synthetic settings');`,
-    './forms': `${react} export const RecordForm=({kind,formId,onDirty})=>h('form',{id:formId,onInput:onDirty},h('input',{'aria-label':'Synthetic '+kind})); export const PlanForm=()=>null;`,
-    './panels': `${react} const panel=kind=>({edit})=>h('button',{onClick:()=>edit(kind)},kind); export const BodyPanel=panel('body'),DietPanel=panel('diet'),TrainingPanel=panel('training'); export const compactDate=d=>d;`,
+    './forms': `${react} export const RecordForm=({kind,formId,onDirty,existing,save})=>h('form',{id:formId,onInput:onDirty,onSubmit:e=>{e.preventDefault();if(existing)save('/api/records',existing)}},h('input',{'aria-label':'Synthetic '+kind})); export const PlanForm=({onStartRecording,onDirty})=>h('div',null,h('input',{'aria-label':'Synthetic target',onInput:onDirty}),h('button',{onClick:onStartRecording},'Start logging'));`,
+    './panels': `${react} const panel=kind=>({edit,history,plan})=>h('div',null,h('button',{onClick:()=>edit(kind)},kind),h('button',{onClick:()=>history(kind)},'history '+kind),h('button',{onClick:()=>plan(kind)},'plan '+kind)); export const BodyPanel=panel('body'),DietPanel=panel('diet'),TrainingPanel=panel('training'); export const compactDate=d=>d;`,
     './personal-settings': `${react} export const PersonalSettings=({onModelDirty,save})=>h('div',null,h('button',{onClick:()=>onModelDirty(true)},'Synthetic model draft'),h('button',{onClick:()=>save('/api/profile',{})},'Save synthetic profile'));`,
-    './history': 'export const HistoryView=()=>null;',
-    './trash': 'export const TrashView=()=>null;',
+    './history': `${react}
+      const row={id:'00000000-0000-4000-8000-000000000016',kind:'body',date:'2026-01-01',data:{weight:80,waist:null,bodyFat:null,condition:'morning',primary:true,note:''},updatedAt:'2026-01-01T00:00:00Z'};
+      export const HistoryView=({edit,remove,initialState})=>h('div',null,h('span',null,'history scroll '+(initialState?.scrollTop??0)),h('button',{onClick:()=>edit(row,{period:'custom',rangeStart:'2026-01-01',rangeEnd:'2026-01-02',condition:'morning',selected:[],scrollTop:140})},'Edit synthetic row'),h('button',{onClick:()=>remove([row])},'Remove synthetic row'));`,
+    './trash': `${react} export const TrashView=({restore})=>h('button',{onClick:()=>restore(['00000000-0000-4000-8000-000000000016'])},'Restore synthetic row');`,
     './calendar': 'export const JournalCalendar=()=>null;',
     './developer-mode': 'export const DeveloperMode=()=>null;',
     './app-update': 'export const AppUpdate=()=>null;',
@@ -95,8 +97,10 @@ await test('record close confirmation uses a nested alert, preserves all three d
       profileSaves++;
       return Response.json({});
     }
+    if (url === '/api/records' || url === '/api/trash')
+      return Response.json({});
     assert.equal(url, '/api/data');
-    assert.equal(init?.method, 'GET');
+    assert.equal(init?.method ?? 'GET', 'GET');
     return Response.json({
       records: [],
       plans: [],
@@ -191,6 +195,91 @@ await test('record close confirmation uses a nested alert, preserves all three d
       'clean form closes without confirmation',
     );
   }
+  await t.test(
+    'history editing returns to its context on save, cancel and explicit discard',
+    async () => {
+      await click(button('history body'));
+      await click(button('Edit synthetic row'));
+      await click(button('保存记录'));
+      assert(button('Edit synthetic row'));
+      assert.match(win.document.body.textContent, /history scroll 140/);
+      await click(button('Edit synthetic row'));
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '.record-dialog [aria-label="关闭"]',
+        )!,
+      );
+      assert.match(win.document.body.textContent, /history scroll 140/);
+      await click(button('Edit synthetic row'));
+      await act(async () =>
+        win.document
+          .querySelector('[aria-label="Synthetic body"]')!
+          .dispatchEvent(new win.Event('input', { bubbles: true })),
+      );
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '.record-dialog [aria-label="关闭"]',
+        )!,
+      );
+      await click(button('继续填写'));
+      assert(win.document.querySelector('.record-dialog'));
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '.record-dialog [aria-label="关闭"]',
+        )!,
+      );
+      await click(button('放弃并关闭'));
+      assert.match(win.document.body.textContent, /history scroll 140/);
+      await click(button('Remove synthetic row'));
+      assert.match(
+        win.document.querySelector('.notice')!.textContent,
+        /已移入回收站/,
+      );
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '.history-dialog [aria-label="关闭"]',
+        )!,
+      );
+      await click(button('回收站'));
+      await click(button('Restore synthetic row'));
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '[role="dialog"] [aria-label="关闭"]',
+        )!,
+      );
+      assert.match(
+        win.document.querySelector('.notice')!.textContent,
+        /已恢复 1 条记录/,
+      );
+      assert.doesNotMatch(
+        win.document.querySelector('.notice')!.textContent,
+        /移入回收站/,
+      );
+    },
+  );
+  await t.test(
+    'starting a meal from the target form preserves the discard guard',
+    async () => {
+      await click(button('plan diet'));
+      await act(async () =>
+        win.document
+          .querySelector('[aria-label="Synthetic target"]')!
+          .dispatchEvent(new win.Event('input', { bubbles: true })),
+      );
+      await click(button('Start logging'));
+      assert(win.document.querySelector('[role="alertdialog"]'));
+      await click(button('继续填写'));
+      assert(win.document.querySelector('[aria-label="Synthetic target"]'));
+      await click(button('Start logging'));
+      await click(button('放弃并关闭'));
+      assert(win.document.querySelector('[aria-label="Synthetic diet"]'));
+      await click(
+        win.document.querySelector<import('happy-dom').HTMLButtonElement>(
+          '.record-dialog [aria-label="关闭"]',
+        )!,
+      );
+    },
+  );
   await t.test(
     'saving a profile preserves a separate unsaved model draft and its close guard',
     async () => {

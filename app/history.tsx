@@ -1,5 +1,6 @@
 'use client';
-import { useId, useRef, useState } from 'react';
+import { foodPortionLabel } from '@/lib/food-portions';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { average, shiftDate, today } from '@/lib/model';
 import type {
@@ -30,12 +31,21 @@ function dietPlanText(p: DietPlan) {
     ? `蛋白质 ${p.protein}g · 碳水 ${p.carbs}g · 脂肪 ${p.fat}g`
     : `肉 ${p.meat}g · 米 ${p.rice}g · 总脂肪 ${p.fat}g`;
 }
+export type HistoryState = {
+  period: string;
+  rangeStart: string;
+  rangeEnd: string;
+  condition: string;
+  selected: string[];
+  scrollTop: number;
+};
 export function HistoryView({
   kind,
   records,
   plans,
   date,
   initialDate,
+  initialState,
   edit,
   remove,
   busy,
@@ -45,21 +55,30 @@ export function HistoryView({
   plans: Plan[];
   date: string;
   initialDate?: string;
-  edit: (r: Entry) => void;
+  initialState?: HistoryState;
+  edit: (r: Entry, state: HistoryState) => void;
   remove: (rows: Entry[]) => Promise<void>;
   busy: boolean;
 }) {
-  const [period, setPeriod] = useState(initialDate ? 'custom' : '90'),
-    [rangeStart, setRangeStart] = useState(
-      () => initialDate ?? shiftDate(date, -89),
+  const [period, setPeriod] = useState(
+      initialState?.period ?? (initialDate ? 'custom' : '90'),
     ),
-    [rangeEnd, setRangeEnd] = useState(initialDate ?? date),
-    [condition, setCondition] = useState('all'),
-    [selected, setSelected] = useState<string[]>([]),
+    [rangeStart, setRangeStart] = useState(
+      () => initialState?.rangeStart ?? initialDate ?? shiftDate(date, -89),
+    ),
+    [rangeEnd, setRangeEnd] = useState(
+      initialState?.rangeEnd ?? initialDate ?? date,
+    ),
+    [condition, setCondition] = useState(initialState?.condition ?? 'all'),
+    [selected, setSelected] = useState<string[]>(initialState?.selected ?? []),
     [pending, setPending] = useState<Entry[]>([]),
     [deleteError, setDeleteError] = useState('');
   const rangeId = useId();
   const results = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (results.current)
+      results.current.scrollTop = initialState?.scrollTop ?? 0;
+  }, [initialState]);
   const rangeError =
     period !== 'custom'
       ? ''
@@ -110,7 +129,16 @@ export function HistoryView({
       <button
         className="icon-button"
         aria-label={`修改${r.date}的记录`}
-        onClick={() => edit(r)}
+        onClick={() =>
+          edit(r, {
+            period,
+            rangeStart,
+            rangeEnd,
+            condition,
+            selected,
+            scrollTop: results.current?.scrollTop ?? 0,
+          })
+        }
         disabled={busy}
       >
         <Pencil size={16} />
@@ -400,7 +428,7 @@ export function EntryDetails({ entry, plan }: { entry: Entry; plan?: Plan }) {
             <span>
               {displayFoodName(f)}
               <small>
-                {f.grams} g · {basisLabels[f.basis]}
+                {foodPortionLabel(f)} · {basisLabels[f.basis]}
               </small>
               <MacroLine foods={[f]} />
             </span>

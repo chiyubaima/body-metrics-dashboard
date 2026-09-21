@@ -227,6 +227,63 @@ await test('owner isolation blocks cross-account reads, changes, deletes and res
     close();
   }
 });
+await test('strength settings persist per owner, legacy saves preserve them, and age anchors remain server-owned', async () => {
+  const { db, close } = connect();
+  try {
+    const old = {
+      name: 'Synthetic',
+      height: 175,
+      age: 30,
+      sex: 'male',
+      note: '',
+    };
+    await db
+      .prepare('INSERT INTO profiles(owner,payload,updated_at) VALUES(?,?,?)')
+      .bind('alice', JSON.stringify(old), '2025-09-07T02:00:00Z')
+      .run();
+    assert.equal((await snapshot(db, 'alice')).profile?.ageAsOf, '2025-09-07');
+    const strength = {
+      enabled: true,
+      references: { push: 'dumbbell-bench', squat: 'none' },
+    };
+    await saveProfile(db, 'alice', { ...old, strength, ageAsOf: '1900-01-01' });
+    let profile = (await snapshot(db, 'alice')).profile!;
+    assert.deepEqual(profile.strength, strength);
+    assert.equal(profile.ageAsOf, '2025-09-07');
+    await saveProfile(db, 'alice', { ...old, name: 'Renamed' });
+    profile = (await snapshot(db, 'alice')).profile!;
+    assert.deepEqual(profile.strength, strength);
+    assert.equal(profile.ageAsOf, '2025-09-07');
+    assert.equal((await snapshot(db, 'bob')).profile, null);
+    await saveProfile(db, 'bob', old);
+    assert.equal((await snapshot(db, 'bob')).profile?.strength, undefined);
+    await saveProfile(db, 'alice', {
+      ...old,
+      age: 31,
+      strength: { enabled: false, references: {} },
+    });
+    profile = (await snapshot(db, 'alice')).profile!;
+    assert.equal(profile.ageAsOf, today());
+    assert.equal(profile.strength?.enabled, false);
+    const stored = await db
+      .prepare('SELECT payload FROM profiles WHERE owner=?')
+      .bind('alice')
+      .first<{ payload: string }>();
+    assert.deepEqual(JSON.parse(stored!.payload).strength, profile.strength);
+    await assert.rejects(
+      saveProfile(db, 'alice', {
+        ...old,
+        strength: { enabled: true, references: { push: 'squat' } },
+      }),
+    );
+    assert.equal(
+      (await snapshot(db, 'alice')).profile?.strength?.enabled,
+      false,
+    );
+  } finally {
+    close();
+  }
+});
 await test('plans are append-only and existing food records retain their original plan', async () => {
   const { db, close } = connect();
   try {

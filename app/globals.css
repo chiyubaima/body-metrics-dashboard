@@ -1837,16 +1837,6 @@ select.entry-input {
   gap: 8px;
   margin: 9px 0;
 }
-.food-portion > label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border: 1.5px solid #dfe8d7;
-  border-radius: 8px;
-  min-width: 0;
-  width: 105px;
-  padding: 0 8px;
-}
 .food-portion input {
   width: 100%;
   min-width: 0;
@@ -1855,10 +1845,6 @@ select.entry-input {
   height: 39px;
   font-weight: 700;
   color: #587a43;
-}
-.food-portion label span {
-  font-size: 12px;
-  color: #9faf94;
 }
 .food-portion select {
   border: 1px solid #e3eade;
@@ -4313,9 +4299,6 @@ select.entry-input {
   margin: 7px 0;
   gap: 7px;
 }
-.meal-form .food-portion label {
-  width: 90px;
-}
 .meal-form .food-portion input,
 .meal-form .food-portion select {
   height: 30px;
@@ -4445,60 +4428,6 @@ select.entry-input {
   padding-bottom: 13px;
   margin-bottom: 16px;
 }
-.strength-body-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 13px;
-}
-.strength-body-grid > button {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  min-width: 0;
-  padding: 10px 11px;
-  background: #fffaf0;
-  border: 1px solid #f0e3c9;
-  border-bottom-width: 3px;
-  border-radius: 14px;
-  text-align: left;
-  transition:
-    background 0.16s,
-    transform 0.16s,
-    border-color 0.16s;
-}
-.strength-body-grid > button:hover {
-  background: #fff3d9;
-  transform: translateY(-1px);
-}
-.strength-body-grid > button:active {
-  transform: translateY(2px);
-}
-.strength-body-grid > button.selected {
-  background: #ffefcc;
-  border-color: #e9b356;
-}
-.strength-body-grid > button > span {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  font-size: 12px;
-  font-weight: 650;
-  color: #846139;
-}
-.strength-body-grid > button > strong {
-  font-size: 29px;
-  line-height: 1.15;
-  color: #ba7218;
-  font-variant-numeric: tabular-nums;
-}
-.strength-body-grid > button > small {
-  font-size: 9px;
-  color: #987b55;
-  white-space: nowrap;
-}
 .strength-grid-caption {
   grid-column: span 2;
   display: flex;
@@ -4531,47 +4460,8 @@ select.entry-input {
 .strength-exercise-detail {
   animation: panel-in 0.2s ease-out;
 }
-.strength-reference {
-  font-size: 10px;
-  line-height: 1.6;
-  color: #917a56;
-  background: #fff9ed;
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin: 10px 0;
-}
-.strength-exercise-detail .exercise-select {
-  margin: 10px 0;
-}
-.exercise-detail-stat {
-  display: flex;
-  gap: 13px;
-  align-items: center;
-  margin: 7px 0;
-}
-.exercise-detail-stat > strong {
-  font-size: 29px;
-  color: #bf7c27;
-  font-variant-numeric: tabular-nums;
-}
-.exercise-detail-stat > strong > small {
-  font-size: 12px;
-  margin-left: 3px;
-  font-weight: 500;
-}
-.exercise-detail-stat > span {
-  font-size: 10px;
-  color: #8e7b62;
-}
-.exercise-detail-stat > span > small {
-  display: block;
-  margin-top: 4px;
-  font-size: 10px;
-  color: #a29584;
-}
 @media (prefers-reduced-motion: reduce) {
-  .orbit-fill,
-  .strength-body-grid > button {
+  .orbit-fill {
     transition: none;
   }
   .strength-exercise-detail {
@@ -4710,10 +4600,6 @@ select.entry-input {
 .strength-growth progress::-moz-progress-bar {
   background: #f3aa35;
   border-radius: 8px;
-}
-.strength-body-grid > button > small {
-  white-space: normal;
-  font-size: 11px;
 }
 .workout-meta {
   display: flex;

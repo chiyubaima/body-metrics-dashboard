@@ -6,6 +6,7 @@ import { act, createElement } from 'react';
 import ts from 'typescript';
 import { average } from '../lib/model.ts';
 import type { Body, Entry, Kind } from '../lib/model.ts';
+import type { HistoryState } from '../app/history.tsx';
 
 await test('diary date ranges, combined filters and deletion remain scoped to visible records', async (t) => {
   const win = new Window({ url: 'http://localhost/' });
@@ -115,7 +116,12 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
   let key = 0;
   let deleted: Entry[] = [];
   let rejectDelete = false;
-  async function render(kind: Kind, initialDate?: string) {
+  let captured: HistoryState | undefined;
+  async function render(
+    kind: Kind,
+    initialDate?: string,
+    initialState?: HistoryState,
+  ) {
     deleted = [];
     await act(async () =>
       root.render(
@@ -126,7 +132,10 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
           plans: [],
           date: '2025-01-31',
           initialDate,
-          edit: () => {},
+          initialState,
+          edit: (_row: Entry, state: HistoryState) => {
+            captured = state;
+          },
           busy: false,
           remove: async (rows: Entry[]) => {
             if (rejectDelete) throw new Error('合成测试删除失败');
@@ -327,6 +336,36 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
       );
       assert(!container.querySelector('[role="alertdialog"]'));
       assert(button('删除所选').disabled);
+    },
+  );
+  await t.test(
+    'editing returns a snapshot that restores filters, selection and scroll',
+    async () => {
+      await render('body');
+      await click('自选区间');
+      await fill('开始日期', '2025-01-30');
+      await fill('结束日期', '2025-01-31');
+      await click('晨起');
+      await selectAll();
+      results().scrollTop = 140;
+      await act(async () =>
+        container
+          .querySelector<import('happy-dom').HTMLButtonElement>(
+            '[aria-label="修改2025-01-31的记录"]',
+          )!
+          .click(),
+      );
+      assert(captured);
+      assert.equal(captured.period, 'custom');
+      assert.equal(captured.condition, 'morning');
+      assert.equal(captured.scrollTop, 140);
+      await render('body', undefined, captured);
+      assert.deepEqual(visible(), ['2025-01-31', '2025-01-30']);
+      assert.equal(results().scrollTop, 140);
+      assert.match(
+        container.querySelector('.selection-toolbar')!.textContent,
+        /已选 2 条/,
+      );
     },
   );
 });

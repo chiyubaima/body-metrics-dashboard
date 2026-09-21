@@ -3,13 +3,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Entry, Exercise, Training } from '../lib/model.ts';
 import { resistanceExercises } from '../lib/exercises.ts';
-import {
-  estimatedStrength,
-  strengthOverview,
-  strengthGrowth,
-  strengthGroup,
-  trainingDayLabel,
-} from '../lib/strength.ts';
+import { buildCoachContext } from '../lib/coach-context.ts';
+import { exerciseProgress, trainingDayLabel } from '../lib/strength.ts';
 const exercise = (id = 'bench-press', weight = 60, reps = 8): Exercise => {
   const def = resistanceExercises.find((e) => e.id === id)!;
   return {
@@ -36,136 +31,163 @@ const record = (date: string, exercises: Exercise[]): Entry => ({
   createdAt: date + 'T01:00:00Z',
   updatedAt: date + 'T01:00:00Z',
 });
-const chest = (rows: Entry[], date = '2026-09-08') =>
-  strengthOverview(rows, date).find((p) => p.group === '胸')!;
-await test('strength uses same exercise performance rather than set volume or newly added exercises', () => {
-  const first = record('2026-09-01', [exercise()]),
-    later = record('2026-09-08', [
-      exercise('bench-press', 66),
-      exercise('machine-press', 200),
-    ]);
-  assert.equal(chest([first]).score, 100);
-  assert.equal(chest([first]).baseline, true);
-  assert.equal(chest([later, first]).score, 110);
-  assert.equal(chest([later, first]).reference?.catalogId, 'bench-press');
-  const duplicate = structuredClone(later);
-  (duplicate.data as Training).exercises![0].sets.push({
-    ...exercise().sets[0],
-    weight: 66,
-  });
-  assert.equal(chest([first, duplicate]).score, 110);
-  assert.equal(chest([first, later], '2026-09-02').score, 100);
-  assert.equal(chest([first, later], '2026-10-08').score, null);
-  assert.equal(chest([first, later], '2026-10-08').previousScore, 110);
-});
-await test('strength filters warmup, incomplete, high rep, unclassified and bodyweight loads', () => {
-  const base = exercise();
-  assert(estimatedStrength(base)! > 60);
-  assert.equal(estimatedStrength(exercise('bench-press', 60, 1)), 60);
-  for (const change of [
-    { warmup: true },
-    { completed: false },
-    { reps: 12 },
-    { weight: 0 },
-    { reps: null },
-    { weight: null },
-  ]) {
-    const invalid = { ...base, sets: [{ ...base.sets[0], ...change }] };
-    assert.equal(estimatedStrength(invalid), null);
+await test('progress shows actual matching-rep weights, not baseline scores or inferred maximums', () => {
+  for (const reps of [1, 8, 12, 20]) {
+    const first = record('2026-09-01', [exercise('bench-press', 30, reps)]);
+    const later = record('2026-09-08', [exercise('bench-press', 35, reps)]);
+    const result = exerciseProgress([later, first], later.date)[0];
+    assert.equal(result.first.weight, 30);
+    assert.equal(result.last.weight, 35);
+    assert.equal(result.change, 5);
+    assert.equal(result.changeUnit, 'kg');
+    assert.equal(result.comparable, true);
+    assert.equal(result.baseline, false);
+    assert.equal('score' in result, false);
+    assert.equal(
+      exerciseProgress([first, later], first.date)[0].baseline,
+      true,
+    );
   }
-  assert.equal(estimatedStrength(exercise('pushup', 0, 8)), null);
-  assert.equal(estimatedStrength(exercise('weighted-pullup', 20, 8)), null);
+});
+await test('changing weight and reps is not called progress, while same-weight reps remain traceable', () => {
+  const first = record('2026-09-01', [exercise('bench-press', 30, 12)]);
+  const changed = record('2026-09-08', [exercise('bench-press', 40, 8)]);
+  const result = exerciseProgress([first, changed], changed.date)[0];
+  assert.equal(result.comparable, false);
+  assert.equal(result.change, null);
+  assert.deepEqual(result.last, { date: changed.date, weight: 40, reps: 8 });
+  const more = record(changed.date, [exercise('bench-press', 30, 15)]);
+  const reps = exerciseProgress([first, more], more.date)[0];
+  assert.equal(reps.change, 3);
+  assert.equal(reps.changeUnit, '次');
+  const lower = record(changed.date, [exercise('bench-press', 25, 12)]);
+  assert.equal(exerciseProgress([first, lower], lower.date)[0].change, -5);
   assert.equal(
-    estimatedStrength({
-      ...base,
-      catalogId: undefined,
-      name: 'Legacy unknown exercise',
-    }),
-    null,
-  );
-  const missed = record('2026-09-01', [base]);
-  (missed.data as Training).status = 'missed';
-  assert.equal(chest([missed]).score, null);
-  assert.equal(chest([]).score, null);
-});
-await test('same day estimates merge without extra points and historical edits or deletions recalculate the evidence', () => {
-  const a = record('2026-09-01', [exercise('bench-press', 50)]),
-    b = record('2026-09-01', [exercise('bench-press', 60)]),
-    c = record('2026-09-08', [exercise('bench-press', 66)]);
-  assert.equal(chest([a, b, c]).score, 110);
-  assert.equal(chest([a, b, c]).history.length, 2);
-  assert.equal(chest([a, c]).score, 132);
-  assert.equal(chest([c]).score, 100);
-  const corrected = record('2026-09-08', [exercise('bench-press', 60)]);
-  assert.equal(chest([a, b, corrected]).score, 100);
-});
-
-await test('glute and leg exercises share one strength reference without merging distinct exercise histories', () => {
-  const squat = exercise('squat', 60);
-  const hip = exercise('hip-thrust', 100);
-  assert.equal(strengthGroup(squat), '臀腿');
-  assert.equal(strengthGroup(hip), '臀腿');
-  const overview = strengthOverview(
-    [
-      record('2026-09-01', [squat]),
-      record('2026-09-08', [hip, exercise('squat', 66)]),
-    ],
-    '2026-09-08',
-  );
-  assert.equal(overview.length, 6);
-  const legs = overview.find((part) => part.group === '臀腿')!;
-  assert.equal(legs.score, 110);
-  assert.equal(legs.reference?.catalogId, 'squat');
-  assert.equal(legs.history.length, 2);
-});
-
-await test('growth starts at level one and new baselines or extra volume never earn points', () => {
-  const empty = strengthGrowth(strengthOverview([], '2026-09-08'));
-  assert.deepEqual(empty, {
-    points: 0,
-    level: 1,
-    next: 10,
-    fraction: 0,
-    baselines: 0,
-  });
-  const first = record('2026-09-01', [exercise()]);
-  const added = record('2026-09-08', [exercise(), exercise('squat', 200)]);
-  const growth = strengthGrowth(strengthOverview([first, added], '2026-09-08'));
-  assert.equal(growth.level, 1);
-  assert.equal(growth.points, 0);
-  assert.equal(growth.baselines, 2);
-  assert.equal(
-    strengthGrowth(
-      strengthOverview(
-        [record('2026-09-08', [exercise('bench-press', 60, 12)])],
-        '2026-09-08',
-      ),
-    ).baselines,
+    exerciseProgress(
+      [first, record(changed.date, [exercise('bench-press', 30, 12)])],
+      changed.date,
+    )[0].change,
     0,
   );
 });
-
-await test('unlocked growth retains peaks, avoids new-group dilution, and respects selected date and corrected evidence', () => {
-  const first = record('2026-09-01', [exercise('bench-press', 60)]);
-  const peak = record('2026-09-02', [exercise('bench-press', 72)]);
-  const lower = record('2026-09-03', [
-    exercise('bench-press', 66),
-    exercise('squat', 80),
+await test('daily best merges duplicate sessions and sets with deterministic reps, without rewarding volume', () => {
+  const mixed = exercise('bench-press', 30, 8);
+  mixed.sets.push(
+    ...exercise('bench-press', 30, 12).sets,
+    ...exercise('bench-press', 25, 20).sets,
+  );
+  const a = record('2026-09-01', [mixed]);
+  const b = record(a.date, [exercise('bench-press', 32, 12)]);
+  const c = record('2026-09-08', [exercise('bench-press', 35, 12)]);
+  const result = exerciseProgress([c, b, a], c.date)[0];
+  assert.equal(result.history.length, 2);
+  assert.equal(result.first.weight, 32);
+  assert.equal(result.first.reps, 12);
+  assert.equal(result.change, 3);
+  assert.equal(exerciseProgress([a], a.date)[0].first.reps, 12);
+  const duplicate = record(c.date, [exercise('bench-press', 35, 12)]);
+  assert.deepEqual(
+    exerciseProgress([a, b, c, duplicate], c.date),
+    exerciseProgress([a, b, c], c.date),
+  );
+});
+await test('pure bodyweight compares reps, added load and per-hand weights retain their units and identity', () => {
+  const first = record('2026-09-01', [
+    exercise('pushup', 0, 8),
+    exercise('weighted-pullup', 10, 8),
+    exercise('dumbbell-bench', 15, 12),
   ]);
-  const all = [lower, peak, first];
-  const growth = (rows: Entry[], date = '2026-09-08') =>
-    strengthGrowth(strengthOverview(rows, date));
-  assert.equal(growth(all).level, 3);
-  assert.equal(growth(all).points, 20);
-  assert.equal(growth(all, '2026-10-15').level, 3);
-  assert.equal(growth(all, '2026-09-01').level, 1);
-  assert.equal(growth([lower, first]).level, 2);
-  assert.equal(growth([lower]).level, 1);
-  const corrected = record('2026-09-02', [exercise('bench-press', 60)]);
-  assert.equal(growth([first, corrected, lower]).level, 2);
-  const max = record('2026-09-04', [exercise('bench-press', 240)]);
-  assert.equal(growth([...all, max]).level, 20);
-  assert.equal(growth([...all, max]).fraction, 1);
+  const later = record('2026-09-08', [
+    exercise('pushup', 0, 12),
+    exercise('weighted-pullup', 15, 8),
+    exercise('dumbbell-bench', 17.5, 12),
+  ]);
+  const all = exerciseProgress([first, later], later.date);
+  const body = all.find((p) => p.name === '俯卧撑')!;
+  assert.equal(body.bodyOnly, true);
+  assert.equal(body.change, 4);
+  assert.equal(body.changeUnit, '次');
+  const weighted = all.find((p) => p.load === 'bodyweight' && !p.bodyOnly)!;
+  assert.equal(weighted.change, 5);
+  assert.equal(weighted.changeUnit, 'kg');
+  const dumbbell = all.find((p) => p.load === 'perHand')!;
+  assert.equal(dumbbell.last.weight, 17.5);
+  assert.equal(dumbbell.change, 2.5);
+  const wrongLoad = {
+    ...exercise('dumbbell-bench', 35, 12),
+    load: 'total' as const,
+  };
+  assert.equal(
+    exerciseProgress(
+      [first, later, record(later.date, [wrongLoad])],
+      later.date,
+    ).length,
+    4,
+  );
+});
+await test('only completed valid working sets participate; unsupported normative exercises can still track raw progress', () => {
+  for (const change of [
+    { warmup: true },
+    { completed: false },
+    { weight: null },
+    { reps: null },
+    { reps: 0 },
+    { weight: -5 },
+  ]) {
+    const invalid = exercise();
+    Object.assign(invalid.sets[0], change);
+    assert.deepEqual(
+      exerciseProgress([record('2026-09-01', [invalid])], '2026-09-08'),
+      [],
+    );
+  }
+  const missed = record('2026-09-01', [exercise()]);
+  (missed.data as Training).status = 'missed';
+  assert.deepEqual(exerciseProgress([missed], '2026-09-08'), []);
+  assert.deepEqual(exerciseProgress([], '2026-09-08'), []);
+  const unknown = { ...exercise(), catalogId: undefined, name: '合成历史动作' };
+  const records = [
+    record('2026-09-01', [unknown, exercise('machine-press', 30, 12)]),
+  ];
+  assert.equal(exerciseProgress(records, '2026-09-08').length, 2);
+});
+await test('recent sorting, canonical exercise aliases, date cutoffs, staleness and corrections derive from surviving evidence', () => {
+  const first = record('2026-09-01', [exercise('bench-press', 30, 12)]);
+  const alias = { ...exercise('bench-press', 35, 12), name: '平板卧推' };
+  const later = record('2026-09-08', [alias]);
+  const rows = [
+    first,
+    later,
+    record('2026-09-09', [exercise('squat', 50, 12)]),
+  ];
+  assert.equal(exerciseProgress(rows, '2026-09-09')[0].name, '杠铃深蹲');
+  assert.equal(exerciseProgress(rows, '2026-09-08').length, 1);
+  assert.equal(exerciseProgress(rows, '2026-09-08')[0].change, 5);
+  assert.equal(exerciseProgress(rows, '2026-10-10')[0].stale, true);
+  assert.equal(exerciseProgress([later], '2026-09-08')[0].baseline, true);
+  const corrected = record(later.date, [exercise('bench-press', 32, 12)]);
+  assert.equal(exerciseProgress([first, corrected], later.date)[0].change, 2);
+});
+await test('Captain receives raw exercise progress and cannot infer a gain from incompatible sets', () => {
+  const records = [
+    record('2026-09-01', [exercise('bench-press', 30, 12)]),
+    record('2026-09-08', [exercise('bench-press', 40, 8)]),
+  ];
+  const { evidence } = buildCoachContext(
+    { records, plans: [], profile: null },
+    '2026-09-08',
+    [],
+    [],
+    [],
+  );
+  const detail = evidence.find((e) => e.id === 'strength-reference')!.detail;
+  const item = JSON.parse(detail.split('；')[0])[0];
+  assert.equal(item.first.weight, 30);
+  assert.equal(item.last.reps, 8);
+  assert.equal(item.change, null);
+  assert.equal(item.comparable, false);
+  assert.equal('score' in item, false);
+  assert(detail.includes('实记重量和次数'));
 });
 
 await test('actual rest and completed or missed sessions take precedence over the schedule label', () => {

@@ -11,12 +11,16 @@ import type {
   Profile,
   Kind,
   MealSlot,
+  CustomDish,
 } from '@/lib/model';
 import { MealForm } from './meal-form';
 import { TrainingForm } from './training-form';
 import { DatePicker } from './calendar';
 import { macroEnergy } from '@/lib/progress';
 import { Field, Choices, Picker } from './form-controls';
+import { strengthPatterns, strengthStandards } from '@/lib/strength-standards';
+import type { StrengthSettings } from '@/lib/strength-standards';
+import { resistanceExercises } from '@/lib/exercises';
 export type Save = (
   path: string,
   body: unknown,
@@ -56,6 +60,7 @@ type RecordProps = {
   busy: boolean;
   onDirty: () => void;
   records: Entry[];
+  dishes?: CustomDish[];
   meal?: MealSlot;
 };
 export function RecordForm(props: RecordProps) {
@@ -244,6 +249,7 @@ export function PlanForm({
   save,
   busy,
   onDirty,
+  onStartRecording,
 }: {
   kind: 'diet' | 'training';
   plan: Plan | null;
@@ -251,6 +257,7 @@ export function PlanForm({
   save: Save;
   busy: boolean;
   onDirty: () => void;
+  onStartRecording?: () => void;
 }) {
   const [id] = useState(() => crypto.randomUUID()),
     [error, setError] = useState('');
@@ -300,6 +307,22 @@ export function PlanForm({
   }
   return (
     <form onSubmit={submit} onChange={onDirty} className="dialog-body">
+      {kind === 'diet' && !plan && onStartRecording && (
+        <div className="plan-start-recording">
+          <div>
+            <strong>还没有营养目标？</strong>
+            <p>先记下吃了什么，目标可以稍后再设。</p>
+          </div>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            onClick={onStartRecording}
+          >
+            先记录一餐
+          </button>
+        </div>
+      )}
       <div className="field">
         <span>
           生效日期 <em>*</em>
@@ -476,6 +499,9 @@ export function ProfileForm({
 }) {
   const [sex, setSex] = useState(profile?.sex ?? 'unspecified'),
     [error, setError] = useState('');
+  const [strength, setStrength] = useState<StrengthSettings>(
+    profile?.strength ?? { enabled: true, references: {} },
+  );
   async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
@@ -487,6 +513,7 @@ export function ProfileForm({
         age: amount(f, 'age'),
         sex,
         note: stringField(f, 'note'),
+        strength,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败。');
@@ -548,6 +575,55 @@ export function ProfileForm({
           placeholder="可保留饭后体重或估计体脂等参考，不会自动计入晨重趋势。"
         />
       </Field>
+      <details className="strength-method rating-settings">
+        <summary>力量评级设置</summary>
+        <p>
+          按年龄、体重和所填性别匹配训练人群参考。伤病、恢复期或标准不适合你时，可以关闭对标，个人进步仍会保留。
+        </p>
+        <Choices
+          label="群体力量对标"
+          value={strength.enabled ? 'on' : 'off'}
+          options={[
+            ['on', '开启'],
+            ['off', '关闭'],
+          ]}
+          onChange={(v) => {
+            setStrength({ ...strength, enabled: v === 'on' });
+            onDirty();
+          }}
+        />
+        {strength.enabled && (
+          <>
+            <p>
+              每类固定一个代表动作。自动选择最早持续记录的适用动作；排除某一类后只显示单项评级，不计算总等级。
+            </p>
+            {strengthPatterns.map((pattern) => (
+              <Field key={pattern.id} label={`${pattern.name} · 代表动作`}>
+                <select
+                  aria-label={`${pattern.name}代表动作`}
+                  value={strength.references[pattern.id] ?? ''}
+                  onChange={(e) => {
+                    const references = { ...strength.references };
+                    if (e.target.value) references[pattern.id] = e.target.value;
+                    else delete references[pattern.id];
+                    setStrength({ ...strength, references });
+                  }}
+                >
+                  <option value="">自动 · 最早持续记录的动作</option>
+                  <option value="none">此类不参与对标</option>
+                  {strengthStandards
+                    .filter((s) => s.pattern === pattern.id)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {resistanceExercises.find((e) => e.id === s.id)!.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            ))}
+          </>
+        )}
+      </details>
       {error && (
         <p className="form-error" role="alert">
           {error}
