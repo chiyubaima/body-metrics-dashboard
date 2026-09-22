@@ -103,6 +103,26 @@ await test('saved targets reject changed labels, dates, hidden duplicates and ma
   );
   assert.equal(locateTarget({ ...target, path: '/other' }, '2026-09-08'), null);
 });
+
+await test('launch targets omit entered passwords and remain locatable across dates', () => {
+  const { metric } = fixture();
+  metric.setAttribute('data-annotate', 'launch.password');
+  metric.setAttribute('data-annotate-view', '启动页');
+  metric.innerHTML =
+    '<h2>输入密码</h2><input type="password" aria-label="4位数字密码" value="0987" />';
+  const target = captureTarget(metric, '2026-01-01');
+  assert.equal(target.view, '启动页');
+  assert.equal(target.anchor, 'launch.password');
+  assert(!JSON.stringify(target).includes('0987'));
+  assert(
+    !JSON.stringify(
+      captureTarget(metric.querySelector('input')!, '2026-01-01'),
+    ).includes('0987'),
+  );
+  assert.equal(locateTarget(target, '2026-01-02'), metric);
+  metric.setAttribute('data-annotate-view', '看板');
+  assert.equal(locateTarget(target, '2026-01-02'), null);
+});
 await test('dialog targets preserve the actual form date and view, even when the dashboard date differs', () => {
   fixture();
   const dialog = win.document.createElement('div');
@@ -233,4 +253,100 @@ await test('operating mode preserves ordinary Escape and clicks, while an open a
   );
   assert.equal(reviewEscape, 1);
   cleanup();
+});
+
+await test('disabled controls can be picked without a click, stay disabled and do not double-pick on a trailing click', () => {
+  const { button, tool } = fixture();
+  button.setAttribute('disabled', '');
+  tool.setAttribute('disabled', '');
+  let picks = 0;
+  const cleanup = listenForAnnotations({
+    picking: true,
+    editorOpen: false,
+    panelOpen: false,
+    onPick: (element) => {
+      assert.equal(element, button);
+      picks++;
+    },
+    onHover: () => {},
+    onEscape: () => {},
+    onGeometry: () => {},
+  });
+  const pointer = (type: string) =>
+    new win.PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      pointerId: 1,
+      button: 0,
+    });
+  const child = button.querySelector('span')!;
+  child.dispatchEvent(pointer('pointerdown'));
+  child.dispatchEvent(pointer('pointerup'));
+  assert.equal(picks, 1);
+  child.dispatchEvent(
+    new win.MouseEvent('click', { bubbles: true, cancelable: true }),
+  );
+  assert.equal(picks, 1);
+  assert.equal(button.hasAttribute('disabled'), true);
+  tool.dispatchEvent(pointer('pointerdown'));
+  tool.dispatchEvent(pointer('pointerup'));
+  assert.equal(picks, 1);
+  cleanup();
+  button.dispatchEvent(pointer('pointerdown'));
+  button.dispatchEvent(pointer('pointerup'));
+  assert.equal(picks, 1);
+  assert.equal(button.hasAttribute('disabled'), true);
+});
+
+await test('disabled-control touch picking ignores drags, scrolling, cancelled gestures and panel/operating modes', () => {
+  const { button } = fixture();
+  button.setAttribute('disabled', '');
+  let picks = 0;
+  const options = {
+    picking: true,
+    editorOpen: false,
+    panelOpen: false,
+    onPick: () => picks++,
+    onHover: () => {},
+    onEscape: () => {},
+    onGeometry: () => {},
+  };
+  const pointer = (type: string, clientY = 0) =>
+    button.dispatchEvent(
+      new win.PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerType: 'touch',
+        pointerId: 1,
+        button: 0,
+        clientY,
+      }),
+    );
+  let cleanup = listenForAnnotations(options);
+  pointer('pointerdown');
+  pointer('pointermove', 30);
+  pointer('pointerup');
+  pointer('pointerdown');
+  win.document.dispatchEvent(new win.Event('scroll', { bubbles: true }));
+  pointer('pointerup');
+  pointer('pointerdown');
+  pointer('pointercancel');
+  pointer('pointerup');
+  assert.equal(picks, 0);
+  pointer('pointerdown');
+  pointer('pointerup');
+  assert.equal(picks, 1);
+  cleanup();
+  for (const mode of [
+    { picking: false },
+    { panelOpen: true },
+    { picking: false, editorOpen: true },
+  ]) {
+    cleanup = listenForAnnotations({ ...options, ...mode });
+    pointer('pointerdown');
+    pointer('pointerup');
+    assert.equal(picks, 1);
+    cleanup();
+  }
 });

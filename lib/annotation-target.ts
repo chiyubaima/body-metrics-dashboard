@@ -86,7 +86,11 @@ export function captureTarget(
       dialog
         ?.querySelector('[data-slot="dialog-title"]')
         ?.textContent?.trim()
-        .slice(0, 120) || '看板',
+        .slice(0, 120) ||
+      element
+        .closest('[data-annotate-view]')
+        ?.getAttribute('data-annotate-view') ||
+      '看板',
     anchor:
       element.closest('[data-annotate]')?.getAttribute('data-annotate') ?? '',
     selector: elementSelector(element),
@@ -121,6 +125,7 @@ export function locateTarget(
     if (matches.length !== 1) return null;
     const element = matches[0];
     if (
+      target.view !== '启动页' &&
       (element
         .closest('[data-record-date]')
         ?.getAttribute('data-record-date') ?? date) !== target.date
@@ -130,7 +135,11 @@ export function locateTarget(
     const view =
       dialog
         ?.querySelector('[data-slot="dialog-title"]')
-        ?.textContent?.trim() || '看板';
+        ?.textContent?.trim() ||
+      element
+        .closest('[data-annotate-view]')
+        ?.getAttribute('data-annotate-view') ||
+      '看板';
     if (
       view !== target.view ||
       element.localName !== target.tag ||
@@ -154,9 +163,24 @@ export function listenForAnnotations(options: {
   onGeometry: () => void;
 }) {
   const { picking, editorOpen, panelOpen } = options;
+  let disabledPress: {
+    element: Element;
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null = null;
+  let pickedOnRelease: Element | null = null;
   const isTool = (target: EventTarget | null) =>
     target instanceof Element && !!target.closest(annotationUi);
   const move = (event: PointerEvent) => {
+    if (
+      disabledPress &&
+      Math.hypot(
+        event.clientX - disabledPress.x,
+        event.clientY - disabledPress.y,
+      ) > 8
+    )
+      disabledPress = null;
     if (picking && !panelOpen) options.onHover(annotationElement(event.target));
   };
   const block = (event: Event) => {
@@ -165,12 +189,49 @@ export function listenForAnnotations(options: {
     if (!(event instanceof PointerEvent && event.pointerType === 'touch'))
       event.preventDefault();
   };
+  const cancelPress = () => {
+    disabledPress = null;
+  };
+  const down = (event: PointerEvent) => {
+    disabledPress = null;
+    pickedOnRelease = null;
+    block(event);
+    const element = annotationElement(event.target);
+    if (
+      picking &&
+      !panelOpen &&
+      event.button === 0 &&
+      element?.matches(':disabled')
+    )
+      disabledPress = {
+        element,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
+  };
+  const up = (event: PointerEvent) => {
+    block(event);
+    const press = disabledPress;
+    disabledPress = null;
+    // Native disabled controls may never emit click, but still emit pointer events.
+    if (
+      press &&
+      event.pointerId === press.pointerId &&
+      annotationElement(event.target) === press.element &&
+      Math.hypot(event.clientX - press.x, event.clientY - press.y) <= 8
+    ) {
+      pickedOnRelease = press.element;
+      options.onPick(press.element);
+    }
+  };
   const click = (event: MouseEvent) => {
     if (isTool(event.target) || (!picking && !editorOpen)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const element = annotationElement(event.target);
-    if (picking && !panelOpen && element) options.onPick(element);
+    if (picking && !panelOpen && element && element !== pickedOnRelease)
+      options.onPick(element);
   };
   const key = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && (picking || panelOpen)) {
@@ -193,22 +254,28 @@ export function listenForAnnotations(options: {
   if (picking) document.documentElement.dataset.developerPicking = '';
   else delete document.documentElement.dataset.developerPicking;
   window.addEventListener('pointermove', move, true);
-  window.addEventListener('pointerdown', block, true);
+  window.addEventListener('pointerdown', down, true);
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', cancelPress, true);
   window.addEventListener('mousedown', block, true);
   window.addEventListener('click', click, true);
   window.addEventListener('dblclick', block, true);
   window.addEventListener('keydown', key, true);
   window.addEventListener('scroll', options.onGeometry, true);
+  window.addEventListener('scroll', cancelPress, true);
   window.addEventListener('resize', options.onGeometry);
   return () => {
     delete document.documentElement.dataset.developerPicking;
     window.removeEventListener('pointermove', move, true);
-    window.removeEventListener('pointerdown', block, true);
+    window.removeEventListener('pointerdown', down, true);
+    window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', cancelPress, true);
     window.removeEventListener('mousedown', block, true);
     window.removeEventListener('click', click, true);
     window.removeEventListener('dblclick', block, true);
     window.removeEventListener('keydown', key, true);
     window.removeEventListener('scroll', options.onGeometry, true);
+    window.removeEventListener('scroll', cancelPress, true);
     window.removeEventListener('resize', options.onGeometry);
   };
 }

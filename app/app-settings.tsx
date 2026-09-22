@@ -25,16 +25,14 @@ import './personal-settings.css';
 export type SettingsSection = 'profile' | 'dishes' | 'backup' | 'models';
 export function AppSettings({
   disabled,
-  local,
   pendingWork,
   onSelect,
-  onStopped,
+  onLock,
 }: {
   disabled: boolean;
-  local: boolean;
   pendingWork: boolean;
   onSelect: (section: SettingsSection) => void;
-  onStopped: () => void;
+  onLock: () => Promise<void>;
 }) {
   const [confirm, setConfirm] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -47,36 +45,8 @@ export function AppSettings({
     setStopping(true);
     setError('');
     try {
-      const response = await fetch('/__body-journal/update/shutdown', {
-        method: 'POST',
-        headers: { 'X-Body-Journal-Update': '1' },
-        signal: AbortSignal.timeout(8000),
-      });
-      const result = (await response.json()) as {
-        phase?: string;
-        message?: string;
-      };
-      if (!response.ok || result.phase !== 'stopping')
-        throw new Error(result.message || '退出未完成，请重试。');
-      let unavailable = 0;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        try {
-          const health = await fetch('/__body-journal/health', {
-            cache: 'no-store',
-            signal: AbortSignal.timeout(1000),
-          });
-          if (!health.ok) throw new Error('closed');
-          unavailable = 0;
-        } catch {
-          if (++unavailable >= 2) {
-            onStopped();
-            if (window.opener) window.close();
-            return;
-          }
-        }
-      }
-      throw new Error('服务尚未关闭，请重试，或关闭身体日记的启动窗口。');
+      await onLock();
+      setConfirm(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : '退出未完成，请重试。');
     } finally {
@@ -92,7 +62,7 @@ export function AppSettings({
             <button
               className="icon-button"
               aria-label="个人设置"
-              disabled={disabled}
+              disabled={stopping}
             />
           }
         >
@@ -112,23 +82,25 @@ export function AppSettings({
               ['backup', '备份与引导', Download],
             ] as const
           ).map(([section, label, Icon]) => (
-            <DropdownMenuItem key={section} onClick={() => onSelect(section)}>
+            <DropdownMenuItem
+              key={section}
+              disabled={disabled}
+              onClick={() => onSelect(section)}
+            >
               <Icon size={17} />
               <span>{label}</span>
             </DropdownMenuItem>
           ))}
-          {local && (
-            <DropdownMenuItem
-              className="app-settings-exit"
-              onClick={() => {
-                setError('');
-                setConfirm(true);
-              }}
-            >
-              <Power size={17} />
-              <span>退出身体日记</span>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem
+            className="app-settings-exit"
+            onClick={() => {
+              setError('');
+              setConfirm(true);
+            }}
+          >
+            <Power size={17} />
+            <span>退出身体日记</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <AlertDialog
@@ -144,9 +116,9 @@ export function AppSettings({
           <Power size={25} aria-hidden="true" />
           <AlertDialogTitle>退出身体日记？</AlertDialogTitle>
           <AlertDialogDescription>
-            退出会关闭本机后台服务，已保存的记录会保留。下次双击启动即可继续。
+            退出后将返回密码页，已保存的记录会保留。再次进入需要输入密码。
             {pendingWork &&
-              '当前还有生成任务或未保存内容，退出会中断任务并丢失未保存的输入。'}
+              '当前还有进行中的任务或未保存内容。退出会关闭当前页面，未保存的输入将丢失；已提交的后台任务可能仍会继续。'}
           </AlertDialogDescription>
           {error && <p role="alert">{error}</p>}
           <div className="discard-actions">
@@ -159,7 +131,7 @@ export function AppSettings({
               继续使用
             </button>
             <button className="primary" disabled={stopping} onClick={stop}>
-              {stopping ? '正在退出…' : '退出并关闭服务'}
+              {stopping ? '正在退出…' : '确认退出'}
             </button>
           </div>
         </AlertDialogContent>

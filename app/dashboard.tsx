@@ -109,9 +109,11 @@ async function request<T = unknown>(
 export default function Dashboard({
   signInPath,
   localPreview,
+  onLock,
 }: {
   signInPath: string;
   localPreview: boolean;
+  onLock: () => Promise<void>;
 }) {
   const recordFormId = useId();
   const continueEditing = useRef<HTMLButtonElement | null>(null);
@@ -126,7 +128,6 @@ export default function Dashboard({
   }>();
   const [medalDirty, setMedalDirty] = useState(false);
   const [coachPending, setCoachPending] = useState(false);
-  const [stopped, setStopped] = useState(false);
   const [celebration, setCelebration] = useState('');
   useEffect(() => {
     if (!celebration) return;
@@ -537,16 +538,6 @@ export default function Dashboard({
       setNotice(e instanceof Error ? e.message : '保存失败，请重试。');
     }
   }
-  if (stopped)
-    return (
-      <main className="app-stopped">
-        <Activity size={38} />
-        <h1>身体日记已退出</h1>
-        <p>
-          后台服务已关闭，记录已保留。可以关闭此页面，下次双击启动即可继续。
-        </p>
-      </main>
-    );
   return (
     <main className="dashboard" data-annotate="dashboard">
       <header className="topbar" data-annotate="layout.header">
@@ -590,13 +581,12 @@ export default function Dashboard({
             {localPreview ? '本机数据' : '我的记录空间'}
           </span>
           <AppSettings
-            disabled={!statsReady}
-            local={localPreview}
+            disabled={!statsReady || busy}
             pendingWork={
               medalBusy || medalDirty || coachPending || dirty || modelDirty
             }
             onSelect={(section) => open({ type: 'settings', section })}
-            onStopped={() => setStopped(true)}
+            onLock={onLock}
           />
         </div>
       </header>

@@ -1,5 +1,28 @@
 # Application working rules
 
+## Authorized commit and sync (2026-09-22)
+
+- The user explicitly authorized commit and push of the verified PIN launch screen, confirmed exit/locking, launch developer mode and annotation revisions to the current main branch. Run repository data-protection checks, preserve personal data and the local service, and do not deploy.
+
+## Launch annotation revisions (2026-09-22)
+
+- Apply the five current launch notes: promote the supporting copy to the main heading; move the logo and inline Chinese/English brand above it; remove the old header brand and unlock arrow. Keep the relocated brand and PIN form usable on mobile.
+- Allow annotation selection of disabled controls without enabling them or firing business actions. Reuse existing launch and annotation files, add focused event regressions, no new dependencies/directories.
+- Reuse parent work/journal-access with annotations-prefixed synthetic evidence; verify disabled-button selection/save, regular operation and responsive layout, run test/typecheck/lint/build, remove temporary runtime. Recheck original notes and resolve only implemented notes with unchanged content/timestamps. Preserve personal data and port 3000; no commit/push/deploy.
+
+## Launch-screen developer annotations (2026-09-22)
+
+- Add the existing DeveloperMode to the launch header for local previews. Reuse selection, editing, saving and list controls; tag launch targets with stable anchors and view=启动页, exclude password values and allow locating this non-date-specific page across days.
+- Before unlock, only development-mode loopback requests with the existing authenticated identity may access scope=launch annotations. Enforce launch view/anchor scope on all database reads/writes, including existing-ID conflicts; other annotations and diary APIs retain the PIN gate. Hosted production keeps normal authentication and locking.
+- Extend existing access/annotation UI and synthetic store/target tests, update README, reuse the parent's documented work/journal-access with developer-prefixed evidence and remove temporary runtime after QA. No dependencies/migrations or personal password/record/annotation edits. Run test/typecheck/lint/build and responsive UI QA; preserve preview and prior work, no commit/push/deploy.
+
+## Password launch screen and lock on exit (2026-09-21)
+
+- Add a first-run four-digit numeric PIN with confirmation (including leading zeros), server-side verification, salted derived hash, bounded failed attempts and random expiring HttpOnly sessions. Preserve platform identity and enforce the lock in the shared API wrapper; access endpoints alone may run before unlock. Never expose hashes/PINs in exports or browser storage.
+- Supersede prior shutdown behavior: confirm Exit, revoke all owner sessions, unmount the diary and return to the PIN screen; cancel preserves drafts. Keep background services and saved records. Warn about pending/unsaved work within the confirmation. Synchronize exit across tabs and recheck session on foreground/expiry.
+- New UI/styles: app/journal-access.tsx and .css; crypto/contracts: lib/journal-access.ts; owner-scoped persistence: db/journal-access.ts; app/api/access contains only route.ts. Append and apply a Drizzle migration without changing personal records or setting the user's PIN. Extend tests/journal-access.test.ts and existing settings tests; no new dependencies.
+- Keep the existing light glass palette; short input/error/unlock/entry transitions, reduced-motion support and accessible keyboard/mobile controls. Synthetic browser QA belongs in documented parent work/journal-access; never copy private state or call models. Verify setup, mismatch/invalid/wrong PIN, throttling, refresh/expiry, owner isolation, unauthorized APIs, confirmed/cancelled exit and responsive visuals; run test/typecheck/lint/build. Preserve port 3000 and prior work; no commit/push/deploy.
+
 ## Exercise progress presentation (2026-09-21)
 
 - Replace the six baseline-100 score cards with actual exercise weight/reps and change since first record, keeping normative ratings unchanged. Show the three most recently recorded exercises first, expand all on demand, and open charts inline. Reuse existing strength/panels modules, tests and styles; no dependencies, migrations or new rating rules.

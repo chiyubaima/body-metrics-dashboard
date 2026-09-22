@@ -6,6 +6,23 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+export const journalAccess = sqliteTable('journal_access', {
+  owner: text('owner').primaryKey(),
+  salt: text('salt').notNull(),
+  hash: text('hash').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  blockedUntil: integer('blocked_until').notNull().default(0),
+});
+export const journalSessions = sqliteTable(
+  'journal_sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    owner: text('owner').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+  },
+  (t) => [index('idx_journal_sessions_owner').on(t.owner)],
+);
+
 export const medalFacts = sqliteTable('medal_facts', {
   id: text('id').primaryKey(),
   owner: text('owner').notNull(),

@@ -29,19 +29,26 @@ const moduleNames: Record<string, string> = {
   global: '全局',
 };
 type Action = 'exit' | 'close' | 'list' | 'pick' | 'operate';
-async function request<T>(method = 'GET', body?: unknown): Promise<T> {
+async function request<T>(
+  method = 'GET',
+  body?: unknown,
+  scope?: 'launch',
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetch('/api/annotations', {
-      method,
-      cache: 'no-store',
-      ...(body
-        ? {
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        : {}),
-    });
+    response = await fetch(
+      '/api/annotations' + (scope === 'launch' ? '?scope=launch' : ''),
+      {
+        method,
+        cache: 'no-store',
+        ...(body
+          ? {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            }
+          : {}),
+      },
+    );
   } catch {
     throw new Error('批注暂时未保存，输入已保留。请重试。');
   }
@@ -53,9 +60,11 @@ async function request<T>(method = 'GET', body?: unknown): Promise<T> {
 export function DeveloperMode({
   date,
   ready,
+  scope,
 }: {
   date: string;
   ready: boolean;
+  scope?: 'launch';
 }) {
   const [enabled, setEnabled] = useState(false),
     [picking, setPicking] = useState(false),
@@ -117,13 +126,13 @@ export function DeveloperMode({
   );
   const refresh = useCallback(async () => {
     try {
-      setNotes(await request<Annotation[]>());
+      setNotes(await request<Annotation[]>('GET', undefined, scope));
       setLoaded(true);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : '无法读取批注，请重试。');
     }
-  }, []);
+  }, [scope]);
   useEffect(() => {
     if (enabled) void Promise.resolve().then(refresh);
   }, [enabled, refresh]);
@@ -268,7 +277,11 @@ export function DeveloperMode({
     setBusy(true);
     setError('');
     try {
-      const result = await request<Annotation>('POST', { id, message, target });
+      const result = await request<Annotation>(
+        'POST',
+        { id, message, target },
+        scope,
+      );
       setNotes((rows) =>
         [...rows.filter((n) => n.id !== result.id), result].sort((a, b) =>
           a.createdAt.localeCompare(b.createdAt),
@@ -297,7 +310,7 @@ export function DeveloperMode({
     setBusy(true);
     setError('');
     try {
-      await request('DELETE', { id: note.id });
+      await request('DELETE', { id: note.id }, scope);
       setNotes((rows) => rows.filter((n) => n.id !== note.id));
       setDeleting(null);
       setNotice('批注已删除');
@@ -312,7 +325,7 @@ export function DeveloperMode({
     setError('');
     const status = note.status === 'open' ? 'resolved' : 'open';
     try {
-      await request('PATCH', { id: note.id, status });
+      await request('PATCH', { id: note.id, status }, scope);
       setNotes((rows) =>
         rows.map((n) => (n.id === note.id ? { ...n, status } : n)),
       );
@@ -403,7 +416,11 @@ export function DeveloperMode({
         </button>
         {!panel && (
           <span className="developer-instruction">
-            {picking ? '点击元素写批注 · 滚动可用' : '可正常打开弹窗、切换日期'}
+            {picking
+              ? '点击元素写批注 · 滚动可用'
+              : scope === 'launch'
+                ? '可正常输入密码、解锁日记'
+                : '可正常打开弹窗、切换日期'}
           </span>
         )}
       </div>

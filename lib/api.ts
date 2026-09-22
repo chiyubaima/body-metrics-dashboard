@@ -1,10 +1,12 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { database } from '@/db';
 import { InputError } from '@/lib/model';
+import { journalUnlocked } from '@/db/journal-access';
 export async function api(
   request: Request,
   action: (db: D1Database, owner: string) => Promise<unknown>,
   mutating = false,
+  allowLocked = false,
 ) {
   const user = await getChatGPTUser();
   if (!user)
@@ -23,7 +25,13 @@ export async function api(
       return Response.json({ error: '请使用记录表单提交。' }, { status: 415 });
   }
   try {
-    const result = await action(database(), user.userId);
+    const db = database();
+    if (!allowLocked && !(await journalUnlocked(db, user.userId, request)))
+      return Response.json(
+        { error: '日记已锁定，请输入密码后继续。', code: 'JOURNAL_LOCKED' },
+        { status: 423, headers: { 'Cache-Control': 'no-store' } },
+      );
+    const result = await action(db, user.userId);
     if (result instanceof Response) return result;
     return Response.json(result, {
       headers: { 'Cache-Control': 'no-store' },

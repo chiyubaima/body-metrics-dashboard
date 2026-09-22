@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { act, createElement } from 'react';
-import { setTimeout as delay } from 'node:timers/promises';
 import ts from 'typescript';
 
-await test('settings route to each section; exit requires confirmation, handles failure and verifies service closure', async (t) => {
+await test('settings route to each section; exit confirms and locks without stopping the service', async (t) => {
   const win = new Window({ url: 'http://localhost/' });
   for (const key of [
     'window',
@@ -78,31 +77,20 @@ await test('settings route to each section; exit requires confirmation, handles 
     stopped = 0,
     shutdowns = 0,
     fail = true;
-  globalThis.fetch = (async (path, options) => {
-    if (path === '/__body-journal/health')
-      throw new Error('Synthetic service closed');
-    assert.equal(path, '/__body-journal/update/shutdown');
-    assert(options);
-    assert.equal(options.method, 'POST');
-    assert.equal(
-      (options.headers as Record<string, string>)['X-Body-Journal-Update'],
-      '1',
-    );
-    shutdowns++;
-    return fail
-      ? Response.json({ message: 'Synthetic exit failed' }, { status: 503 })
-      : Response.json({ phase: 'stopping' });
+  globalThis.fetch = (async () => {
+    throw new Error('Exit must not call shutdown or health');
   }) as typeof fetch;
   await act(async () =>
     root.render(
       createElement(AppSettings, {
         disabled: false,
-        local: true,
         pendingWork: true,
         onSelect: (value: string) => {
           selected = value;
         },
-        onStopped: () => {
+        onLock: async () => {
+          shutdowns++;
+          if (fail) throw new Error('Synthetic exit failed');
           stopped++;
         },
       }),
@@ -126,23 +114,21 @@ await test('settings route to each section; exit requires confirmation, handles 
   await click('退出身体日记');
   assert.match(
     container.querySelector('[role="alertdialog"]')!.textContent,
-    /会中断任务/,
+    /未保存的输入将丢失/,
   );
   assert.equal(shutdowns, 0);
   await click('继续使用');
   assert.equal(shutdowns, 0);
   assert(!container.querySelector('[role="alertdialog"]'));
   await click('退出身体日记');
-  await click('退出并关闭服务');
+  await click('确认退出');
   assert.match(
     container.querySelector('[role="alert"]')!.textContent,
     /Synthetic exit failed/,
   );
   assert.equal(stopped, 0);
   fail = false;
-  await click('退出并关闭服务');
-  assert(button('正在退出…').disabled);
-  await act(async () => delay(1150));
+  await click('确认退出');
   assert.equal(shutdowns, 2);
   assert.equal(stopped, 1);
 
@@ -157,7 +143,6 @@ await test('settings route to each section; exit requires confirmation, handles 
         if (path === '/api/medals/connection')
           return Response.json({
             text: true,
-            local: true,
             image: { configured: true, provider: 'codex' },
           });
         assert.equal(path, '/api/coach');
