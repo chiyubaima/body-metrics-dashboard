@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: '身体日记 · 看见每一份积累',
   description: '个人身体变化、饮食与训练记录看板。',
   robots: { index: false, follow: false },
+  icons: { icon: { url: '/favicon.png', type: 'image/png', sizes: '64x64' } },
 };
 
 export default function RootLayout({

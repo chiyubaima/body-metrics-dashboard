@@ -1,5 +1,15 @@
 # Application working rules
 
+## Authorized logo commit and sync (2026-09-22)
+
+- The user explicitly authorized committing and pushing the verified otter logo integration, existing-test adapters, brand artwork and provenance to the current main branch. Run staged-content and outgoing-history protection checks, preserve personal data and the local service, and do not deploy.
+
+## Otter logo integration (2026-09-22)
+
+- The user now authorizes replacing product branding with the selected orange otter hugging a green journal. Update dashboard header, launch brand, decorative launch journal's brand and browser favicon. Preserve Activity icons used for body metrics and the separate Captain character.
+- Proportionally resize `public/brand/option-03-otter.png` into `public/brand/body-journal-otter.png` (256px) and `public/favicon.png` (64px); preserve the full character and transparency. Set the favicon explicitly in layout metadata and remove the obsolete favicon.svg. No generated redesign, dependency, new component abstraction or business change.
+- Use existing source/style files, transparent 56px desktop / 44px mobile brand images, explicit dimensions and decorative alt text beside the brand name. Remove obsolete badge/rotation styling. Synthetic UI QA belongs in parent work/brand, with all APIs mocked and no personal data/model access. Run test/typecheck/lint/build, preserve the real service, no commit/push/deploy.
+
 ## Authorized commit and sync (2026-09-22)
 
 - The user explicitly authorized commit and push of the verified PIN launch screen, confirmed exit/locking, launch developer mode and annotation revisions to the current main branch. Run repository data-protection checks, preserve personal data and the local service, and do not deploy.

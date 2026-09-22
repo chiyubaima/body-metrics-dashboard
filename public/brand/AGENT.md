@@ -1,0 +1,11 @@
+# Brand artwork
+
+- This directory contains original Body Journal logo artwork and its provenance only.
+- The user has now explicitly authorized product integration of the selected otter. `body-journal-otter.png` is its proportional 256px production derivative; `../favicon.png` is the 64px derivative. Preserve original artwork, palette, full silhouette and alpha. This authorization supersedes the earlier design-only integration restrictions below for this otter only; other candidates and Captain remain unchanged.
+- The user's explicit attached-image correction selects the ORANGE OTTER HUGGING A GREEN JOURNAL, stored as `option-03-otter.png`. It is byte-identical to their attached `exec-238e0da5-d60b-4d66-abf2-712e3f0080a9.png`. Identify the selected design by image and character, not display order or an inferred option number. Preserve its orange body, ivory muzzle/belly, green journal, seated pose, and curled tail.
+- The prior sprout refinement was based on the assistant's mistaken interpretation. Keep `body-journal-sprout-v2.png` and `SPROUT.md` as unselected exploration, not user-approved direction. Its leaf, belly and cheek instructions do not apply to the selected otter. This correction does not authorize changing the attached original or integrating assets into the app.
+- The second exploration delivers ten distinct candidates named `option-01-<concept>.png` through `option-10-<concept>.png`. `OPTIONS.md` stores exact prompts, names, rationale and honest validation; `options.html` is a static comparison gallery using these local files, with no dependencies or user data.
+- Use `body-journal-logo-v1.png`, incrementing the version for subsequent candidates; preserve generated alpha and do not overwrite an existing design without a replacement request.
+- `README.md` records the concept, exact ImageGen prompt, generation method, and actual validation. Keep only delivered artwork and useful provenance; delete redundant temporary exports after review.
+- The initial design is a reviewable candidate. Adding it here does not authorize changing the application's existing branding, favicon, or Captain character.
+- Inspect the image and its small-size legibility before delivery. Do not place private health records, credentials, or user annotations in assets or prompts.

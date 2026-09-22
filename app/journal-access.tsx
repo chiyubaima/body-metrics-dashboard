@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
@@ -287,9 +288,16 @@ export function PinScreen({
           data-annotate="launch.story"
         >
           <div className="launch-brand" data-annotate="launch.brand">
-            <span aria-hidden="true">
-              <Activity size={23} strokeWidth={2.5} />
-            </span>
+            <Image
+              className="brand-mark"
+              src="/brand/body-journal-otter.png"
+              width={56}
+              height={56}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              unoptimized
+            />
             <div>
               身体日记<small>｜BODY JOURNAL</small>
             </div>
@@ -305,7 +313,14 @@ export function PinScreen({
             <div className="launch-paper launch-paper-back" />
             <div className="launch-paper launch-paper-front">
               <div className="launch-paper-top">
-                <Activity size={21} />
+                <Image
+                  src="/brand/body-journal-otter.png"
+                  width={24}
+                  height={24}
+                  alt=""
+                  draggable={false}
+                  unoptimized
+                />
                 <span>MY BODY JOURNAL</span>
                 <i />
               </div>

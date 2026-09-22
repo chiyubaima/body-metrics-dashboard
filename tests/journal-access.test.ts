@@ -335,6 +335,9 @@ await test('launch screen gates dashboard, confirms setup, preserves errors, unl
   const developer = dataUrl(
     `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))}; export const DeveloperMode=({scope,ready})=>h('button',{'data-testid':'developer','data-scope':scope,disabled:!ready},'开发者模式');`,
   );
+  const image = dataUrl(
+    `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))}; export default function Image({unoptimized,...props}){return h('img',props);}`,
+  );
   const source = ts
     .transpileModule(
       readFileSync(
@@ -353,7 +356,7 @@ await test('launch screen gates dashboard, confirms setup, preserves errors, unl
     .replace(
       /from (["'])([^"']+)\1/g,
       (_m, _q, name: string) =>
-        `from ${JSON.stringify(name === './dashboard' ? dashboard : name === './developer-mode' ? developer : name === '@/lib/model' ? new URL('../lib/model.ts', import.meta.url).href : import.meta.resolve(name))}`,
+        `from ${JSON.stringify(name === './dashboard' ? dashboard : name === './developer-mode' ? developer : name === 'next/image' ? image : name === '@/lib/model' ? new URL('../lib/model.ts', import.meta.url).href : import.meta.resolve(name))}`,
     );
   const { default: JournalAccess } = await import(dataUrl(source));
   const { createRoot } = await import('react-dom/client');

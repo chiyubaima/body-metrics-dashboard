@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { resolveRecordAction } from '@/lib/coach-tool-types';
 import type { CoachToolAction } from '@/lib/coach-tool-types';
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
@@ -542,9 +543,16 @@ export default function Dashboard({
     <main className="dashboard" data-annotate="dashboard">
       <header className="topbar" data-annotate="layout.header">
         <div className="brand">
-          <span className="brand-mark">
-            <Activity size={25} strokeWidth={3} />
-          </span>
+          <Image
+            className="brand-mark"
+            src="/brand/body-journal-otter.png"
+            width={56}
+            height={56}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            unoptimized
+          />
           <div>
             <h1>
               身体日记<span>一点点，变更好</span>

@@ -48,6 +48,7 @@ await test('record close confirmation uses a nested alert, preserves all three d
     'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
   const react = `import {createElement as h} from ${JSON.stringify(import.meta.resolve('react'))};`;
   const stubs: Record<string, string> = {
+    'next/image': `${react} export default function Image({unoptimized,...props}){return h('img',props);}`,
     './app-settings': `${react} export const AppSettings=({onSelect})=>h('button',{onClick:()=>onSelect('models')},'Synthetic settings');`,
     './forms': `${react} export const RecordForm=({kind,formId,onDirty,existing,save})=>h('form',{id:formId,onInput:onDirty,onSubmit:e=>{e.preventDefault();if(existing)save('/api/records',existing)}},h('input',{'aria-label':'Synthetic '+kind})); export const PlanForm=({onStartRecording,onDirty})=>h('div',null,h('input',{'aria-label':'Synthetic target',onInput:onDirty}),h('button',{onClick:onStartRecording},'Start logging'));`,
     './panels': `${react} const panel=kind=>({edit,history,plan})=>h('div',null,h('button',{onClick:()=>edit(kind)},kind),h('button',{onClick:()=>history(kind)},'history '+kind),h('button',{onClick:()=>plan(kind)},'plan '+kind)); export const BodyPanel=panel('body'),DietPanel=panel('diet'),TrainingPanel=panel('training'); export const compactDate=d=>d;`,
