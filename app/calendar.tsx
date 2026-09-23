@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { CalendarMarks } from '@/lib/dashboard-data';
 import {
   CalendarDays,
   ChevronLeft,
@@ -30,6 +31,7 @@ function CalendarGrid({
   records = [],
   week = false,
   footprints = true,
+  marks: calendarMarks,
 }: {
   view: string;
   value: string;
@@ -39,6 +41,7 @@ function CalendarGrid({
   records?: Entry[];
   week?: boolean;
   footprints?: boolean;
+  marks?: CalendarMarks;
 }) {
   const dates = week ? weekDates(value) : monthDates(view);
   return (
@@ -49,7 +52,9 @@ function CalendarGrid({
         </span>
       ))}
       {dates.map((d) => {
-        const marks = dayMarks(footprints ? records : [], d);
+        const marks = calendarMarks
+          ? (calendarMarks[d] ?? dayMarks([], d))
+          : dayMarks(footprints ? records : [], d);
         return (
           <button
             type="button"
@@ -217,15 +222,54 @@ export function JournalCalendar({
   records,
   plans,
   name,
+  loadMarks,
+  version,
 }: {
   date: string;
   onChange: (d: string) => void;
   records: Entry[];
   plans: Plan[];
   name?: string;
+  loadMarks?: (
+    from: string,
+    to: string,
+    signal: AbortSignal,
+  ) => Promise<CalendarMarks>;
+  version?: number;
 }) {
   const [expanded, setExpanded] = useState(false),
     [view, setView] = useState(date);
+  const [response, setResponse] = useState<{
+    key: string;
+    marks: CalendarMarks;
+  }>();
+  const [error, setError] = useState<{ key: string; message: string }>();
+  const [retry, setRetry] = useState(0);
+  const marksKey = JSON.stringify([view.slice(0, 7), version, retry]);
+  useEffect(() => {
+    if (!expanded || !loadMarks) return;
+    const controller = new AbortController();
+    const dates = monthDates(view);
+    void loadMarks(
+      dates[0] < '2000-01-01' ? '2000-01-01' : dates[0],
+      dates.at(-1)! > '2100-12-31' ? '2100-12-31' : dates.at(-1)!,
+      controller.signal,
+    )
+      .then((marks) => {
+        if (!controller.signal.aborted) {
+          setResponse({ key: marksKey, marks });
+          setError(undefined);
+        }
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setError({
+            key: marksKey,
+            message: e instanceof Error ? e.message : '打卡标记读取失败。',
+          });
+      });
+    return () => controller.abort();
+  }, [expanded, loadMarks, view, marksKey]);
   const week = weekDates(date),
     counts = weekCounts(records, date),
     plan = activePlan(plans, 'training', date)?.data as
@@ -268,12 +312,36 @@ export function JournalCalendar({
                   view={view}
                   value={date}
                   records={records}
+                  marks={
+                    loadMarks
+                      ? response?.key === marksKey
+                        ? response.marks
+                        : {}
+                      : undefined
+                  }
                   onChange={(d) => {
                     onChange(d);
                     setView(d);
                     setExpanded(false);
                   }}
                 />
+                {loadMarks && response?.key !== marksKey && (
+                  <output className="helper">
+                    {error?.key === marksKey ? (
+                      <>
+                        {error.message}
+                        <button
+                          className="text-button"
+                          onClick={() => setRetry((n) => n + 1)}
+                        >
+                          重试
+                        </button>
+                      </>
+                    ) : (
+                      '正在读取打卡标记…'
+                    )}
+                  </output>
+                )}
                 <button
                   className="text-button"
                   onClick={() => setExpanded(false)}

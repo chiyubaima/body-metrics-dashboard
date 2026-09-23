@@ -1,5 +1,15 @@
 # Application working rules
 
+## Authorized scaling commit and sync (2026-09-23)
+
+- The user explicitly authorized committing and pushing the verified calculation reuse, history pagination, date-scoped dashboard reads and related tests/documentation to the current main branch. Audit staged content and outgoing history, preserve personal data and the running service, and do not deploy. Parent H5 and synthetic verification artifacts remain outside this application repository.
+
+## Bounded dashboard and history reads (2026-09-23)
+
+- Implement the authorized calculation reuse, 50-row history pages and date-scoped dashboard with server-derived lifetime summaries. Preserve historical baselines/plans/bodyweight, medal evidence, form reuse and existing data semantics.
+- Add `lib/dashboard-data.ts` for read contracts/summary shaping and `db/dashboard.ts` for owned reads; use GET on existing data/records routes. Keep complete snapshots for Agent/export and explicit on-demand form/medal context. Use per-call indexes and React memoization, never stale mutable or cross-owner caches. Handle stale responses, empty pages and retained edit/filter/scroll state.
+- No dependencies, migrations, personal-record/model access, commit/push/deploy. Synthetic scaling/UI work belongs in parent's documented work/data-scaling; clean temporary runtime. Extend relevant tests and data-scaling tests, run test/typecheck/lint/build, measure 90/900/9000 synthetic records and bounded payload, verify browser save/readback and narrow layout, update README/parent H5.
+
 ## Authorized logo commit and sync (2026-09-22)
 
 - The user explicitly authorized committing and pushing the verified otter logo integration, existing-test adapters, brand artwork and provenance to the current main branch. Run staged-content and outgoing-history protection checks, preserve personal data and the local service, and do not deploy.

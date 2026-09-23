@@ -56,7 +56,7 @@ export function Onboarding({
         setVisible(
           !dismissed &&
             !snapshot.profile &&
-            !snapshot.records.length &&
+            !(snapshot.overview?.recordCount ?? snapshot.records.length) &&
             !snapshot.plans.length,
         );
       }

@@ -1,5 +1,6 @@
 import { medalCardModule } from './medal-card-module.ts';
 import { test } from 'node:test';
+import { dashboardData } from '../lib/dashboard-data.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window, type HTMLInputElement as TestInput } from 'happy-dom';
@@ -769,4 +770,55 @@ await test('Captain medal cards confirm inline, retain failed drafts and read ne
   assert.equal(writes.at(-1)!.revision, 5);
   assert.equal(changed, 1);
   assert.match(container.textContent, /已获得/);
+  m = {
+    ...m,
+    revision: m.revision + 1,
+    proposal: { ...m.definition, metric: 'body_days', unit: '天' },
+  };
+  const compact = dashboardData(
+    {
+      records: [],
+      plans: [],
+      profile: null,
+      medals: [medalView(m, [], today(), facts)],
+      medalFacts: facts,
+    },
+    today(),
+  );
+  const preview = compact.overview!.medalPreviews[m.id];
+  delete compact.overview!.medalPreviews[m.id];
+  await act(async () =>
+    root.render(
+      createElement(CaptainMedalCard, {
+        initial,
+        snapshot: compact,
+        onChanged: async () => {},
+      }),
+    ),
+  );
+  assert.match(container.textContent, /进度待刷新/);
+  assert.doesNotMatch(container.textContent, /按当前规则，已有/);
+  assert.equal(
+    [...container.querySelectorAll('button')].find(
+      (b) => b.textContent === '采用这版规则',
+    )!.disabled,
+    true,
+  );
+  await act(async () =>
+    root.render(
+      createElement(CaptainMedalCard, {
+        initial,
+        snapshot: {
+          ...compact,
+          overview: {
+            ...compact.overview!,
+            medalPreviews: { [m.id]: preview },
+          },
+        },
+        onChanged: async () => {},
+      }),
+    ),
+  );
+  assert.doesNotMatch(container.textContent, /进度待刷新/);
+  assert.match(container.textContent, /按当前规则，已有/);
 });

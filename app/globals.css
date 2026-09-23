@@ -5220,6 +5220,19 @@ select.entry-input {
   padding: 12px 24px 16px;
   border-bottom: 1px solid #e7ede8;
 }
+.history-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.history-pagination > span {
+  margin-right: auto;
+  font-size: 13px;
+}
 .history-controls .selection-toolbar {
   flex-wrap: wrap;
   gap: 8px 12px;

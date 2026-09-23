@@ -100,7 +100,8 @@ await test('record close confirmation uses a nested alert, preserves all three d
     }
     if (url === '/api/records' || url === '/api/trash')
       return Response.json({});
-    assert.equal(url, '/api/data');
+    assert.equal(typeof url, 'string');
+    assert.ok(url === '/api/data' || (url as string).startsWith('/api/data?'));
     assert.equal(init?.method ?? 'GET', 'GET');
     return Response.json({
       records: [],

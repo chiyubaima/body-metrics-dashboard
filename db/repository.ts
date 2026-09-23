@@ -19,7 +19,7 @@ import type {
 import { listDishes } from './dishes.ts';
 import { dishFood, dishNameKey } from '../lib/dishes.ts';
 import { factStatement } from './medal-facts.ts';
-type Row = {
+export type Row = {
   id: string;
   owner: string;
   kind: Entry['kind'];
@@ -38,7 +38,7 @@ type PlanRow = {
   payload: string;
   created_at: string;
 };
-function entry(r: Row): Entry {
+export function entry(r: Row): Entry {
   const data = JSON.parse(r.payload);
   if (r.kind === 'body') data.primary = r.primary_morning === 1;
   return {
@@ -64,13 +64,14 @@ function plan(r: PlanRow): Plan {
 export async function snapshot(
   db: D1Database,
   owner: string,
+  kind?: Entry['kind'],
 ): Promise<Snapshot> {
   const [records, plans, profile] = await db.batch([
     db
       .prepare(
-        'SELECT * FROM records WHERE owner=? AND deleted_at IS NULL ORDER BY date DESC, created_at DESC',
+        `SELECT * FROM records WHERE owner=? AND deleted_at IS NULL${kind ? ' AND kind=?' : ''} ORDER BY date DESC, created_at DESC`,
       )
-      .bind(owner),
+      .bind(owner, ...(kind ? [kind] : [])),
     db
       .prepare(
         'SELECT * FROM plans WHERE owner=? ORDER BY date DESC, created_at DESC',

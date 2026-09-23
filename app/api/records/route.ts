@@ -1,5 +1,14 @@
 import { api, readBody } from '@/lib/api';
 import { saveEntry, removeEntry, restoreEntry } from '@/db/repository';
+import { calendarMarks, historyPage } from '@/db/dashboard';
+export async function GET(r: Request) {
+  return api(r, async (db, owner) => {
+    const query = new URL(r.url).searchParams;
+    return query.get('view') === 'calendar'
+      ? calendarMarks(db, owner, query)
+      : historyPage(db, owner, query);
+  });
+}
 export async function POST(r: Request) {
   return api(
     r,

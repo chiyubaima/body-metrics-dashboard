@@ -2,7 +2,14 @@
 import Image from 'next/image';
 import { resolveRecordAction } from '@/lib/coach-tool-types';
 import type { CoachToolAction } from '@/lib/coach-tool-types';
-import { useState, useEffect, useCallback, useRef, useId } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useId,
+} from 'react';
 import {
   Activity,
   Award,
@@ -32,6 +39,11 @@ import { AppSettings, type SettingsSection } from './app-settings';
 import { BodyPanel, DietPanel, TrainingPanel, compactDate } from './panels';
 import { HistoryView } from './history';
 import type { HistoryState } from './history';
+import type {
+  CalendarMarks,
+  HistoryPage,
+  HistoryQuery,
+} from '@/lib/dashboard-data';
 import { JournalCalendar } from './calendar';
 import { TrashView } from './trash';
 import { DeveloperMode } from './developer-mode';
@@ -79,13 +91,14 @@ async function request<T = unknown>(
   path: string,
   body?: unknown,
   method = 'POST',
+  signal?: AbortSignal,
 ) {
   let response: Response;
   try {
     response = await fetch(
       path,
       body === undefined
-        ? { cache: 'no-store' }
+        ? { cache: 'no-store', signal }
         : {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -106,6 +119,23 @@ async function request<T = unknown>(
       (data as { error?: string }).error ?? '暂时无法连接，请稍后重试。',
     );
   return data as T;
+}
+function loadHistory(query: HistoryQuery, signal: AbortSignal) {
+  const search = new URLSearchParams({ ...query, page: String(query.page) });
+  return request<HistoryPage>(
+    `/api/records?${search}`,
+    undefined,
+    'GET',
+    signal,
+  );
+}
+function loadCalendar(from: string, to: string, signal: AbortSignal) {
+  return request<CalendarMarks>(
+    `/api/records?view=calendar&from=${from}&to=${to}`,
+    undefined,
+    'GET',
+    signal,
+  );
 }
 export default function Dashboard({
   signInPath,
@@ -140,21 +170,45 @@ export default function Dashboard({
     [data, setData] = useState<Snapshot>(initial),
     [loaded, setLoaded] = useState(false),
     [loadError, setLoadError] = useState(''),
-    [modal, setModal] = useState<Modal | null>(null),
+    [modal, writeModal] = useState<Modal | null>(null),
     [busy, setBusy] = useState(false),
     [dirty, setDirty] = useState(false),
     [confirmClose, setConfirmClose] = useState(false),
     [notice, setNotice] = useState('');
+  const [dataVersion, setDataVersion] = useState(0);
+  const [context, setContext] = useState<{ modal: Modal; data: Snapshot }>();
+  const [contextError, setContextError] = useState<{
+    modal: Modal;
+    message: string;
+  }>();
+  const [contextRetry, setContextRetry] = useState(0);
+  const setModal = useCallback((next: Modal | null) => {
+    setContext(undefined);
+    setContextError(undefined);
+    writeModal(next);
+  }, []);
+  const [medalData, setMedalData] = useState<Snapshot>(initial);
+  const dateRef = useRef(date);
+  useLayoutEffect(() => {
+    dateRef.current = date;
+  }, [date]);
   const modalGeneration = useRef(0);
   const closeTarget = useRef<Modal | null>(null);
   const requestSequence = useRef(0),
     working = useRef(false);
   const refresh = useCallback(async () => {
     const sequence = ++requestSequence.current;
+    const requestedDate = dateRef.current;
     try {
-      const next = await request<Snapshot>('/api/data');
-      if (sequence === requestSequence.current) {
+      const next = await request<Snapshot>(
+        `/api/data?view=dashboard&date=${requestedDate}`,
+      );
+      if (
+        sequence === requestSequence.current &&
+        requestedDate === dateRef.current
+      ) {
         setData(next);
+        setDataVersion((value) => value + 1);
         setLoaded(true);
         setLoadError('');
         if (
@@ -180,15 +234,18 @@ export default function Dashboard({
       }
       return next;
     } catch (e) {
-      if (sequence === requestSequence.current)
+      if (
+        sequence === requestSequence.current &&
+        requestedDate === dateRef.current
+      )
         setLoadError(e instanceof Error ? e.message : '读取失败');
       throw e;
     }
   }, []);
   useEffect(() => {
-    void Promise.resolve()
-      .then(refresh)
-      .catch(() => {});
+    void refresh().catch(() => {});
+  }, [date, refresh]);
+  useEffect(() => {
     const focused = () => {
       if (!working.current) refresh().catch(() => {});
     };
@@ -208,14 +265,60 @@ export default function Dashboard({
       clearInterval(rollover);
     };
   }, [refresh]);
-  const open = useCallback((next: Modal) => {
-    modalGeneration.current++;
-    setDirty(false);
-    setModelDirty(false);
-    setConfirmClose(false);
-    setNotice('');
-    setModal(next);
-  }, []);
+  useEffect(() => {
+    if (
+      !modal ||
+      (modal.type !== 'medals' &&
+        (modal.type !== 'record' || modal.kind === 'body'))
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    const path =
+      modal.type === 'medals'
+        ? '/api/data'
+        : `/api/data?view=context&kind=${modal.kind}`;
+    void request<Snapshot>(path, undefined, 'GET', controller.signal)
+      .then((next) => {
+        if (controller.signal.aborted) return;
+        setContext({ modal, data: next });
+        setContextError(undefined);
+        if (modal.type === 'medals') setMedalData(next);
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setContextError({
+            modal,
+            message: e instanceof Error ? e.message : '读取失败，请重试。',
+          });
+      });
+    return () => controller.abort();
+  }, [modal, contextRetry]);
+  const contextReady =
+    !modal ||
+    (modal.type !== 'medals' &&
+      (modal.type !== 'record' || modal.kind === 'body')) ||
+    context?.modal === modal;
+  const recordContext = context?.modal === modal ? context.data : data;
+  const refreshMedals = useCallback(async () => {
+    const [full] = await Promise.all([
+      request<Snapshot>('/api/data'),
+      refresh(),
+    ]);
+    setMedalData(full);
+    return full;
+  }, [refresh]);
+  const open = useCallback(
+    (next: Modal) => {
+      modalGeneration.current++;
+      setDirty(false);
+      setModelDirty(false);
+      setConfirmClose(false);
+      setNotice('');
+      setModal(next);
+    },
+    [setModal],
+  );
   const leave = (next: Modal | null) => {
     if (busy) return;
     if (dirty || modelDirty) {
@@ -251,7 +354,9 @@ export default function Dashboard({
       open({ type: 'medals' });
     } else if (action.type === 'record') {
       const generation = modalGeneration.current;
-      const fresh = await refresh();
+      const fresh = await request<Snapshot>(
+        `/api/data?view=context&kind=${action.entry.kind}`,
+      );
       if (modalGeneration.current !== generation || working.current)
         throw new Error('当前页面已开始其他编辑，请完成后重新打开草稿。');
       const resolved = resolveRecordAction(action, fresh.records);
@@ -294,7 +399,7 @@ export default function Dashboard({
         data?: Diet | Training;
       };
       if (path === '/api/records' && saved.kind === 'training' && saved.data) {
-        const existing = data.records.find((r) => r.id === saved.id);
+        const existing = recordContext.records.find((r) => r.id === saved.id);
         const candidate = {
           id: saved.id!,
           kind: saved.kind,
@@ -306,9 +411,12 @@ export default function Dashboard({
           updatedAt: new Date().toISOString(),
         } as Entry;
         const previousWins = existing
-          ? workoutAchievements(existing, data.records)
+          ? workoutAchievements(existing, recordContext.records)
           : [];
-        const wins = workoutAchievements(candidate, data.records).filter(
+        const wins = workoutAchievements(
+          candidate,
+          recordContext.records,
+        ).filter(
           (win) =>
             !previousWins.some(
               (old) =>
@@ -331,12 +439,14 @@ export default function Dashboard({
         saved.kind === 'diet' &&
         saved.data
       ) {
-        const count = new Set(
-          data.records
-            .filter((r) => r.kind === 'diet' && r.date <= saved.date)
-            .map((r) => r.date)
-            .concat(saved.date),
-        ).size;
+        const count =
+          recordContext.overview?.dietDays ??
+          new Set(
+            recordContext.records
+              .filter((r) => r.kind === 'diet' && r.date <= saved.date)
+              .map((r) => r.date)
+              .concat(saved.date),
+          ).size;
         const foodSummary = nutritionSummary((saved.data as Diet).foods);
         const meals = new Set(
           (saved.data as Diet).foods.map((food) => food.meal ?? 'unsorted'),
@@ -498,8 +608,10 @@ export default function Dashboard({
     return () => lifecycle.abort();
   }, [open, data.records, date]);
 
-  const statsReady = loaded && !loadError;
+  const statsReady =
+    loaded && !loadError && (!data.overview || data.overview.date === date);
   const panelProps = {
+    overview: data.overview,
     onFactsChanged: refresh,
     profile: data.profile,
     ratingSettings: () => open({ type: 'settings', section: 'profile' }),
@@ -605,6 +717,8 @@ export default function Dashboard({
           onChange={setDate}
           records={data.records}
           plans={data.plans}
+          loadMarks={loadCalendar}
+          version={dataVersion}
         />
         <Coach
           date={date}
@@ -644,7 +758,15 @@ export default function Dashboard({
           {!localPreview && <a href={signInPath}>重新登录</a>}
         </div>
       )}
-      <div className="columns">
+      {!statsReady && !loadError && (
+        <output className="helper">正在读取 {date} 的记录…</output>
+      )}
+      <div
+        className="columns"
+        aria-busy={!statsReady}
+        inert={!statsReady}
+        style={!statsReady ? { visibility: 'hidden' } : undefined}
+      >
         <BodyPanel {...panelProps} height={data.profile?.height ?? null} />
         <DietPanel {...panelProps} complete={complete} busy={busy} />
         <TrainingPanel {...panelProps} />
@@ -696,16 +818,16 @@ export default function Dashboard({
         }}
       />
       <Medals
-        medals={data.medals || []}
-        facts={data.medalFacts}
+        medals={medalData.medals || []}
+        facts={medalData.medalFacts}
         openTarget={medalTarget}
-        records={data.records}
+        records={medalData.records}
         date={date}
-        visible={modal?.type === 'medals'}
+        visible={modal?.type === 'medals' && contextReady}
         blocked={!!modal && modal.type !== 'medals'}
         onOpen={() => open({ type: 'medals' })}
         onClose={() => setModal(null)}
-        onChanged={refresh}
+        onChanged={refreshMedals}
         onDirty={setMedalDirty}
         onBusy={setMedalBusy}
         onEvidence={(e) => {
@@ -714,7 +836,7 @@ export default function Dashboard({
         }}
       />
       <Dialog
-        open={modal !== null && modal.type !== 'medals'}
+        open={modal !== null && (modal.type !== 'medals' || !contextReady)}
         onOpenChange={(v) => {
           if (!v) close();
         }}
@@ -760,7 +882,7 @@ export default function Dashboard({
                 type="submit"
                 form={recordFormId}
                 className="primary record-save"
-                disabled={busy || confirmClose}
+                disabled={busy || confirmClose || !contextReady}
                 aria-busy={busy}
               >
                 <Check size={17} />
@@ -797,7 +919,27 @@ export default function Dashboard({
             </DialogDescription>
           )}
           <div className="dialog-form-region">
-            {modal?.type === 'record' && (
+            {!contextReady && (
+              <output className="dialog-body">
+                {contextError?.modal === modal ? (
+                  <>
+                    <p>{contextError.message}</p>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setContextError(undefined);
+                        setContextRetry((n) => n + 1);
+                      }}
+                    >
+                      重试读取
+                    </button>
+                  </>
+                ) : (
+                  '正在读取历史，稍等一下…'
+                )}
+              </output>
+            )}
+            {modal?.type === 'record' && contextReady && (
               <RecordForm
                 key={(modal.draft?.id ?? modal.entry?.id ?? 'new') + modal.kind}
                 formId={recordFormId}
@@ -808,7 +950,7 @@ export default function Dashboard({
                 save={save}
                 busy={busy}
                 onDirty={() => setDirty(true)}
-                records={data.records}
+                records={recordContext.records}
                 dishes={data.dishes ?? []}
                 meal={modal.meal}
               />
@@ -877,6 +1019,8 @@ export default function Dashboard({
                   }
                   remove={remove}
                   busy={busy}
+                  loadPage={loadHistory}
+                  version={dataVersion}
                 />
               </>
             )}

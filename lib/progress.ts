@@ -1,4 +1,4 @@
-import { average, shiftDate } from './model.ts';
+import { morningIndex, shiftDate } from './model.ts';
 import { cardioTypes } from './exercises.ts';
 import type {
   Body,
@@ -66,6 +66,7 @@ export function bodyPoints(
   height: number | null = null,
 ) {
   const measuredMetric = metric === 'bmi' ? 'weight' : metric;
+  const morningWeights = morningIndex(records);
   const sorted = [...records]
     .filter((r) => r.kind === 'body' && r.date <= end)
     .sort(
@@ -82,7 +83,7 @@ export function bodyPoints(
           !morning ||
           (r.primaryMorning === 1 && (r.data as Body).condition === 'morning')),
     );
-    const avg = average(records, date);
+    const avg = morningWeights.averageAt(date);
     const value = row ? (row.data as Body)[measuredMetric] : null,
       mean =
         measuredMetric === 'weight' && morning && avg.count >= 3

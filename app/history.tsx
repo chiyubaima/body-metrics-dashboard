@@ -1,8 +1,16 @@
 'use client';
 import { foodPortionLabel } from '@/lib/food-portions';
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import { average, shiftDate, today } from '@/lib/model';
+import { morningIndex, shiftDate, today } from '@/lib/model';
+import type { HistoryPage, HistoryQuery } from '@/lib/dashboard-data';
 import type {
   Body,
   Diet,
@@ -32,6 +40,7 @@ function dietPlanText(p: DietPlan) {
     : `肉 ${p.meat}g · 米 ${p.rice}g · 总脂肪 ${p.fat}g`;
 }
 export type HistoryState = {
+  page?: number;
   period: string;
   rangeStart: string;
   rangeEnd: string;
@@ -49,6 +58,8 @@ export function HistoryView({
   edit,
   remove,
   busy,
+  loadPage,
+  version,
 }: {
   kind: Kind;
   records: Entry[];
@@ -59,6 +70,8 @@ export function HistoryView({
   edit: (r: Entry, state: HistoryState) => void;
   remove: (rows: Entry[]) => Promise<void>;
   busy: boolean;
+  loadPage?: (query: HistoryQuery, signal: AbortSignal) => Promise<HistoryPage>;
+  version?: number;
 }) {
   const [period, setPeriod] = useState(
       initialState?.period ?? (initialDate ? 'custom' : '90'),
@@ -73,12 +86,17 @@ export function HistoryView({
     [selected, setSelected] = useState<string[]>(initialState?.selected ?? []),
     [pending, setPending] = useState<Entry[]>([]),
     [deleteError, setDeleteError] = useState('');
+  const [page, setPage] = useState(initialState?.page ?? 1);
+  const [response, setResponse] = useState<{
+    key: string;
+    value: HistoryPage;
+  }>();
+  const [failure, setFailure] = useState<{ key: string; message: string }>();
+  const [retry, setRetry] = useState(0);
+  const restoreScroll = useRef<number | null>(initialState?.scrollTop ?? 0);
+  const weights = useMemo(() => morningIndex(records), [records]);
   const rangeId = useId();
   const results = useRef<HTMLElement>(null);
-  useLayoutEffect(() => {
-    if (results.current)
-      results.current.scrollTop = initialState?.scrollTop ?? 0;
-  }, [initialState]);
   const rangeError =
     period !== 'custom'
       ? ''
@@ -89,27 +107,102 @@ export function HistoryView({
           : rangeStart < '2000-01-01' || rangeEnd > today()
             ? '请选择2000年1月1日至今天之间的日期。'
             : '';
-  const from =
+  const requestedFrom =
     period === 'custom'
       ? rangeStart
       : period === 'all'
         ? ''
         : shiftDate(date, 1 - Number(period));
+  const from =
+    requestedFrom && requestedFrom < '2000-01-01'
+      ? '2000-01-01'
+      : requestedFrom;
   const to = period === 'custom' ? rangeEnd : date;
+  const queryKey = JSON.stringify([
+    kind,
+    from,
+    to,
+    condition,
+    page,
+    retry,
+    version,
+  ]);
+  const current = response?.key === queryKey ? response.value : undefined;
+  const error = failure?.key === queryKey ? failure.message : '';
+  const loading = !!loadPage && !rangeError && !current && !error;
+  useEffect(() => {
+    if (!loadPage || rangeError) return;
+    const controller = new AbortController();
+    void loadPage({ kind, from, to, condition, page }, controller.signal)
+      .then((value) => {
+        if (!controller.signal.aborted) {
+          setResponse({ key: queryKey, value });
+          setFailure(undefined);
+        }
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted) {
+          setResponse(undefined);
+          setFailure({
+            key: queryKey,
+            message: e instanceof Error ? e.message : '读取失败，请重试。',
+          });
+        }
+      });
+    return () => controller.abort();
+  }, [
+    loadPage,
+    kind,
+    from,
+    to,
+    condition,
+    page,
+    queryKey,
+    rangeError,
+    version,
+  ]);
+  useLayoutEffect(() => {
+    if (
+      (!loadPage || current) &&
+      results.current &&
+      restoreScroll.current !== null
+    ) {
+      results.current.scrollTop = restoreScroll.current;
+      restoreScroll.current = null;
+    }
+  }, [loadPage, current]);
   function resetResults() {
+    setPage(1);
+    restoreScroll.current = 0;
     setSelected([]);
     if (results.current) results.current.scrollTop = 0;
   }
-  const rows = records.filter(
-    (r) =>
-      !rangeError &&
-      r.kind === kind &&
-      r.date <= to &&
-      r.date >= from &&
-      (kind !== 'body' ||
-        condition === 'all' ||
-        (r.data as Body).condition === condition),
-  );
+  const filtered = loadPage
+    ? []
+    : records.filter(
+        (r) =>
+          !rangeError &&
+          r.kind === kind &&
+          r.date <= to &&
+          r.date >= from &&
+          (kind !== 'body' ||
+            condition === 'all' ||
+            (r.data as Body).condition === condition),
+      );
+  const total = rangeError
+    ? 0
+    : loadPage
+      ? (current?.total ?? 0)
+      : filtered.length;
+  const pages = Math.max(1, Math.ceil(total / 50));
+  const currentPage = loadPage
+    ? (current?.page ?? page)
+    : Math.min(page, pages);
+  const rows = rangeError
+    ? []
+    : loadPage
+      ? (current?.records ?? [])
+      : filtered.slice((currentPage - 1) * 50, currentPage * 50);
   const selection = rows.filter((r) => selected.includes(r.id));
   const toggle = (id: string) =>
     setSelected((old) =>
@@ -131,6 +224,7 @@ export function HistoryView({
         aria-label={`修改${r.date}的记录`}
         onClick={() =>
           edit(r, {
+            page: currentPage,
             period,
             rangeStart,
             rangeEnd,
@@ -253,7 +347,7 @@ export function HistoryView({
                 )
               }
             />
-            {rows.length > 100 ? '选择前100条' : '全选当前结果'}
+            全选当前页
           </label>
           <span>已选 {selection.length} 条</span>
           <button
@@ -269,6 +363,43 @@ export function HistoryView({
           </button>
         </div>
       </div>
+      <nav className="history-pagination" aria-label="历史记录分页">
+        <span aria-live="polite">
+          {loading
+            ? '正在读取记录…'
+            : error
+              ? '记录暂未读取，请重试'
+              : `共 ${total} 条 · 第 ${currentPage} / ${pages} 页`}
+        </span>
+        <button
+          className="secondary small"
+          disabled={busy || loading || currentPage <= 1}
+          onClick={() => {
+            setPage(currentPage - 1);
+            setSelected([]);
+            restoreScroll.current = 0;
+          }}
+        >
+          上一页
+        </button>
+        <button
+          className="secondary small"
+          disabled={busy || loading || currentPage >= pages}
+          onClick={() => {
+            setPage(currentPage + 1);
+            setSelected([]);
+            restoreScroll.current = 0;
+          }}
+        >
+          下一页
+        </button>
+      </nav>
+      {error && (
+        <div className="load-error" role="alert">
+          {error}
+          <button onClick={() => setRetry((n) => n + 1)}>重试读取</button>
+        </div>
+      )}
       <DeleteConfirm
         count={pending.length}
         label={{ body: '身体', diet: '饮食', training: '训练' }[kind]}
@@ -280,6 +411,7 @@ export function HistoryView({
             await remove(pending);
             setPending([]);
             setSelected([]);
+            setRetry((n) => n + 1);
           } catch (e) {
             setDeleteError(
               e instanceof Error ? e.message : '删除失败，请重试。',
@@ -293,13 +425,15 @@ export function HistoryView({
         aria-label="日记记录列表"
       >
         <div className="history-summary">
-          <strong>{rows.length} 条记录</strong>
+          <strong>{loading ? '正在读取…' : `${rows.length} 条记录`}</strong>
           <span>
             {rows.length
               ? `${rows.at(-1)!.date} — ${rows[0].date}`
               : rangeError
                 ? '等待选择有效日期区间'
-                : '这一范围还没有记录'}
+                : loading || error
+                  ? ''
+                  : '这一范围还没有记录'}
           </span>
         </div>
         {kind === 'body' && rows.length > 0 ? (
@@ -319,7 +453,7 @@ export function HistoryView({
               <tbody>
                 {rows.map((r) => {
                   const b = r.data as Body,
-                    a = average(records, r.date);
+                    a = current?.averages[r.date] ?? weights.averageAt(r.date);
                   return (
                     <tr key={r.id}>
                       <td>{checkbox(r)}</td>
@@ -361,7 +495,7 @@ export function HistoryView({
             </article>
           ))
         )}
-        {!rows.length && !rangeError && (
+        {!rows.length && !rangeError && !loading && !error && (
           <div className="empty-note">
             换一个时间范围，或从今天的第一次记录开始。
           </div>

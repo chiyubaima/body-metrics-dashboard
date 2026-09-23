@@ -1,5 +1,5 @@
-import type { Body, Entry, Exercise, Profile, Training } from './model.ts';
-import { average, morningEntries, shiftDate, today } from './model.ts';
+import type { Entry, Exercise, Profile, Training } from './model.ts';
+import { morningIndex, shiftDate, today } from './model.ts';
 import { workingSets } from './progress.ts';
 import { exerciseDefinition } from './exercises.ts';
 import {
@@ -39,14 +39,18 @@ export function ratingEstimate(exercise: Exercise) {
 }
 
 export function ratingBodyweight(records: Entry[], date: string) {
-  const mean = average(records, date);
+  return indexedBodyweight(morningIndex(records), date);
+}
+function indexedBodyweight(
+  index: ReturnType<typeof morningIndex>,
+  date: string,
+) {
+  const mean = index.averageAt(date);
   if (mean.value !== null)
     return { value: mean.value, date, basis: '7天晨重均值' };
-  const last = morningEntries(records, date)
-    .filter((r) => r.date >= shiftDate(date, -27))
-    .at(-1);
-  return last
-    ? { value: (last.data as Body).weight!, date: last.date, basis: '最近晨重' }
+  const last = index.latestAt(date);
+  return last && last.date >= shiftDate(date, -27)
+    ? { value: last.value, date: last.date, basis: '最近晨重' }
     : null;
 }
 
@@ -55,6 +59,8 @@ export function strengthRating(
   profile: Profile | null | undefined,
   date: string,
 ) {
+  const morning = morningIndex(records);
+  const bodyweights = new Map<string, ReturnType<typeof ratingBodyweight>>();
   const settings = profile?.strength;
   const enabled = settings?.enabled !== false;
   const profileIssue = !enabled
@@ -110,7 +116,9 @@ export function strengthRating(
         .map(ratingEstimate)
         .filter((n): n is number => n !== null);
       const estimate = estimates.length ? Math.max(...estimates) : null;
-      const bodyweight = ratingBodyweight(records, session.date);
+      if (!bodyweights.has(session.date))
+        bodyweights.set(session.date, indexedBodyweight(morning, session.date));
+      const bodyweight = bodyweights.get(session.date)!;
       const age =
         profile?.age == null
           ? null

@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { average } from '../lib/model.ts';
 import type { Body, Entry, Kind } from '../lib/model.ts';
 import type { HistoryState } from '../app/history.tsx';
+import type { HistoryPage, HistoryQuery } from '../lib/dashboard-data.ts';
 
 await test('diary date ranges, combined filters and deletion remain scoped to visible records', async (t) => {
   const win = new Window({ url: 'http://localhost/' });
@@ -366,6 +367,108 @@ await test('diary date ranges, combined filters and deletion remain scoped to vi
         container.querySelector('.selection-toolbar')!.textContent,
         /已选 2 条/,
       );
+    },
+  );
+  await t.test(
+    'remote history bounds rendered rows, rejects stale responses and restores page/scroll after editing',
+    async () => {
+      const pending: {
+        query: HistoryQuery;
+        signal: AbortSignal;
+        resolve: (value: HistoryPage) => void;
+        reject: (reason: Error) => void;
+      }[] = [];
+      const loadPage = (query: HistoryQuery, signal: AbortSignal) =>
+        new Promise<HistoryPage>((resolve, reject) =>
+          pending.push({ query, signal, resolve, reject }),
+        );
+      const pageData = (page: number): HistoryPage => ({
+        page,
+        pageSize: 50,
+        total: 125,
+        averages: {},
+        records: Array.from({ length: page === 3 ? 25 : 50 }, (_, i) => ({
+          ...records[0],
+          id: `remote-${page}-${i}`,
+          kind: 'body',
+          data: { ...(records[0].data as Body), note: `PAGE ${page}` },
+        })),
+      });
+      const props = {
+        kind: 'body',
+        records: [],
+        plans: [],
+        date: '2025-01-31',
+        busy: false,
+        loadPage,
+        remove: async () => {},
+        edit: (_r: Entry, state: HistoryState) => {
+          captured = state;
+        },
+      };
+      await act(async () =>
+        root.render(
+          createElement(HistoryView, {
+            ...props,
+            key: ++key,
+            initialState: {
+              period: 'all',
+              rangeStart: '',
+              rangeEnd: '',
+              condition: 'all',
+              selected: [],
+              scrollTop: 140,
+              page: 2,
+            },
+          }),
+        ),
+      );
+      assert.equal(pending[0].query.page, 2);
+      assert.match(container.textContent, /正在读取/);
+      await act(async () => pending[0].resolve(pageData(2)));
+      assert.equal(visible().length, 50);
+      assert.equal(results().scrollTop, 140);
+      assert.match(container.textContent, /共 125 条 · 第 2 \/ 3 页/);
+      await click('下一页');
+      const stale = pending.at(-1)!;
+      assert.equal(stale.query.page, 3);
+      await click('30 天');
+      const latest = pending.at(-1)!;
+      assert.equal(latest.query.page, 1);
+      assert.equal(stale.signal.aborted, true);
+      await act(async () => stale.resolve(pageData(3)));
+      assert.equal(visible().length, 0);
+      await act(async () => latest.resolve(pageData(1)));
+      assert.equal(visible().length, 50);
+      assert.doesNotMatch(results().textContent, /PAGE 3/);
+      await click('下一页');
+      await act(async () => pending.at(-1)!.reject(new Error('合成网络失败')));
+      assert.match(container.textContent, /合成网络失败/);
+      assert.equal(visible().length, 0);
+      await click('重试读取');
+      await act(async () => pending.at(-1)!.resolve(pageData(2)));
+      results().scrollTop = 240;
+      await act(async () =>
+        container
+          .querySelector<import('happy-dom').HTMLButtonElement>(
+            '[aria-label^="修改"]',
+          )!
+          .click(),
+      );
+      assert.equal(captured!.page, 2);
+      assert.equal(captured!.scrollTop, 240);
+      await act(async () =>
+        root.render(
+          createElement(HistoryView, {
+            ...props,
+            key: ++key,
+            initialState: captured,
+          }),
+        ),
+      );
+      assert.equal(pending.at(-1)!.query.page, 2);
+      await act(async () => pending.at(-1)!.resolve(pageData(2)));
+      assert.equal(results().scrollTop, 240);
     },
   );
 });

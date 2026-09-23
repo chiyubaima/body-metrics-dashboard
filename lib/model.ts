@@ -123,6 +123,7 @@ export type Plan = {
   createdAt: string;
 };
 export type Snapshot = {
+  overview?: import('./dashboard-data.ts').DashboardOverview;
   medals?: import('./medals.ts').MedalView[];
   medalFacts?: import('./medal-facts.ts').MedalFacts;
   records: Entry[];
@@ -199,6 +200,41 @@ export function average(records: Entry[], end: string) {
       : null,
     count: values.length,
   };
+}
+// One immutable index per calculation; no data survives an owner or record change.
+export function morningIndex(records: Entry[]) {
+  const daily = new Map(
+    morningEntries(records, '9999-12-31').map((r) => [
+      r.date,
+      (r.data as Body).weight!,
+    ]),
+  );
+  const dates = [...daily.keys()];
+  function averageAt(end: string) {
+    const values: number[] = [];
+    for (let i = -6; i <= 0; i++) {
+      const value = daily.get(shiftDate(end, i));
+      if (value !== undefined) values.push(value);
+    }
+    return {
+      value: values.length
+        ? values.reduce((a, b) => a + b, 0) / values.length
+        : null,
+      count: values.length,
+    };
+  }
+  function latestAt(end: string) {
+    let lo = 0,
+      hi = dates.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (dates[mid] <= end) lo = mid + 1;
+      else hi = mid;
+    }
+    const date = dates[lo - 1];
+    return date ? { date, value: daily.get(date)! } : null;
+  }
+  return { averageAt, latestAt };
 }
 export function weekCounts(records: Entry[], date: string) {
   const days = weekDates(date);

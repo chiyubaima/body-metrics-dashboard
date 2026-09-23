@@ -26,6 +26,7 @@ import {
   trainingDraft,
 } from '../lib/model.ts';
 import type { Body, Entry } from '../lib/model.ts';
+import { calendarMarks, historyPage } from '../db/dashboard.ts';
 
 // Exercise production queries against real SQLite, with D1's atomic batch contract.
 function connect(path = ':memory:', migrate = true) {
@@ -915,6 +916,109 @@ await test('one cardio session keeps all activities through edits, deletion, res
     state = await snapshot(db, 'alice');
     assert.deepEqual(state.records[0].data, deleted.data);
     assert.equal(weekCounts(state.records, today()).cardio, 1);
+  } finally {
+    close();
+  }
+});
+
+await test('history pagination keeps owner/deletion filters, deterministic pages and complete seven-day averages', async () => {
+  const { db, close } = connect();
+  try {
+    const end = '2026-09-22';
+    for (let i = 0; i < 65; i++) {
+      const date = shiftDate(end, -i);
+      await saveEntry(db, 'alice', body(date, 70 + i / 100));
+      const other = body(date, 100);
+      other.data.condition = 'other';
+      other.data.primary = false;
+      await saveEntry(db, 'alice', other);
+    }
+    await saveEntry(db, 'bob', body(end, 200));
+    const query = (page = 1, condition = 'all') =>
+      new URLSearchParams({
+        kind: 'body',
+        from: '2000-01-01',
+        to: end,
+        page: String(page),
+        condition,
+      });
+    const one = await historyPage(db, 'alice', query());
+    const two = await historyPage(db, 'alice', query(2));
+    const three = await historyPage(db, 'alice', query(3));
+    assert.equal(one.total, 130);
+    assert.deepEqual(
+      [one.records.length, two.records.length, three.records.length],
+      [50, 50, 30],
+    );
+    assert.equal(
+      new Set(
+        [...one.records, ...two.records, ...three.records].map((r) => r.id),
+      ).size,
+      130,
+    );
+    const full = await snapshot(db, 'alice');
+    const filtered = await historyPage(db, 'alice', query(1, 'other'));
+    assert.equal(filtered.total, 65);
+    assert.ok(
+      filtered.records.every((r) => (r.data as Body).condition === 'other'),
+    );
+    for (const page of [one, two, three, filtered])
+      for (const row of page.records)
+        assert.deepEqual(
+          page.averages[row.date],
+          average(full.records, row.date),
+        );
+    await removeEntry(
+      db,
+      'alice',
+      three.records.map((r) => r.id),
+    );
+    const clamped = await historyPage(db, 'alice', query(3));
+    assert.equal(clamped.page, 2);
+    assert.equal(clamped.total, 100);
+    assert.equal(clamped.records.length, 50);
+    await restoreEntry(db, 'alice', three.records[0].id);
+    assert.equal((await historyPage(db, 'alice', query(3))).records.length, 1);
+    assert.equal((await historyPage(db, 'bob', query())).total, 1);
+    assert.equal((await historyPage(db, 'nobody', query())).total, 0);
+    const context = await snapshot(db, 'alice', 'training');
+    assert.equal(context.records.length, 0);
+    const marks = await calendarMarks(
+      db,
+      'alice',
+      new URLSearchParams({ from: '2026-09-01', to: end }),
+    );
+    assert.equal(marks[end].body, true);
+    assert.equal(Object.keys(marks).length, 22);
+    assert.deepEqual(
+      await calendarMarks(
+        db,
+        'nobody',
+        new URLSearchParams({ from: '2026-09-01', to: end }),
+      ),
+      {},
+    );
+    for (const changes of [
+      { page: '0' },
+      { page: '1.1' },
+      { page: 'Infinity' },
+      { kind: "body' OR 1=1--" },
+      { from: '2026-02-30' },
+      { from: '2026-09-23' },
+      { condition: 'wrong' },
+    ]) {
+      const invalid = query();
+      for (const [key, value] of Object.entries(changes))
+        invalid.set(key, value!);
+      await assert.rejects(historyPage(db, 'alice', invalid));
+    }
+    await assert.rejects(
+      calendarMarks(
+        db,
+        'alice',
+        new URLSearchParams({ from: '2026-01-01', to: end }),
+      ),
+    );
   } finally {
     close();
   }

@@ -1,6 +1,6 @@
 'use client';
 import { foodPortionLabel } from '@/lib/food-portions';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import {
   Activity,
@@ -60,6 +60,7 @@ import { referenceFoods } from '@/lib/foods';
 import { displayFoodName } from '@/lib/food-labels';
 import { MealIcon, MacroLine, NutritionRings } from './nutrition';
 type PanelProps = {
+  overview?: import('@/lib/dashboard-data').DashboardOverview;
   records: Entry[];
   plans: Plan[];
   date: string;
@@ -299,15 +300,23 @@ export function BodyPanel(props: PanelProps & { height: number | null }) {
     [morningOnly, setMorningOnly] = useState(true);
   const rows = records.filter((r) => r.kind === 'body' && r.date <= date),
     avg = average(records, date);
-  const waist = rows.find((r) => (r.data as Body).waist !== null),
-    fat = rows.find((r) => (r.data as Body).bodyFat !== null);
-  const points = bodyPoints(
-      records,
-      date,
-      Number(period),
-      metric,
-      metric === 'bmi' || morningOnly,
-      props.height,
+  const waist = props.overview
+      ? props.overview.waist
+      : rows.find((r) => (r.data as Body).waist !== null),
+    fat = props.overview
+      ? props.overview.fat
+      : rows.find((r) => (r.data as Body).bodyFat !== null);
+  const points = useMemo(
+      () =>
+        bodyPoints(
+          records,
+          date,
+          Number(period),
+          metric,
+          metric === 'bmi' || morningOnly,
+          props.height,
+        ),
+      [records, date, period, metric, morningOnly, props.height],
     ),
     has = points.some((p) => p.value !== null);
   return (
@@ -656,7 +665,15 @@ export function TrainingPanel(props: PanelProps) {
   const { records, plans, date, ready, edit, history, plan } = props,
     [selected, setSelected] = useState(''),
     [showAll, setShowAll] = useState(false);
-  const progress = exerciseProgress(records, date);
+  const progress = useMemo(
+    () =>
+      props.overview?.progress ??
+      exerciseProgress(records, date).map((p) => ({
+        ...p,
+        days: p.history.length,
+      })),
+    [props.overview, records, date],
+  );
   const visible = showAll ? progress : progress.slice(0, 3);
   const cp = activePlan(plans, 'training', date),
     target = (cp?.data as TrainingPlan) ?? trainingDraft;
@@ -669,11 +686,13 @@ export function TrainingPanel(props: PanelProps) {
           b.id.localeCompare(a.id),
       ),
     rows = sessions.filter((r) => r.date === date),
-    latest = sessions.find(
-      (r) =>
-        (r.data as Training).status === 'completed' &&
-        (r.data as Training).type !== 'rest',
-    );
+    latest = props.overview
+      ? props.overview.latestTraining
+      : sessions.find(
+          (r) =>
+            (r.data as Training).status === 'completed' &&
+            (r.data as Training).type !== 'rest',
+        );
   const counts = weekCounts(sessions, date),
     goal = target.resistance + target.cardio,
     completed =
@@ -686,7 +705,11 @@ export function TrainingPanel(props: PanelProps) {
         ? latestActivities.reduce((sum, activity) => sum + activity.minutes!, 0)
         : null
       : latestTraining?.minutes;
-  const rating = strengthRating(records, props.profile, date);
+  const rating = useMemo(
+    () =>
+      props.overview?.rating ?? strengthRating(records, props.profile, date),
+    [props.overview, records, props.profile, date],
+  );
   const schedule = cp
     ? target.schedule[weekDates(date).indexOf(date)]
     : 'unplanned';
@@ -909,8 +932,8 @@ export function TrainingPanel(props: PanelProps) {
                       id="strength-exercise-detail"
                     >
                       <p className="chart-note">
-                        {compactDate(item.first.date)} 首次记录 · 共{' '}
-                        {item.history.length} 个训练日
+                        {compactDate(item.first.date)} 首次记录 · 共 {item.days}{' '}
+                        个训练日
                       </p>
                       <TrendChart
                         points={item.history.slice(-12).map((point) => ({

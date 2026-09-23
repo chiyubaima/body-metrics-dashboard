@@ -96,9 +96,11 @@ export function MedalRulePreview({
 export function MedalCard({
   medal,
   children,
+  pending = false,
 }: {
   medal: MedalView;
   children?: ReactNode;
+  pending?: boolean;
 }) {
   return (
     <article
@@ -109,28 +111,38 @@ export function MedalCard({
         <MedalArtwork
           art={medal.art}
           id={medal.id}
-          stage={medal.status === 'active' ? medal.progress.achieved.length : 0}
+          stage={
+            !pending && medal.status === 'active'
+              ? medal.progress.achieved.length
+              : 0
+          }
         />
         <div>
           <small>
-            {medal.proposal
-              ? '新版本待确认'
-              : medal.status === 'draft'
-                ? '勋章草稿'
-                : medal.status === 'archived'
-                  ? '已归档'
-                  : medal.progress.achieved.length
-                    ? '已获得'
-                    : '正在追踪'}
+            {pending
+              ? '进度待刷新'
+              : medal.proposal
+                ? '新版本待确认'
+                : medal.status === 'draft'
+                  ? '勋章草稿'
+                  : medal.status === 'archived'
+                    ? '已归档'
+                    : medal.progress.achieved.length
+                      ? '已获得'
+                      : '正在追踪'}
           </small>
           <h4>{medal.definition.name}</h4>
           <p>{medal.definition.goal}</p>
         </div>
       </div>
-      <MedalRulePreview
-        definition={medal.definition}
-        progress={medal.progress}
-      />
+      {pending ? (
+        <p className="medal-fine">规则已更新，读取最新进度后即可继续。</p>
+      ) : (
+        <MedalRulePreview
+          definition={medal.definition}
+          progress={medal.progress}
+        />
+      )}
       <p className="medal-fine">
         {medal.definition.includeHistory ? '计入已有记录' : '从启用当天开始'}
         {medal.definition.startDate
@@ -185,17 +197,27 @@ export function CaptainMedalCard({
     } | null>(null);
   const fresh = snapshot?.medals?.find((m) => m.id === initial.id);
   const m = fresh && fresh.revision >= local.revision ? fresh : local;
+  const preview = snapshot?.overview?.medalPreviews[m.id];
+  const pending =
+    !!snapshot?.overview &&
+    (m.proposal
+      ? preview?.revision !== m.revision
+      : fresh !== m && m.revision !== initial.revision);
   const view =
     fresh === m && !m.proposal
       ? fresh
-      : snapshot
-        ? medalView(
-            m.proposal ? { ...m, definition: m.proposal, versions: [] } : m,
-            snapshot.records,
-            today(),
-            snapshot.medalFacts,
-          )
-        : initial;
+      : snapshot?.overview
+        ? preview?.revision === m.revision
+          ? preview
+          : { ...initial, ...m, definition: m.proposal ?? m.definition }
+        : snapshot
+          ? medalView(
+              m.proposal ? { ...m, definition: m.proposal, versions: [] } : m,
+              snapshot.records,
+              today(),
+              snapshot.medalFacts,
+            )
+          : initial;
   useEffect(() => {
     let active = true;
     void callMedal(
@@ -251,12 +273,12 @@ export function CaptainMedalCard({
     }
   }
   return (
-    <MedalCard medal={{ ...view, proposal: m.proposal }}>
+    <MedalCard medal={{ ...view, proposal: m.proposal }} pending={pending}>
       <div className="captain-medal-actions">
         {(m.status === 'draft' || m.proposal) && (
           <button
             className="coach-confirm-record"
-            disabled={busy || disabled}
+            disabled={busy || disabled || pending}
             onClick={() =>
               void act(async () => {
                 const saved = await callMedal<Medal>('/api/medals', {
@@ -317,6 +339,19 @@ export function CaptainMedalCard({
               : '生成专属图案'}
         </button>
       </div>
+      {pending && (
+        <button
+          className="coach-chip"
+          disabled={busy || disabled}
+          onClick={() =>
+            void act(async () => {
+              await onChanged?.();
+            })
+          }
+        >
+          刷新进度
+        </button>
+      )}
       {error && <output className="coach-error">{error}</output>}
       {imageJob && (
         <output className="medal-fine">
